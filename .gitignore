@@ -77,4 +77,5 @@ instance/
 # Backup files
 *.bak
 *.backup
-*~
+*~.claude/settings.local.json
+ai_recommendation_history.json
