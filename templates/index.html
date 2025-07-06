@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polarized Training Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .summary-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.2em;
+        }
+        
+        .summary-card .value {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        
+        .summary-card .label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .zone-colors {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .zone-legend {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .zone-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+        
+        .zone1 { background-color: #4CAF50; }
+        .zone2 { background-color: #FF9800; }
+        .zone3 { background-color: #F44336; }
+        
+        .workouts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        
+        .workout-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .workout-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .workout-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 0;
+        }
+        
+        .workout-date {
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        
+        .workout-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 15px;
+        }
+        
+        .zone-breakdown {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            font-size: 0.9em;
+        }
+        
+        .zone-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .zone-percentage {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #7f8c8d;
+            font-size: 1.2em;
+        }
+        
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .time-range-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .time-range-controls label {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .time-range-controls select {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            background: white;
+            font-size: 1em;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        
+        .time-range-controls select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .refresh-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: transform 0.2s;
+        }
+        
+        .refresh-button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .refresh-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .combined-chart {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .combined-chart h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .combined-chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+        
+        .combined-stats {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            font-size: 1.1em;
+            margin-top: 20px;
+        }
+        
+        .combined-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .combined-percentage {
+            font-weight: bold;
+            font-size: 1.3em;
+        }
+        
+        .target-info {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .workouts {
+                grid-template-columns: 1fr;
+            }
+            
+            .workout-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .chart-container {
+                height: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏃‍♂️ Polarized Training Analysis</h1>
+        
+        <div class="zone-colors">
+            <div class="zone-legend">
+                <div class="zone-color zone1"></div>
+                <span>Zone 1: Low Intensity (≤82% Max HR)</span>
+            </div>
+            <div class="zone-legend">
+                <div class="zone-color zone2"></div>
+                <span>Zone 2: Threshold (82-87% Max HR)</span>
+            </div>
+            <div class="zone-legend">
+                <div class="zone-color zone3"></div>
+                <span>Zone 3: High Intensity (≥87% Max HR)</span>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="time-range-controls">
+                <label for="timeRange">Time Range:</label>
+                <select id="timeRange" onchange="filterWorkouts()">
+                    <option value="7">Last 7 days</option>
+                    <option value="14">Last 14 days</option>
+                    <option value="30" selected>Last 30 days</option>
+                    <option value="60">Last 60 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="180">Last 6 months</option>
+                    <option value="365">Last year</option>
+                    <option value="all">All time</option>
+                </select>
+            </div>
+            <button class="refresh-button" onclick="loadData()">🔄 Refresh Data</button>
+        </div>
+        
+        <div id="summary" class="summary" style="display: none;">
+            <div class="summary-card">
+                <h3>Total Workouts</h3>
+                <div class="value" id="total-workouts">-</div>
+                <div class="label">analyzed</div>
+            </div>
+            <div class="summary-card">
+                <h3>Total Time</h3>
+                <div class="value" id="total-time">-</div>
+                <div class="label">minutes</div>
+            </div>
+            <div class="summary-card">
+                <h3>Adherence Score</h3>
+                <div class="value" id="adherence-score">-</div>
+                <div class="label">out of 100</div>
+            </div>
+            <div class="summary-card">
+                <h3>Zone Distribution</h3>
+                <div class="value" id="zone-distribution">-</div>
+                <div class="label">Z1 / Z2 / Z3</div>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading">Loading workout data...</div>
+        <div id="error" class="error" style="display: none;"></div>
+        
+        <div id="combined-chart" class="combined-chart" style="display: none;">
+            <h2>Combined Training Distribution</h2>
+            <div class="combined-chart-container">
+                <canvas id="combinedChart"></canvas>
+            </div>
+            <div class="combined-stats">
+                <div class="combined-stat">
+                    <div class="zone-color zone1"></div>
+                    <div class="combined-percentage" id="combined-zone1">-</div>
+                    <div>Zone 1</div>
+                    <div class="target-info">Target: 80%</div>
+                </div>
+                <div class="combined-stat">
+                    <div class="zone-color zone2"></div>
+                    <div class="combined-percentage" id="combined-zone2">-</div>
+                    <div>Zone 2</div>
+                    <div class="target-info">Target: 10%</div>
+                </div>
+                <div class="combined-stat">
+                    <div class="zone-color zone3"></div>
+                    <div class="combined-percentage" id="combined-zone3">-</div>
+                    <div>Zone 3</div>
+                    <div class="target-info">Target: 10%</div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="workouts" class="workouts"></div>
+    </div>
+
+    <script>
+        let workoutData = null;
+        let filteredActivities = [];
+        let combinedChart = null;
+        
+        async function loadData() {
+            const loadingDiv = document.getElementById('loading');
+            const errorDiv = document.getElementById('error');
+            const workoutsDiv = document.getElementById('workouts');
+            const summaryDiv = document.getElementById('summary');
+            const combinedChartDiv = document.getElementById('combined-chart');
+            const refreshButton = document.querySelector('.refresh-button');
+            
+            loadingDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            workoutsDiv.innerHTML = '';
+            summaryDiv.style.display = 'none';
+            combinedChartDiv.style.display = 'none';
+            refreshButton.disabled = true;
+            refreshButton.textContent = '🔄 Loading...';
+            
+            try {
+                const response = await fetch('/api/workouts');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                workoutData = await response.json();
+                
+                loadingDiv.style.display = 'none';
+                filterWorkouts(); // This will display everything based on current time range
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                loadingDiv.style.display = 'none';
+                errorDiv.style.display = 'block';
+                errorDiv.textContent = `Error loading data: ${error.message}. Make sure to run the analysis first.`;
+            } finally {
+                refreshButton.disabled = false;
+                refreshButton.textContent = '🔄 Refresh Data';
+            }
+        }
+        
+        function filterWorkouts() {
+            if (!workoutData) return;
+            
+            const timeRange = document.getElementById('timeRange').value;
+            const now = new Date();
+            let cutoffDate;
+            
+            if (timeRange === 'all') {
+                cutoffDate = new Date(0); // Beginning of time
+            } else {
+                cutoffDate = new Date(now.getTime() - (parseInt(timeRange) * 24 * 60 * 60 * 1000));
+            }
+            
+            filteredActivities = workoutData.activities.filter(activity => {
+                const activityDate = new Date(activity.date);
+                return activityDate >= cutoffDate;
+            });
+            
+            displaySummary(filteredActivities);
+            displayCombinedChart(filteredActivities);
+            displayWorkouts(filteredActivities);
+        }
+        
+        function displaySummary(activities) {
+            const summaryDiv = document.getElementById('summary');
+            
+            // Calculate summary stats for filtered activities
+            const totalActivities = activities.length;
+            const totalMinutes = activities.reduce((sum, a) => sum + a.duration_minutes, 0);
+            
+            // Calculate weighted zone percentages
+            let totalZone1Minutes = 0;
+            let totalZone2Minutes = 0;
+            let totalZone3Minutes = 0;
+            
+            activities.forEach(activity => {
+                const activityMinutes = activity.duration_minutes;
+                totalZone1Minutes += activityMinutes * (activity.zone1_percent / 100);
+                totalZone2Minutes += activityMinutes * (activity.zone2_percent / 100);
+                totalZone3Minutes += activityMinutes * (activity.zone3_percent / 100);
+            });
+            
+            const zone1Percent = totalMinutes > 0 ? (totalZone1Minutes / totalMinutes) * 100 : 0;
+            const zone2Percent = totalMinutes > 0 ? (totalZone2Minutes / totalMinutes) * 100 : 0;
+            const zone3Percent = totalMinutes > 0 ? (totalZone3Minutes / totalMinutes) * 100 : 0;
+            
+            // Calculate adherence score
+            const zone1Target = 80;
+            const zone2Target = 10;
+            const zone3Target = 10;
+            
+            const zone1Deviation = Math.abs(zone1Percent - zone1Target);
+            const zone2Deviation = Math.abs(zone2Percent - zone2Target);
+            const zone3Deviation = Math.abs(zone3Percent - zone3Target);
+            
+            const totalDeviation = (zone1Deviation * 0.5) + (zone2Deviation * 0.25) + (zone3Deviation * 0.25);
+            const adherenceScore = Math.max(0, 100 - totalDeviation);
+            
+            document.getElementById('total-workouts').textContent = totalActivities;
+            document.getElementById('total-time').textContent = totalMinutes;
+            document.getElementById('adherence-score').textContent = Math.round(adherenceScore);
+            document.getElementById('zone-distribution').textContent = 
+                `${Math.round(zone1Percent)}% / ${Math.round(zone2Percent)}% / ${Math.round(zone3Percent)}%`;
+            
+            summaryDiv.style.display = 'grid';
+        }
+        
+        function displayCombinedChart(activities) {
+            const combinedChartDiv = document.getElementById('combined-chart');
+            
+            if (activities.length === 0) {
+                combinedChartDiv.style.display = 'none';
+                return;
+            }
+            
+            // Calculate combined zone percentages
+            const totalMinutes = activities.reduce((sum, a) => sum + a.duration_minutes, 0);
+            let totalZone1Minutes = 0;
+            let totalZone2Minutes = 0;
+            let totalZone3Minutes = 0;
+            
+            activities.forEach(activity => {
+                const activityMinutes = activity.duration_minutes;
+                totalZone1Minutes += activityMinutes * (activity.zone1_percent / 100);
+                totalZone2Minutes += activityMinutes * (activity.zone2_percent / 100);
+                totalZone3Minutes += activityMinutes * (activity.zone3_percent / 100);
+            });
+            
+            const zone1Percent = totalMinutes > 0 ? (totalZone1Minutes / totalMinutes) * 100 : 0;
+            const zone2Percent = totalMinutes > 0 ? (totalZone2Minutes / totalMinutes) * 100 : 0;
+            const zone3Percent = totalMinutes > 0 ? (totalZone3Minutes / totalMinutes) * 100 : 0;
+            
+            // Update combined stats display
+            document.getElementById('combined-zone1').textContent = Math.round(zone1Percent) + '%';
+            document.getElementById('combined-zone2').textContent = Math.round(zone2Percent) + '%';
+            document.getElementById('combined-zone3').textContent = Math.round(zone3Percent) + '%';
+            
+            // Create or update combined chart
+            const ctx = document.getElementById('combinedChart');
+            if (combinedChart) {
+                combinedChart.destroy();
+            }
+            
+            combinedChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Zone 1\n(Low Intensity)', 'Zone 2\n(Threshold)', 'Zone 3\n(High Intensity)'],
+                    datasets: [{
+                        label: 'Combined Time Distribution',
+                        data: [zone1Percent, zone2Percent, zone3Percent],
+                        backgroundColor: ['#4CAF50', '#FF9800', '#F44336'],
+                        borderColor: ['#388E3C', '#F57C00', '#D32F2F'],
+                        borderWidth: 2
+                    }, {
+                        label: 'Target Distribution',
+                        data: [80, 10, 10],
+                        backgroundColor: ['rgba(76, 175, 80, 0.3)', 'rgba(255, 152, 0, 0.3)', 'rgba(244, 67, 54, 0.3)'],
+                        borderColor: ['#388E3C', '#F57C00', '#D32F2F'],
+                        borderWidth: 2,
+                        borderDash: [5, 5]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.dataset.label || '';
+                                    return `${label}: ${context.parsed.y.toFixed(1)}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Percentage of Time'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                maxRotation: 0,
+                                minRotation: 0
+                            }
+                        }
+                    }
+                }
+            });
+            
+            combinedChartDiv.style.display = 'block';
+        }
+        
+        function displayWorkouts(activities) {
+            const workoutsDiv = document.getElementById('workouts');
+            
+            activities.forEach((activity, index) => {
+                const workoutCard = createWorkoutCard(activity, index);
+                workoutsDiv.appendChild(workoutCard);
+            });
+        }
+        
+        function createWorkoutCard(activity, index) {
+            const card = document.createElement('div');
+            card.className = 'workout-card';
+            
+            const date = new Date(activity.date).toLocaleDateString();
+            const duration = activity.duration_minutes;
+            
+            card.innerHTML = `
+                <div class="workout-header">
+                    <h3 class="workout-title">${activity.name}</h3>
+                    <div class="workout-date">${date}</div>
+                </div>
+                <div class="workout-stats">
+                    <span>Duration: ${duration} min</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="chart-${index}"></canvas>
+                </div>
+                <div class="zone-breakdown">
+                    <div class="zone-stat">
+                        <div class="zone-color zone1"></div>
+                        <div class="zone-percentage">${Math.round(activity.zone1_percent)}%</div>
+                        <div>Zone 1</div>
+                    </div>
+                    <div class="zone-stat">
+                        <div class="zone-color zone2"></div>
+                        <div class="zone-percentage">${Math.round(activity.zone2_percent)}%</div>
+                        <div>Zone 2</div>
+                    </div>
+                    <div class="zone-stat">
+                        <div class="zone-color zone3"></div>
+                        <div class="zone-percentage">${Math.round(activity.zone3_percent)}%</div>
+                        <div>Zone 3</div>
+                    </div>
+                </div>
+            `;
+            
+            // Create chart after the card is added to DOM
+            setTimeout(() => {
+                createChart(activity, index);
+            }, 100);
+            
+            return card;
+        }
+        
+        function createChart(activity, index) {
+            const ctx = document.getElementById(`chart-${index}`);
+            if (!ctx) return;
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Zone 1\n(Low)', 'Zone 2\n(Threshold)', 'Zone 3\n(High)'],
+                    datasets: [{
+                        label: 'Time Distribution',
+                        data: [
+                            activity.zone1_percent,
+                            activity.zone2_percent,
+                            activity.zone3_percent
+                        ],
+                        backgroundColor: ['#4CAF50', '#FF9800', '#F44336'],
+                        borderColor: ['#388E3C', '#F57C00', '#D32F2F'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.parsed.y.toFixed(1)}% of workout time`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Percentage of Time'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                maxRotation: 0,
+                                minRotation: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Load data when page loads
+        document.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+</html>

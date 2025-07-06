@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:pmc.ncbi.nlm.nih.gov)"
+    ],
+    "deny": []
+  }
+}
