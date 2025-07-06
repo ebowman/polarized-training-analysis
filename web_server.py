@@ -13,6 +13,7 @@ import argparse
 import json
 import os
 import sys
+import signal
 import uuid
 import threading
 import time
@@ -561,7 +562,33 @@ def not_found(error):
 def internal_error(error):
     return jsonify({'error': 'Internal server error'}), 500
 
+def cleanup_and_exit():
+    """Clean up resources before shutting down"""
+    print("\n🛑 Shutting down server...")
+    
+    # Cancel any running AI generation threads
+    with ai_sessions_lock:
+        active_sessions = len([s for s in ai_sessions.values() if s.get('status') == 'pending'])
+        if active_sessions > 0:
+            print(f"⏳ Waiting for {active_sessions} AI generation(s) to complete...")
+            # Mark all pending sessions as cancelled
+            for session_id, session_data in ai_sessions.items():
+                if session_data.get('status') == 'pending':
+                    session_data['status'] = 'error'
+                    session_data['error'] = 'Server shutdown'
+    
+    print("✅ Server shutdown complete")
+    sys.exit(0)
+
+def signal_handler(sig, frame):
+    """Handle shutdown signals gracefully"""
+    cleanup_and_exit()
+
 def main():
+    # Set up signal handlers for clean shutdown
+    signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
+    signal.signal(signal.SIGTERM, signal_handler)  # Termination signal
+    
     parser = argparse.ArgumentParser(description="Web server for training analysis visualization")
     parser.add_argument("--port", type=int, default=5000, help="Port to run the server on")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind the server to")
@@ -577,11 +604,11 @@ def main():
     print("=" * 60)
     
     try:
-        app.run(host=args.host, port=args.port, debug=args.debug)
+        app.run(host=args.host, port=args.port, debug=args.debug, threaded=True)
     except KeyboardInterrupt:
-        print("\nServer stopped by user")
+        cleanup_and_exit()
     except Exception as e:
-        print(f"Error starting server: {e}")
+        print(f"💥 Error starting server: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
