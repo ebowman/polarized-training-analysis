@@ -40,8 +40,8 @@ class AIRecommendationEngine:
         self.client = openai.OpenAI(
             api_key=api_key
         )
-        # Use GPT-4 as fallback since o1 may not be available in all accounts
-        self.model = "gpt-4"
+        # Use OpenAI's o3 model for advanced reasoning and analysis
+        self.model = "o3"
     
     def load_user_preferences(self) -> str:
         """Load user workout preferences from markdown file"""

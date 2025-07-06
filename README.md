@@ -19,7 +19,7 @@ This tool downloads your training data from Strava, analyzes your heart rate and
 - Time range filtering (7 days to all time)
 - **📥 One-Click Strava Download** with OAuth2 integration
 - Intelligent workout recommendations with detailed structure and reasoning
-- **🤖 AI-Powered Recommendations** using OpenAI with session-based loading
+- **🤖 AI-Powered Recommendations** using OpenAI o3 with session-based loading
 - Real-time data refresh with smart caching
 - **📋 Recommendation History** with browser-based storage
 - Responsive design for mobile and desktop
@@ -169,8 +169,8 @@ Then open your browser to `http://localhost:5000`
 
 ## AI-Powered Recommendations
 
-### 🤖 **OpenAI Integration**
-The tool now includes AI-powered workout recommendations using OpenAI's API with **session-based processing** for optimal performance:
+### 🤖 **OpenAI o3 Integration**
+The tool now includes AI-powered workout recommendations using OpenAI's advanced o3 model with **session-based processing** for optimal performance:
 
 - **Non-Blocking Generation**: AI recommendations load in background with visual progress
 - **Session Management**: Reliable processing even for slow OpenAI responses
