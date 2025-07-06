@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Workout Preferences & Training Goals</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+        }
+        
+        h3 {
+            color: #7f8c8d;
+        }
+        
+        .equipment-section {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #3498db;
+        }
+        
+        .zone-highlight {
+            background-color: #e8f5e8;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #3498db;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .current-values {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        
+        ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        
+        ul li {
+            padding: 5px 0;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        ul li:last-child {
+            border-bottom: none;
+        }
+        
+        strong {
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Training Analysis</a>
+        
+        <h1>My Workout Preferences & Training Goals</h1>
+
+        <h2>Primary Training Goals</h2>
+        <ul>
+            <li><strong>Cycling FTP Improvement</strong>: Training to raise my cycling Functional Threshold Power (FTP) on Peloton</li>
+            <li><strong>Multi-Modal Fitness</strong>: Developing well-rounded endurance and strength across different exercise modalities</li>
+        </ul>
+
+        <div class="current-values">
+            <strong>Current Configuration:</strong>
+            <ul>
+                <li>Cycling FTP: {{ ftp }} watts</li>
+                <li>Max Heart Rate: {{ max_hr }} bpm</li>
+            </ul>
+        </div>
+
+        <h2>Equipment & Training Modalities</h2>
+
+        <div class="equipment-section">
+            <h3>🚴 Cycling (Peloton)</h3>
+            <ul>
+                <li><strong>Primary Platform</strong>: Peloton bike</li>
+                <li><strong>Focus</strong>: FTP improvement and power development using <strong>Power Zones</strong></li>
+                <li><strong>Current FTP</strong>: {{ ftp }} watts</li>
+                <li><strong>Target FTP</strong>: [Set your goal] watts</li>
+            </ul>
+            
+            <h4>Preferred Power Zone Sessions:</h4>
+            <div class="zone-highlight">
+                <strong>Power Zone 2-3 Endurance Rides</strong> ({{ pz2_range }} - {{ pz3_watts }}W): 60-120 minutes for aerobic base
+                <strong>Power Zone 4 Threshold Work</strong> ({{ pz4_range }}): 20-40 minutes for FTP improvement
+                <strong>Power Zone 5-6 Intervals</strong> ({{ pz5_range }} - {{ pz6_range }}): Short intervals for VO2 max development
+                <strong>Mixed Power Zone Rides</strong>: Combination sessions for variety
+            </div>
+        </div>
+
+        <div class="equipment-section">
+            <h3>🚣 Rowing (Concept2 RowERG)</h3>
+            <ul>
+                <li><strong>Equipment</strong>: Concept2 RowERG</li>
+                <li><strong>Focus</strong>: Cardiovascular endurance using <strong>Heart Rate Zones</strong></li>
+                <li><strong>Max Heart Rate</strong>: {{ max_hr }} bpm</li>
+            </ul>
+            
+            <h4>Preferred HR Zone Sessions:</h4>
+            <div class="zone-highlight">
+                <strong>HR Zone 2 Steady State</strong> ({{ hr2_range }} bpm): 30-60 minutes for cross-training
+                <strong>HR Zone 3-4 Threshold Pieces</strong> ({{ hr3_range }} - {{ hr4_range }} bpm): Interval training
+                <strong>HR Zone 5 Intervals</strong> ({{ hr5_range }} bpm): Short, high-intensity pieces
+                <strong>Technique-focused sessions</strong>: Lower intensity with form emphasis
+            </div>
+        </div>
+
+        <div class="equipment-section">
+            <h3>🏋️ Strength Training</h3>
+            <ul>
+                <li><strong>Equipment</strong>: Dumbbells and bodyweight exercises</li>
+                <li><strong>Focus</strong>: Functional strength using <strong>RPE (Rate of Perceived Exertion)</strong></li>
+            </ul>
+            
+            <h4>Preferred Training Types:</h4>
+            <div class="zone-highlight">
+                <strong>RPE 6-7 Circuits</strong> (moderate intensity): Endurance-focused strength
+                <strong>RPE 7-8 Compound Movements</strong>: Squats, deadlifts, presses for power
+                <strong>RPE 4-5 Mobility/Core</strong>: Recovery and injury prevention
+                <strong>Sport-specific strength</strong>: Movements that support cycling and rowing
+            </div>
+        </div>
+
+        <h2>Weekly Training Preferences</h2>
+
+        <h3>Ideal Weekly Structure</h3>
+        <ul>
+            <li><strong>Total Training Hours</strong>: [Set your target] hours per week</li>
+            <li><strong>High-Intensity Sessions</strong>: 2-3 per week</li>
+            <li><strong>Easy/Recovery Sessions</strong>: 4-5 per week</li>
+            <li><strong>Strength Training</strong>: 2-3 sessions per week</li>
+        </ul>
+
+        <h3>Session Preferences</h3>
+        <ul>
+            <li><strong>Morning vs Evening</strong>: [Your preference]</li>
+            <li><strong>Session Duration</strong>: 
+                <ul style="margin-left: 20px; list-style-type: disc;">
+                    <li>Short sessions: 30-45 minutes</li>
+                    <li>Medium sessions: 60-90 minutes</li>
+                    <li>Long sessions: 2+ hours</li>
+                </ul>
+            </li>
+            <li><strong>Rest Days</strong>: [Your preferred rest day schedule]</li>
+        </ul>
+
+        <h2>Current Fitness Level</h2>
+        <ul>
+            <li><strong>Cycling Experience</strong>: [Beginner/Intermediate/Advanced]</li>
+            <li><strong>Rowing Experience</strong>: [Beginner/Intermediate/Advanced]</li>
+            <li><strong>Strength Training Experience</strong>: [Beginner/Intermediate/Advanced]</li>
+            <li><strong>Weekly Training History</strong>: [How many hours/sessions per week currently]</li>
+        </ul>
+
+        <h2>Constraints & Considerations</h2>
+        <ul>
+            <li><strong>Time Availability</strong>: [Your typical available training windows]</li>
+            <li><strong>Recovery Needs</strong>: [Any specific recovery requirements]</li>
+            <li><strong>Injury History</strong>: [Any relevant injury considerations]</li>
+            <li><strong>Seasonal Goals</strong>: [Any upcoming events or seasonal objectives]</li>
+        </ul>
+
+        <h2>AI Recommendation Preferences</h2>
+        <ul>
+            <li><strong>Workout Types I Enjoy</strong>: [List preferred workout styles]</li>
+            <li><strong>Workout Types I Want to Avoid</strong>: [List any workout types to minimize]</li>
+            <li><strong>Intensity Preference</strong>: [Conservative/Moderate/Aggressive training approach]</li>
+            <li><strong>Variety vs Consistency</strong>: [Prefer varied workouts vs consistent structure]</li>
+        </ul>
+
+        <div style="background-color: #e8f5e8; border: 1px solid #c3e6c3; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p><strong>Note:</strong> This file is used by the AI workout recommendation system to personalize training suggestions based on your goals, equipment, and preferences. Update this file as your goals and circumstances change.</p>
+            <p>The zone ranges shown above are automatically calculated from your current FTP ({{ ftp }}W) and Max HR ({{ max_hr }} bpm) settings.</p>
+        </div>
+    </div>
+</body>
+</html>

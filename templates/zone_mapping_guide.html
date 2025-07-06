@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Zone Mapping Guide</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+        }
+        
+        h3 {
+            color: #7f8c8d;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+        }
+        
+        th, td {
+            border: 1px solid #bdc3c7;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #ecf0f1;
+            font-weight: bold;
+        }
+        
+        .zone-1 { background-color: #d5f4e6; }
+        .zone-2 { background-color: #fef9e7; }
+        .zone-3 { background-color: #fdf2f2; }
+        
+        .code-block {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+            white-space: pre-line;
+        }
+        
+        .highlight {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        
+        .config-box {
+            background-color: #e8f5e8;
+            border: 1px solid #c3e6c3;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #3498db;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Training Analysis</a>
+        
+        <h1>Training Zone Mapping Guide</h1>
+
+        <h2>Understanding Different Zone Systems</h2>
+        <p>There are multiple zone systems used in endurance training. This guide explains how they relate to each other and when to use each system.</p>
+
+        <h2>1. Polarized Training Zones (Research-Based)</h2>
+        <p>The NIH research defines <strong>3 simple zones</strong> for training distribution analysis:</p>
+
+        <table>
+            <tr>
+                <th>Polarized Zone</th>
+                <th>Purpose</th>
+                <th>Target Distribution</th>
+            </tr>
+            <tr class="zone-1">
+                <td><strong>Zone 1</strong></td>
+                <td>Low Intensity / Aerobic Base</td>
+                <td><strong>80%</strong> of training time</td>
+            </tr>
+            <tr class="zone-2">
+                <td><strong>Zone 2</strong></td>
+                <td>Threshold / "Gray Zone"</td>
+                <td><strong>10%</strong> of training time</td>
+            </tr>
+            <tr class="zone-3">
+                <td><strong>Zone 3</strong></td>
+                <td>High Intensity / VO2 Max</td>
+                <td><strong>10%</strong> of training time</td>
+            </tr>
+        </table>
+
+        <h2>2. Power Zones (Cycling - Peloton/FTP Based)</h2>
+        <p>For cycling activities, we use <strong>power zones</strong> based on your Functional Threshold Power (FTP):</p>
+
+        <table>
+            <tr>
+                <th>Power Zone</th>
+                <th>% of FTP</th>
+                <th>Watts (Your FTP: <span id="ftp-value">{{ ftp }}</span>W)</th>
+                <th>Description</th>
+                <th>Maps to Polarized</th>
+            </tr>
+            <tr class="zone-1">
+                <td><strong>Zone 1</strong></td>
+                <td>0-55%</td>
+                <td id="pz1-watts">{{ pz1_range }}</td>
+                <td>Active Recovery</td>
+                <td>Zone 1</td>
+            </tr>
+            <tr class="zone-1">
+                <td><strong>Zone 2</strong></td>
+                <td>55-75%</td>
+                <td id="pz2-watts">{{ pz2_range }}</td>
+                <td>Endurance/Aerobic Base</td>
+                <td>Zone 1</td>
+            </tr>
+            <tr class="zone-1">
+                <td><strong>Zone 3</strong></td>
+                <td>75-90%</td>
+                <td id="pz3-watts">{{ pz3_range }}</td>
+                <td>Tempo</td>
+                <td>Zone 1</td>
+            </tr>
+            <tr class="zone-2">
+                <td><strong>Zone 4</strong></td>
+                <td>90-105%</td>
+                <td id="pz4-watts">{{ pz4_range }}</td>
+                <td>Lactate Threshold</td>
+                <td>Zone 2</td>
+            </tr>
+            <tr class="zone-3">
+                <td><strong>Zone 5</strong></td>
+                <td>105-120%</td>
+                <td id="pz5-watts">{{ pz5_range }}</td>
+                <td>VO2 Max</td>
+                <td>Zone 3</td>
+            </tr>
+            <tr class="zone-3">
+                <td><strong>Zone 6</strong></td>
+                <td>120%+</td>
+                <td id="pz6-watts">{{ pz6_range }}</td>
+                <td>Anaerobic/Neuromuscular</td>
+                <td>Zone 3</td>
+            </tr>
+        </table>
+
+        <div class="code-block">Peloton Power Zone Mapping:
+Polarized Zone 1 (80% target) = Power Zones 1-3 (0-90% FTP)
+Polarized Zone 2 (10% target) = Power Zone 4 (90-105% FTP)  
+Polarized Zone 3 (10% target) = Power Zones 5-6 (105%+ FTP)</div>
+
+        <h2>3. Heart Rate Zones (Rowing/Running - HR Based)</h2>
+        <p>For rowing and other activities without power data, we use <strong>heart rate zones</strong> based on your maximum HR (<span id="max-hr-value">{{ max_hr }}</span> bpm):</p>
+
+        <table>
+            <tr>
+                <th>HR Zone</th>
+                <th>BPM Range</th>
+                <th>% of Max HR</th>
+                <th>Description</th>
+                <th>Maps to Polarized</th>
+            </tr>
+            <tr class="zone-1">
+                <td><strong>Zone 1</strong></td>
+                <td id="hr1-range">{{ hr1_range }}</td>
+                <td>50-70%</td>
+                <td>Recovery/Easy</td>
+                <td>Zone 1</td>
+            </tr>
+            <tr class="zone-1">
+                <td><strong>Zone 2</strong></td>
+                <td id="hr2-range">{{ hr2_range }}</td>
+                <td>70-82%</td>
+                <td>Aerobic Base</td>
+                <td>Zone 1</td>
+            </tr>
+            <tr class="zone-2">
+                <td><strong>Zone 3</strong></td>
+                <td id="hr3-range">{{ hr3_range }}</td>
+                <td>82-87%</td>
+                <td>Aerobic Threshold</td>
+                <td>Zone 2</td>
+            </tr>
+            <tr class="zone-2">
+                <td><strong>Zone 4</strong></td>
+                <td id="hr4-range">{{ hr4_range }}</td>
+                <td>87-93%</td>
+                <td>Lactate Threshold</td>
+                <td>Zone 2</td>
+            </tr>
+            <tr class="zone-3">
+                <td><strong>Zone 5</strong></td>
+                <td id="hr5-range">{{ hr5_range }}</td>
+                <td>93%+</td>
+                <td>VO2 Max/Anaerobic</td>
+                <td>Zone 3</td>
+            </tr>
+        </table>
+
+        <div class="code-block">Rowing Heart Rate Zone Mapping:
+Polarized Zone 1 (80% target) = HR Zones 1-2 ({{ hr_zone1_combined }})
+Polarized Zone 2 (10% target) = HR Zones 3-4 ({{ hr_zone2_combined }})
+Polarized Zone 3 (10% target) = HR Zone 5 ({{ hr_zone3_combined }})</div>
+
+        <h2>4. Activity-Specific Recommendations</h2>
+
+        <h3>🚴 <strong>Cycling (Peloton) - Use Power Zones</strong></h3>
+        <ul>
+            <li><strong>"Power Zone 2 Endurance Ride"</strong> instead of "Zone 1 Easy Ride"</li>
+            <li><strong>"Power Zone 4 Threshold Intervals"</strong> instead of "Zone 2 Threshold"</li>
+            <li><strong>"Power Zone 5 VO2 Max Intervals"</strong> instead of "Zone 3 High Intensity"</li>
+        </ul>
+        <p><em>Example: "Power Zone 2-3 endurance ride for 90 minutes (65-85% FTP) to build aerobic base"</em></p>
+
+        <h3>🚣 <strong>Rowing (Concept2) - Use Heart Rate Zones</strong></h3>
+        <ul>
+            <li><strong>"HR Zone 2 Steady State"</strong> instead of "Zone 1 Easy"</li>
+            <li><strong>"HR Zone 4 Threshold Pieces"</strong> instead of "Zone 2 Threshold"</li>
+            <li><strong>"HR Zone 5 Intervals"</strong> instead of "Zone 3 High Intensity"</li>
+        </ul>
+        <p><em>Example: "HR Zone 2 steady state for 45 minutes ({{ hr2_range }}) for cross-training recovery"</em></p>
+
+        <h3>🏋️ <strong>Strength Training - Different System</strong></h3>
+        <p>Strength training uses different metrics:</p>
+        <ul>
+            <li><strong>RPE (Rate of Perceived Exertion)</strong>: 1-10 scale</li>
+            <li><strong>% of 1RM</strong>: Percentage of one-rep maximum</li>
+            <li><strong>Time-based</strong>: Duration rather than intensity zones</li>
+        </ul>
+
+        <div class="config-box">
+            <h3>5. Your Current Configuration</h3>
+            <ul>
+                <li><strong>Cycling FTP</strong>: {{ ftp }} watts (for power zone calculations)</li>
+                <li><strong>Max Heart Rate</strong>: {{ max_hr }} bpm (for HR zone calculations)</li>
+                <li><strong>Rowing FTP</strong>: Not set (will use HR zones for rowing)</li>
+            </ul>
+        </div>
+
+        <h2>6. Practical Examples</h2>
+
+        <h3>Polarized Training Distribution (Last 14 Days)</h3>
+        <div class="code-block">Zone 1 (Low): 75% [Target: 80%] ← Based on all activities combined
+Zone 2 (Threshold): 15% [Target: 10%]
+Zone 3 (High): 10% [Target: 10%]</div>
+
+        <h3>Specific Workout Recommendations</h3>
+        <div class="code-block">🚴 "60-min Power Zone 2 Endurance Ride (65-75% FTP)"
+🚣 "45-min HR Zone 2 Steady State ({{ hr2_range }})"
+🏋️ "30-min Functional Strength Circuit (RPE 6-7)"</div>
+
+        <div class="highlight">
+            <h3>7. Why This Approach?</h3>
+            <ol>
+                <li><strong>Scientific Accuracy</strong>: Uses the most precise measurement available for each activity</li>
+                <li><strong>Practical Application</strong>: Aligns with how athletes actually train</li>
+                <li><strong>Equipment-Specific</strong>: Matches the tools and metrics you're already using</li>
+                <li><strong>Clear Communication</strong>: Eliminates confusion between different zone systems</li>
+            </ol>
+            <p>This way, you get polarized training analysis for overall planning, but specific power zone guidance for Peloton rides and heart rate zone guidance for rowing!</p>
+        </div>
+    </div>
+</body>
+</html>

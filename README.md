@@ -17,8 +17,11 @@ This tool downloads your training data from Strava, analyzes your heart rate and
 - Interactive bar charts for each workout showing zone distribution
 - Combined chart showing aggregate training distribution vs. targets
 - Time range filtering (7 days to all time)
+- **📥 One-Click Strava Download** with OAuth2 integration
 - Intelligent workout recommendations with detailed structure and reasoning
-- Real-time data refresh with caching
+- **🤖 AI-Powered Recommendations** using OpenAI with session-based loading
+- Real-time data refresh with smart caching
+- **📋 Recommendation History** with browser-based storage
 - Responsive design for mobile and desktop
 
 ### 📈 **Training Analysis**
@@ -66,7 +69,9 @@ The tool generates specific, actionable workout recommendations using advanced a
 - 💡 🟡 Tempo workout (45m): "Optional technique work to maintain neuromuscular fitness"
 
 ### 🔄 **Data Integration**
-- Automatic Strava API integration with caching
+- **One-Click Download**: OAuth2 integration for seamless Strava authorization
+- **Smart Caching**: Only downloads new activities, preserves existing cache
+- **Background Processing**: Non-blocking downloads with progress indicators
 - Downloads activity details and streams (heart rate, power, time)
 - Respects API rate limits with intelligent caching
 
@@ -103,6 +108,12 @@ STRAVA_CLIENT_SECRET=your_client_secret_here
 # Training Analysis Configuration
 MAX_HEART_RATE=180
 FTP=250
+
+# OpenAI API Configuration (for AI recommendations)
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Flask Configuration (for web security)
+FLASK_SECRET_KEY=your_secret_key_here
 ```
 
 ## Strava API Setup
@@ -114,6 +125,15 @@ FTP=250
 4. Note your Client ID and Client Secret
 
 ### 2. Authorization
+You can authorize the application in two ways:
+
+**Option A: Web Interface (Recommended)**
+1. Start the web server: `python web_server.py`
+2. Open your browser to `http://localhost:5000`
+3. Click "📥 Download Latest" to begin OAuth2 flow
+4. Authorize with Strava in your browser
+
+**Option B: Command Line**
 ```bash
 python strava_fetch.py --authorize
 ```
@@ -147,6 +167,54 @@ python web_server.py --port 8080 --host 0.0.0.0
 
 Then open your browser to `http://localhost:5000`
 
+## AI-Powered Recommendations
+
+### 🤖 **OpenAI Integration**
+The tool now includes AI-powered workout recommendations using OpenAI's API with **session-based processing** for optimal performance:
+
+- **Non-Blocking Generation**: AI recommendations load in background with visual progress
+- **Session Management**: Reliable processing even for slow OpenAI responses
+- **Personalized Plans**: Based on your training goals, equipment, and recent data
+- **Your Training Goals**: Customizable preferences in `workout_preferences.md`
+- **Equipment Available**: Peloton, Concept2 RowERG, dumbbells, bodyweight
+- **Recent Training Data**: Your last 14 days of Strava activities
+- **NIH Research**: Evidence-based polarized training principles
+- **Personal Context**: FTP goals, training history, recovery needs
+
+### 📝 **Customizing Your Preferences**
+Edit `workout_preferences.md` to personalize AI recommendations:
+
+```markdown
+## Primary Training Goals
+- **Cycling FTP Improvement**: Training to raise my cycling FTP on Peloton
+- **Multi-Modal Fitness**: Rowing, strength training, etc.
+
+## Equipment & Training Modalities
+- **Peloton bike**: FTP improvement and power development
+- **Concept2 RowERG**: Cardiovascular endurance
+- **Dumbbells**: Functional strength training
+```
+
+### 🔄 **Using AI Features**
+1. **Automatic Recommendations**: AI suggestions start generating when you load the dashboard
+2. **Background Processing**: Shows progress spinner while OpenAI generates recommendations
+3. **Refresh for Variety**: Click "🔄 Refresh AI" for different workout options
+4. **View History**: Click "📋 History" to see previous AI recommendations
+5. **Equipment-Specific**: Each recommendation specifies required equipment
+6. **Reliable Loading**: Session-based system handles slow/failed API responses gracefully
+
+### 💡 **AI Recommendation Examples**
+- **"Power Zone 2 Endurance Ride (90m)"** - Structured power zone training for base building
+- **"HR Zone 2 Steady State Row (45m)"** - Cross-training at 120-140 bpm for recovery
+- **"Functional Strength Circuit (30m)"** - RPE 6-7 strength training for endurance athletes
+
+### 🔧 **Setup Requirements**
+1. Get an OpenAI API key from [platform.openai.com](https://platform.openai.com)
+2. Add it to your `.env` file: `OPENAI_API_KEY=your_key_here`
+3. Restart the web server to enable AI features
+
+If you don't have an OpenAI API key, the tool will still work perfectly with the built-in algorithm-based recommendations.
+
 ### Data Management
 
 #### Fetch New Data
@@ -158,17 +226,32 @@ python strava_fetch.py --count 20
 python strava_fetch.py --count 10
 ```
 
-## Training Zones
+## Training Zone Systems
 
-### Heart Rate Zones
-- **Zone 1**: ≤ 82% of Max HR (Low Intensity)
-- **Zone 2**: 82-87% of Max HR (Threshold)
-- **Zone 3**: ≥ 87% of Max HR (High Intensity)
+This tool uses multiple zone systems to provide the most accurate training guidance:
 
-### Power Zones
-- **Zone 1**: ≤ 65% of FTP (Low Intensity)
-- **Zone 2**: 65-88% of FTP (Threshold)
-- **Zone 3**: ≥ 88% of FTP (High Intensity)
+### 📊 **Polarized Training Zones (for overall analysis)**
+Research-based 3-zone system for training distribution:
+- **Polarized Zone 1**: Low Intensity - **80%** target (aerobic base)
+- **Polarized Zone 2**: Threshold - **10%** target (lactate threshold)  
+- **Polarized Zone 3**: High Intensity - **10%** target (VO2 max)
+
+### 🚴 **Power Zones (for Peloton cycling)**
+Activity-specific zones based on your FTP (301W):
+- **Power Zone 1-3**: 0-90% FTP → Maps to Polarized Zone 1
+- **Power Zone 4**: 90-105% FTP → Maps to Polarized Zone 2
+- **Power Zone 5-6**: 105%+ FTP → Maps to Polarized Zone 3
+
+### 🚣 **Heart Rate Zones (for rowing/other activities)**
+Activity-specific zones based on max HR (171 bpm):
+- **HR Zone 1-2**: 86-140 bpm → Maps to Polarized Zone 1
+- **HR Zone 3-4**: 140-159 bpm → Maps to Polarized Zone 2
+- **HR Zone 5**: 159+ bpm → Maps to Polarized Zone 3
+
+### 🏋️ **Strength Training**
+Uses RPE (Rate of Perceived Exertion) 1-10 scale instead of zones.
+
+**📖 See `zone_mapping_guide.md` for detailed explanations and examples.**
 
 ## File Structure
 
@@ -222,10 +305,22 @@ python strava_fetch.py --count 10
 
 ## API Endpoints
 
+### Core Endpoints
 - `GET /` - Web dashboard
 - `GET /api/workouts` - Get workout data as JSON
 - `GET /api/workouts/refresh` - Force refresh workout data
 - `GET /api/status` - Server status and cache info
+
+### OAuth2 & Data Download
+- `GET /download-workouts` - Initiate Strava OAuth2 flow
+- `GET /auth/callback` - Handle OAuth2 callback from Strava
+- `GET /download-progress` - Show download progress page
+- `POST /api/download-workouts` - Download latest workouts from Strava
+
+### AI Recommendations (Session-Based)
+- `GET /api/ai-status/<session_id>` - Check AI generation status (pending/ready/error)
+- `POST /api/ai-recommendations/refresh` - Start new AI generation session
+- `GET /api/ai-recommendations/history` - Get AI recommendation history
 
 ## Troubleshooting
 

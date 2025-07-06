@@ -3,3 +3,4 @@ python-dotenv==1.1.1
 pandas==2.3.0
 numpy
 flask
+openai>=1.30.0

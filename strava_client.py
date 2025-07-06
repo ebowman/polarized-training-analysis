@@ -44,10 +44,11 @@ class StravaClient:
         with open(token_file, 'w') as f:
             json.dump(tokens, f)
     
-    def get_authorization_url(self) -> str:
+    def get_authorization_url(self, redirect_uri: str = None) -> str:
         """Get URL for OAuth authorization"""
         scope = "read,activity:read_all,profile:read_all"
-        redirect_uri = "http://localhost:8080/callback"
+        if redirect_uri is None:
+            redirect_uri = "http://localhost:8080/callback"
         return (f"https://www.strava.com/oauth/authorize?"
                 f"client_id={self.client_id}&"
                 f"response_type=code&"
