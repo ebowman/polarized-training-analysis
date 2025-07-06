@@ -69,6 +69,9 @@ def get_training_data(force_refresh=False):
         # Calculate distribution
         distribution = analyzer.calculate_training_distribution(analyses)
         
+        # Get workout recommendations (uses fixed 14-day window internally)
+        recommendations = analyzer.get_workout_recommendations(analyses)
+        
         # Format data for web interface
         data = {
             'config': {
@@ -85,6 +88,18 @@ def get_training_data(force_refresh=False):
                 'adherence_score': distribution.adherence_score,
                 'recommendations': distribution.recommendations
             },
+            'workout_recommendations': [
+                {
+                    'workout_type': rec.workout_type.value,
+                    'primary_zone': rec.primary_zone,
+                    'duration_minutes': rec.duration_minutes,
+                    'description': rec.description,
+                    'structure': rec.structure,
+                    'reasoning': rec.reasoning,
+                    'priority': rec.priority
+                }
+                for rec in recommendations
+            ],
             'activities': [
                 {
                     'id': a.activity_id,

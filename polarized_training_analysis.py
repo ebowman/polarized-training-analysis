@@ -95,6 +95,9 @@ def main():
         # Calculate training distribution
         distribution = analyzer.calculate_training_distribution(analyses)
         
+        # Get workout recommendations (uses fixed 14-day window internally)
+        recommendations = analyzer.get_workout_recommendations(analyses)
+        
         # Generate report
         report = analyzer.generate_report(distribution, analyses)
         
@@ -113,9 +116,22 @@ def main():
         print(f"Zone 3 (High): {distribution.zone3_percent:.1f}% [Target: 10%]")
         print(f"Adherence Score: {distribution.adherence_score:.1f}/100")
         
-        print(f"\nTop Recommendations:")
+        print(f"\nGeneral Recommendations:")
         for i, rec in enumerate(distribution.recommendations[:3], 1):
             print(f"  {i}. {rec}")
+        
+        print(f"\n🎯 Next Workout Recommendations (based on last 14 days):")
+        for i, rec in enumerate(recommendations, 1):
+            duration_hours = rec.duration_minutes // 60
+            duration_mins = rec.duration_minutes % 60
+            duration_str = f"{duration_hours}h {duration_mins}m" if duration_hours > 0 else f"{rec.duration_minutes}m"
+            
+            zone_icon = "🟢" if rec.primary_zone == 1 else "🟡" if rec.primary_zone == 2 else "🔴"
+            priority_icon = "🚨" if rec.priority == "high" else "⚠️" if rec.priority == "medium" else "💡"
+            
+            print(f"\n  {i}. {priority_icon} {zone_icon} {rec.description} ({duration_str})")
+            print(f"     Structure: {rec.structure}")
+            print(f"     Why: {rec.reasoning}")
         
         print(f"\n✅ Full report saved to: {args.output}")
         
@@ -136,6 +152,18 @@ def main():
                 'adherence_score': distribution.adherence_score,
                 'recommendations': distribution.recommendations
             },
+            'workout_recommendations': [
+                {
+                    'workout_type': rec.workout_type.value,
+                    'primary_zone': rec.primary_zone,
+                    'duration_minutes': rec.duration_minutes,
+                    'description': rec.description,
+                    'structure': rec.structure,
+                    'reasoning': rec.reasoning,
+                    'priority': rec.priority
+                }
+                for rec in recommendations
+            ],
             'activities': [
                 {
                     'id': a.activity_id,

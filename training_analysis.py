@@ -15,6 +15,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
+from enum import Enum
 import numpy as np
 from dotenv import load_dotenv
 
@@ -71,6 +72,26 @@ class ActivityAnalysis:
     zone3_percent: float
     average_hr: Optional[int] = None
     average_power: Optional[int] = None
+
+class WorkoutType(Enum):
+    """Types of recommended workouts"""
+    EASY_AEROBIC = "easy_aerobic"
+    LONG_AEROBIC = "long_aerobic" 
+    TEMPO = "tempo"
+    THRESHOLD = "threshold"
+    INTERVALS = "intervals"
+    RECOVERY = "recovery"
+
+@dataclass
+class WorkoutRecommendation:
+    """Workout recommendation with specific details"""
+    workout_type: WorkoutType
+    primary_zone: int
+    duration_minutes: int
+    description: str
+    structure: str
+    reasoning: str
+    priority: str  # "high", "medium", "low"
 
 @dataclass
 class TrainingDistribution:
@@ -331,3 +352,278 @@ class TrainingAnalyzer:
                 report.append(f"    Avg Power: {analysis.average_power}W")
         
         return "\n".join(report)
+    
+    def _filter_activities_for_recommendations(self, analyses: List[ActivityAnalysis], 
+                                             days: int = 14) -> List[ActivityAnalysis]:
+        """Filter activities to recent period for recommendation analysis (research-based 14-day window)"""
+        if not analyses:
+            return []
+        
+        cutoff_date = datetime.now() - timedelta(days=days)
+        filtered = []
+        
+        for analysis in analyses:
+            try:
+                # Handle both ISO format with and without timezone
+                activity_date_str = analysis.date.replace('Z', '+00:00') if analysis.date.endswith('Z') else analysis.date
+                activity_date = datetime.fromisoformat(activity_date_str).replace(tzinfo=None)
+                
+                if activity_date >= cutoff_date:
+                    filtered.append(analysis)
+            except (ValueError, AttributeError):
+                # Skip activities with invalid dates
+                continue
+        
+        return filtered
+    
+    def get_workout_recommendations(self, all_analyses: List[ActivityAnalysis],
+                                  target_weekly_hours: float = 8.0) -> List[WorkoutRecommendation]:
+        """Generate workout recommendations based on research-backed 14-day analysis window"""
+        recommendations = []
+        
+        # Filter to last 14 days for recommendations (research-based window)
+        recent_analyses = self._filter_activities_for_recommendations(all_analyses, days=14)
+        
+        if not recent_analyses:
+            # If no recent activities, provide general guidance
+            recommendations.append(WorkoutRecommendation(
+                workout_type=WorkoutType.EASY_AEROBIC,
+                primary_zone=1,
+                duration_minutes=60,
+                description="Easy aerobic base workout",
+                structure="60 minutes easy pace in Zone 1 to restart training",
+                reasoning="No recent training data found. Start with easy aerobic base work",
+                priority="high"
+            ))
+            return recommendations
+        
+        # Calculate distribution for recent 14-day period
+        recent_distribution = self.calculate_training_distribution(recent_analyses)
+        
+        # Calculate deviations from target based on recent training
+        zone1_deviation = recent_distribution.zone1_percent - self.target_zone1_percent
+        zone2_deviation = recent_distribution.zone2_percent - self.target_zone2_percent 
+        zone3_deviation = recent_distribution.zone3_percent - self.target_zone3_percent
+        
+        # Calculate absolute time considerations
+        total_training_minutes = recent_distribution.total_minutes
+        weekly_volume = total_training_minutes / 2  # 14 days = 2 weeks
+        zone3_minutes = recent_distribution.zone3_minutes
+        zone1_minutes = recent_distribution.zone1_minutes
+        
+        # Minimum thresholds based on research (per week)
+        min_zone3_per_week = 30  # Minimum 30 minutes/week of Zone 3 for fitness maintenance
+        min_total_volume_per_week = 180  # Minimum 3 hours/week for meaningful training
+        
+        # Analyze recent workout pattern
+        last_workout_zones = self._analyze_recent_pattern(recent_analyses)
+        days_since_last_intensity = self._days_since_last_intensity(recent_analyses)
+        
+        # Primary recommendation based on both percentages AND absolute time considerations
+        
+        # Check absolute volume first - insufficient total training
+        if weekly_volume < min_total_volume_per_week:
+            recommendations.append(self._recommend_volume_increase(weekly_volume, min_total_volume_per_week))
+        
+        # Check Zone 3 absolute time - insufficient high intensity
+        elif (zone3_minutes / 2) < min_zone3_per_week and days_since_last_intensity > 4:
+            recommendations.append(self._recommend_intensity_workout_volume(zone3_minutes / 2, days_since_last_intensity))
+        
+        # Check Zone 1 percentage deviation - need more aerobic base
+        elif zone1_deviation < -10 or (zone1_minutes < total_training_minutes * 0.7):
+            recommendations.append(self._recommend_aerobic_workout(zone1_deviation, target_weekly_hours, zone1_minutes))
+        
+        # Check Zone 2 excess - too much threshold work
+        elif zone2_deviation > 5:
+            recommendations.append(self._recommend_polarize_workout())
+        
+        # Check Zone 3 percentage deviation - need intensity but have minimum volume
+        elif zone3_deviation < -3 and days_since_last_intensity > 3:
+            recommendations.append(self._recommend_intensity_workout(days_since_last_intensity))
+        
+        # Balanced approach - maintain good distribution
+        else:
+            recommendations.append(self._recommend_balanced_workout(recent_distribution, last_workout_zones))
+        
+        # Secondary recommendations
+        recommendations.extend(self._get_secondary_recommendations(recent_distribution, recent_analyses))
+        
+        return recommendations[:3]  # Return top 3 recommendations
+    
+    def _analyze_recent_pattern(self, recent_analyses: List[ActivityAnalysis]) -> Dict[str, int]:
+        """Analyze pattern of recent workouts"""
+        if not recent_analyses:
+            return {"zone1": 0, "zone2": 0, "zone3": 0}
+        
+        # Look at last 3 workouts
+        last_3 = recent_analyses[-3:]
+        pattern = {"zone1": 0, "zone2": 0, "zone3": 0}
+        
+        for analysis in last_3:
+            dominant_zone = max(
+                [(1, analysis.zone1_percent), 
+                 (2, analysis.zone2_percent), 
+                 (3, analysis.zone3_percent)],
+                key=lambda x: x[1]
+            )[0]
+            pattern[f"zone{dominant_zone}"] += 1
+        
+        return pattern
+    
+    def _days_since_last_intensity(self, recent_analyses: List[ActivityAnalysis]) -> int:
+        """Calculate days since last high-intensity workout"""
+        if not recent_analyses:
+            return 7
+        
+        for i, analysis in enumerate(reversed(recent_analyses)):
+            if analysis.zone3_percent > 15:  # Significant Zone 3 time
+                return i
+        
+        return 7  # Default if no recent intensity found
+    
+    def _recommend_volume_increase(self, current_weekly_volume: float, min_weekly_volume: float) -> WorkoutRecommendation:
+        """Recommend increasing overall training volume"""
+        volume_deficit = min_weekly_volume - current_weekly_volume
+        
+        return WorkoutRecommendation(
+            workout_type=WorkoutType.EASY_AEROBIC,
+            primary_zone=1,
+            duration_minutes=int(volume_deficit * 0.6),  # 60% of deficit in one workout
+            description="Volume building aerobic workout",
+            structure=f"{int(volume_deficit * 0.6)} minutes easy pace in Zone 1 to build training volume",
+            reasoning=f"Your weekly training volume ({current_weekly_volume:.0f}min) is below minimum recommended ({min_weekly_volume}min)",
+            priority="high"
+        )
+    
+    def _recommend_intensity_workout_volume(self, current_zone3_per_week: float, days_since_intensity: int) -> WorkoutRecommendation:
+        """Recommend intensity workout based on insufficient Zone 3 time"""
+        return WorkoutRecommendation(
+            workout_type=WorkoutType.INTERVALS,
+            primary_zone=3,
+            duration_minutes=75,
+            description="High-intensity interval session",
+            structure="15min warmup + 4x5min @ Zone 3 (3min recovery) + 15min cooldown",
+            reasoning=f"You're only getting {current_zone3_per_week:.0f}min/week of Zone 3 (need ≥30min) and it's been {days_since_intensity} days",
+            priority="high"
+        )
+    
+    def _recommend_aerobic_workout(self, zone1_deviation: float, target_weekly_hours: float, zone1_minutes: float = None) -> WorkoutRecommendation:
+        """Recommend aerobic base workout"""
+        severity = abs(zone1_deviation)
+        
+        if severity > 20:
+            duration = int(target_weekly_hours * 60 * 0.4)  # 40% of weekly volume
+            workout_type = WorkoutType.LONG_AEROBIC
+            description = "Long aerobic base ride/run"
+            structure = f"{duration} minutes steady in Zone 1 (≤{self.hr_zones.zone1_max} bpm)"
+            priority = "high"
+        else:
+            duration = int(target_weekly_hours * 60 * 0.25)  # 25% of weekly volume
+            workout_type = WorkoutType.EASY_AEROBIC
+            description = "Easy aerobic workout"
+            structure = f"{duration} minutes easy pace in Zone 1"
+            priority = "medium"
+        
+        return WorkoutRecommendation(
+            workout_type=workout_type,
+            primary_zone=1,
+            duration_minutes=duration,
+            description=description,
+            structure=structure,
+            reasoning=f"You need {abs(zone1_deviation):.1f}% more Zone 1 training to reach the 80% target",
+            priority=priority
+        )
+    
+    def _recommend_intensity_workout(self, days_since_intensity: int) -> WorkoutRecommendation:
+        """Recommend high-intensity workout"""
+        if days_since_intensity > 5:
+            return WorkoutRecommendation(
+                workout_type=WorkoutType.INTERVALS,
+                primary_zone=3,
+                duration_minutes=75,
+                description="High-intensity interval session",
+                structure="15min warmup + 5x4min @ Zone 3 (3min recovery) + 15min cooldown",
+                reasoning=f"It's been {days_since_intensity} days since your last high-intensity session",
+                priority="high"
+            )
+        else:
+            return WorkoutRecommendation(
+                workout_type=WorkoutType.THRESHOLD,
+                primary_zone=2,
+                duration_minutes=60,
+                description="Threshold workout",
+                structure="15min warmup + 3x8min @ Zone 2 (3min recovery) + 10min cooldown",
+                reasoning="Maintain fitness with moderate threshold work",
+                priority="medium"
+            )
+    
+    def _recommend_polarize_workout(self) -> WorkoutRecommendation:
+        """Recommend workout to reduce Zone 2 time"""
+        return WorkoutRecommendation(
+            workout_type=WorkoutType.EASY_AEROBIC,
+            primary_zone=1,
+            duration_minutes=90,
+            description="Strict aerobic workout",
+            structure=f"90 minutes strictly below {self.hr_zones.zone1_max} bpm - avoid the 'gray zone'",
+            reasoning="You have too much Zone 2 training. Focus on pure aerobic base work",
+            priority="high"
+        )
+    
+    def _recommend_balanced_workout(self, distribution: TrainingDistribution, 
+                                   last_workout_zones: Dict[str, int]) -> WorkoutRecommendation:
+        """Recommend workout for balanced training"""
+        # If last workout was intense, recommend easy
+        if last_workout_zones.get("zone3", 0) > 0:
+            return WorkoutRecommendation(
+                workout_type=WorkoutType.EASY_AEROBIC,
+                primary_zone=1,
+                duration_minutes=60,
+                description="Recovery/easy aerobic workout",
+                structure="60 minutes easy pace in Zone 1 for active recovery",
+                reasoning="Active recovery after recent intensity work",
+                priority="medium"
+            )
+        
+        # Otherwise recommend based on weekly pattern
+        return WorkoutRecommendation(
+            workout_type=WorkoutType.LONG_AEROBIC,
+            primary_zone=1,
+            duration_minutes=120,
+            description="Aerobic base building workout",
+            structure="2 hours steady aerobic pace - focus on efficiency and endurance",
+            reasoning="Your training is well-balanced. Continue building aerobic base",
+            priority="medium"
+        )
+    
+    def _get_secondary_recommendations(self, distribution: TrainingDistribution,
+                                     recent_analyses: List[ActivityAnalysis]) -> List[WorkoutRecommendation]:
+        """Get additional workout recommendations"""
+        secondary = []
+        
+        # Always suggest recovery if needed
+        if len(recent_analyses) >= 3:
+            recent_intensity = sum(1 for a in recent_analyses[-3:] if a.zone3_percent > 10)
+            if recent_intensity >= 2:
+                secondary.append(WorkoutRecommendation(
+                    workout_type=WorkoutType.RECOVERY,
+                    primary_zone=1,
+                    duration_minutes=45,
+                    description="Active recovery session",
+                    structure="45 minutes very easy pace with mobility work",
+                    reasoning="You've had multiple intense sessions recently",
+                    priority="low"
+                ))
+        
+        # Suggest technique work
+        if distribution.zone2_percent < 15:  # If not overdoing Zone 2
+            secondary.append(WorkoutRecommendation(
+                workout_type=WorkoutType.TEMPO,
+                primary_zone=2,
+                duration_minutes=45,
+                description="Tempo/technique workout",
+                structure="10min warmup + 20min @ tempo pace (Zone 2) + 15min cooldown",
+                reasoning="Optional tempo work to maintain neuromuscular fitness",
+                priority="low"
+            ))
+        
+        return secondary

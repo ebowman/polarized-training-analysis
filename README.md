@@ -9,7 +9,7 @@ The polarized training approach suggests that endurance athletes should spend ap
 - **10%** of training time in Zone 2 (Threshold)  
 - **10%** of training time in Zone 3 (High Intensity)
 
-This tool downloads your training data from Strava, analyzes your heart rate and power zones, and provides detailed insights into how well you're following this proven training methodology.
+This tool downloads your training data from Strava, analyzes your heart rate and power zones, and provides detailed insights into how well you're following this proven training methodology. It also generates intelligent, research-based workout recommendations to help you maintain optimal training distribution.
 
 ## Features
 
@@ -17,14 +17,53 @@ This tool downloads your training data from Strava, analyzes your heart rate and
 - Interactive bar charts for each workout showing zone distribution
 - Combined chart showing aggregate training distribution vs. targets
 - Time range filtering (7 days to all time)
-- Real-time data refresh
+- Intelligent workout recommendations with detailed structure and reasoning
+- Real-time data refresh with caching
 - Responsive design for mobile and desktop
 
 ### 📈 **Training Analysis**
 - Heart rate zone analysis based on maximum heart rate
 - Power zone analysis based on Functional Threshold Power (FTP)
 - Adherence scoring (0-100 scale)
-- Personalized recommendations for training optimization
+- Research-based workout recommendations with dual-window approach
+
+### 🕐 **Dual-Window Analysis Approach**
+Based on sports science research, the tool uses two different time windows:
+
+- **Display Analysis**: User-selected time range (7 days to all time)
+  - Shows historical trends and long-term adherence
+  - Allows exploration of different training periods
+  - Used for zone distribution charts and summaries
+
+- **Workout Recommendations**: Fixed 14-day window
+  - Based on research showing 1-2 weeks as optimal for immediate training decisions
+  - Captures recent training stress and recovery needs
+  - Prevents recommendations from being skewed by viewing preferences
+  - Aligns with elite athlete patterns (2 hard sessions per week)
+
+### 🎯 **Intelligent Workout Recommendations**
+The tool generates specific, actionable workout recommendations using advanced analysis:
+
+- **Dual Metrics Analysis**: Considers both percentage distribution AND absolute time in each zone
+- **Volume Assessment**: Evaluates if total training volume meets minimum thresholds
+- **Intensity Requirements**: Ensures adequate Zone 3 time for fitness maintenance (≥30min/week)
+- **Recovery Patterns**: Analyzes recent workout intensity and recommends appropriate recovery
+- **Smart Prioritization**: High-priority recommendations for critical training gaps
+- **Detailed Structure**: Complete workout descriptions with warmup, intervals, and cooldown
+- **Scientific Reasoning**: Evidence-based explanations for each recommendation
+
+**Key Analysis Factors:**
+- **Total Training Volume**: Minimum 3 hours/week for meaningful adaptation
+- **Zone 3 Minimum**: At least 30 minutes/week of high-intensity work
+- **Zone 1 Baseline**: Minimum 70% of total time for aerobic base
+- **Recovery Timing**: Days since last high-intensity session
+- **Pattern Recognition**: Recent workout type distribution
+
+**Example Recommendations:**
+- 🚨 🟢 Volume building workout (108m): "Your weekly volume (142min) is below minimum (180min)"
+- 🚨 🔴 High-intensity intervals (75m): "You're only getting 15min/week of Zone 3 (need ≥30min)"
+- ⚠️ 🟢 Long aerobic base ride (3h 12m): "You need 15.3% more Zone 1 training"
+- 💡 🟡 Tempo workout (45m): "Optional technique work to maintain neuromuscular fitness"
 
 ### 🔄 **Data Integration**
 - Automatic Strava API integration with caching
@@ -166,11 +205,20 @@ python strava_fetch.py --count 10
 - Shows your actual vs. target zone distribution
 - Weighted by training time (longer workouts have more influence)
 - Visual comparison with polarized training targets
+- Updates dynamically with time range selection
 
 ### Individual Workout Charts
 - Bar chart for each workout showing zone breakdown
 - Workout metadata (name, date, duration, average HR/power)
 - Color-coded zones for easy identification
+- Filtered by selected time range
+
+### Workout Recommendations Section
+- Color-coded priority cards (high/medium/low priority)
+- Zone icons and duration badges
+- Detailed workout structure with specific instructions
+- Reasoning explanations for each recommendation
+- Always based on last 14 days regardless of viewing period
 
 ## API Endpoints
 
@@ -224,6 +272,16 @@ The polarized training model suggests that the most effective training distribut
 - Strategic high-intensity work (Zone 3)
 
 This approach has been validated across multiple sports and athlete populations.
+
+### Time Window Research
+
+The dual-window approach is based on the following research findings:
+
+- **Minimum Assessment Period**: Research shows polarized distribution should be assessed over "at least a week, if not longer"
+- **Optimal Analysis Window**: 4-12 weeks provides meaningful training distribution analysis
+- **Immediate Recommendations**: 1-2 weeks captures recent training stress and recovery needs
+- **Elite Patterns**: Elite athletes typically perform 2 high-intensity sessions per week, creating 14-day training patterns
+- **Physiological Windows**: Training adaptations and recovery occur over 7-14 day periods
 
 ## Contributing
 

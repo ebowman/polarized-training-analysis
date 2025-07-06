@@ -271,6 +271,113 @@
             margin-top: 5px;
         }
         
+        .recommendations {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .recommendations h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .recommendation-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .recommendation-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .recommendation-card.high-priority {
+            border-left: 4px solid #e74c3c;
+            background: linear-gradient(135deg, #fdf2f2 0%, #fce4e4 100%);
+        }
+        
+        .recommendation-card.medium-priority {
+            border-left: 4px solid #f39c12;
+            background: linear-gradient(135deg, #fef9e7 0%, #fcf3cf 100%);
+        }
+        
+        .recommendation-card.low-priority {
+            border-left: 4px solid #27ae60;
+            background: linear-gradient(135deg, #eafaf1 0%, #d5f4e6 100%);
+        }
+        
+        .recommendation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .recommendation-title {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .recommendation-priority {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .priority-high {
+            background-color: #e74c3c;
+            color: white;
+        }
+        
+        .priority-medium {
+            background-color: #f39c12;
+            color: white;
+        }
+        
+        .priority-low {
+            background-color: #27ae60;
+            color: white;
+        }
+        
+        .recommendation-duration {
+            display: inline-block;
+            background-color: #3498db;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+        
+        .recommendation-structure {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #495057;
+        }
+        
+        .recommendation-reasoning {
+            font-style: italic;
+            color: #6c757d;
+            margin-top: 8px;
+        }
+        
         @media (max-width: 768px) {
             .container {
                 padding: 15px;
@@ -380,6 +487,14 @@
             </div>
         </div>
         
+        <div id="recommendations" class="recommendations" style="display: none;">
+            <h2>🎯 Next Workout Recommendations</h2>
+            <p style="text-align: center; color: #6c757d; margin-bottom: 20px; font-style: italic;">
+                Based on your last 14 days of training (research-optimal window)
+            </p>
+            <div id="recommendation-cards"></div>
+        </div>
+        
         <div id="workouts" class="workouts"></div>
     </div>
 
@@ -446,6 +561,7 @@
             
             displaySummary(filteredActivities);
             displayCombinedChart(filteredActivities);
+            displayRecommendations(workoutData.workout_recommendations);
             displayWorkouts(filteredActivities);
         }
         
@@ -590,6 +706,63 @@
             });
             
             combinedChartDiv.style.display = 'block';
+        }
+        
+        function displayRecommendations(recommendations) {
+            const recommendationsDiv = document.getElementById('recommendations');
+            const cardsDiv = document.getElementById('recommendation-cards');
+            
+            if (!recommendations || recommendations.length === 0) {
+                recommendationsDiv.style.display = 'none';
+                return;
+            }
+            
+            cardsDiv.innerHTML = '';
+            
+            recommendations.forEach(rec => {
+                const card = createRecommendationCard(rec);
+                cardsDiv.appendChild(card);
+            });
+            
+            recommendationsDiv.style.display = 'block';
+        }
+        
+        function createRecommendationCard(recommendation) {
+            const card = document.createElement('div');
+            card.className = `recommendation-card ${recommendation.priority}-priority`;
+            
+            const durationHours = Math.floor(recommendation.duration_minutes / 60);
+            const remainingMinutes = recommendation.duration_minutes % 60;
+            const durationText = durationHours > 0 ? 
+                `${durationHours}h ${remainingMinutes}m` : 
+                `${recommendation.duration_minutes}m`;
+            
+            const zoneIcon = getZoneIcon(recommendation.primary_zone);
+            
+            card.innerHTML = `
+                <div class="recommendation-header">
+                    <div class="recommendation-title">
+                        ${zoneIcon} ${recommendation.description}
+                        <span class="recommendation-duration">${durationText}</span>
+                    </div>
+                    <span class="recommendation-priority priority-${recommendation.priority}">
+                        ${recommendation.priority}
+                    </span>
+                </div>
+                <div class="recommendation-structure">${recommendation.structure}</div>
+                <div class="recommendation-reasoning">${recommendation.reasoning}</div>
+            `;
+            
+            return card;
+        }
+        
+        function getZoneIcon(zone) {
+            switch(zone) {
+                case 1: return '🟢';
+                case 2: return '🟡';
+                case 3: return '🔴';
+                default: return '⚪';
+            }
         }
         
         function displayWorkouts(activities) {
