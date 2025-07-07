@@ -79,3 +79,6 @@ instance/
 
 # Claude settings
 .claude/settings.local.json
+
+# Personal configuration files (users can customize without affecting git)
+workout_preferences_personal.md

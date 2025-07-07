@@ -155,6 +155,33 @@ python web_server.py --no-auto-download
 - **Scientific reasoning**: "Your Zone 1 percentage is 15% below target, limiting aerobic adaptation"
 - **Progressive structure**: Detailed warmup, intervals, and cooldown instructions
 
+### **🎯 Personalizing AI Recommendations**
+
+#### **Two-Tier Preference System**
+The tool supports both default and personal preferences for maximum flexibility:
+
+- **📋 Default preferences** (`workout_preferences.md`) - Baseline recommendations included with the project
+- **✏️ Personal preferences** (`workout_preferences_personal.md`) - Your custom goals and constraints (not tracked by git)
+
+#### **How to Customize**
+1. **Copy the example**: `cp workout_preferences_personal.md.example workout_preferences_personal.md`
+2. **Edit your personal file** with your specific goals, equipment, time constraints, and training preferences
+3. **The AI automatically uses your personal file** if it exists, otherwise falls back to the default
+
+#### **What You Can Customize**
+- **Training goals** (marathon times, FTP targets, race preparation)
+- **Available equipment** (Peloton models, rowing machines, weights)
+- **Time constraints** (weekday limits, weekend availability)
+- **Workout preferences** (interval vs steady-state, morning vs evening)
+- **Physical considerations** (injury history, recovery needs)
+- **Seasonal periodization** (base building, peak, recovery phases)
+
+#### **Benefits**
+- **🔒 Privacy**: Personal goals stay on your computer, not in git
+- **🔄 Updates**: Pull project updates without losing customizations
+- **👥 Sharing**: Share the project while keeping personal details private
+- **🎯 Precision**: AI gets highly specific recommendations based on your actual situation
+
 ## 💡 Real-World Example
 
 **Sarah's Story**: Marathon runner, 35, training 6 hours/week

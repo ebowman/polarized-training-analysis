@@ -544,7 +544,7 @@
         
         <div id="ai-recommendations" class="recommendations" style="display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>🎯 Next Workout Recommendations</h2>
+                <h2>🎯 Choose Your Next Workout</h2>
                 <div>
                     <button id="refresh-ai-btn" class="refresh-button" onclick="refreshAIRecommendations()">
                         🔄 Refresh AI
@@ -555,7 +555,7 @@
                 </div>
             </div>
             <p style="text-align: center; color: #6c757d; margin-bottom: 20px; font-style: italic;">
-                Personalized recommendations using AI based on your last 14 days, preferences, goals, and NIH research
+                Pick one of these AI-generated workout options based on your training data, goals, and equipment preferences
             </p>
             <div id="ai-recommendation-cards"></div>
             <div id="ai-history" class="ai-history" style="display: none;">
@@ -1133,6 +1133,15 @@
             aiRecommendationsDiv.style.display = 'block';
         }
         
+        function getPriorityLabel(priority) {
+            const labels = {
+                'high': 'BEST CHOICE',
+                'medium': 'GOOD OPTION', 
+                'low': 'ALTERNATIVE'
+            };
+            return labels[priority] || priority.toUpperCase();
+        }
+
         function createAIRecommendationCard(recommendation) {
             const card = document.createElement('div');
             card.className = `recommendation-card ${recommendation.priority}-priority`;
@@ -1153,7 +1162,7 @@
                         <span class="ai-recommendation-equipment">${recommendation.equipment}</span>
                     </div>
                     <span class="recommendation-priority priority-${recommendation.priority}">
-                        ${recommendation.priority}
+                        ${getPriorityLabel(recommendation.priority)}
                     </span>
                 </div>
                 <div class="recommendation-structure">${recommendation.structure}</div>
