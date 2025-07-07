@@ -496,9 +496,10 @@
                 <div class="label">analyzed</div>
             </div>
             <div class="summary-card">
-                <h3>Total Time</h3>
+                <h3>Total Volume</h3>
                 <div class="value" id="total-time">-</div>
-                <div class="label">minutes</div>
+                <div class="label" id="total-time-label">minutes</div>
+                <div class="volume-guidance" id="volume-guidance" style="font-size: 0.8em; margin-top: 5px; color: #bbb; font-weight: normal;"></div>
             </div>
             <div class="summary-card">
                 <h3>Adherence Score</h3>
@@ -689,6 +690,7 @@
             // Calculate summary stats for filtered activities
             const totalActivities = activities.length;
             const totalMinutes = activities.reduce((sum, a) => sum + a.duration_minutes, 0);
+            const totalHours = totalMinutes / 60;
             
             // Calculate weighted zone percentages
             let totalZone1Minutes = 0;
@@ -719,7 +721,27 @@
             const adherenceScore = Math.max(0, 100 - totalDeviation);
             
             document.getElementById('total-workouts').textContent = totalActivities;
-            document.getElementById('total-time').textContent = totalMinutes;
+            
+            // Display volume in hours and add guidance
+            if (totalHours >= 1) {
+                document.getElementById('total-time').textContent = totalHours.toFixed(1);
+                document.getElementById('total-time-label').textContent = 'hours';
+            } else {
+                document.getElementById('total-time').textContent = totalMinutes;
+                document.getElementById('total-time-label').textContent = 'minutes';
+            }
+            
+            // Add volume-based training guidance
+            let volumeGuidance = '';
+            if (totalHours < 4) {
+                volumeGuidance = '<4h/week: Mixed approach recommended';
+            } else if (totalHours < 6) {
+                volumeGuidance = `${totalHours.toFixed(1)}h/week: Pyramidal (70/20/10)`;
+            } else {
+                volumeGuidance = `${totalHours.toFixed(1)}h/week: Polarized (80/10/10)`;
+            }
+            document.getElementById('volume-guidance').textContent = volumeGuidance;
+            
             document.getElementById('adherence-score').textContent = Math.round(adherenceScore);
             document.getElementById('zone-distribution').textContent = 
                 `${Math.round(zone1Percent)}% / ${Math.round(zone2Percent)}% / ${Math.round(zone3Percent)}%`;
@@ -752,10 +774,13 @@
             const zone2Percent = totalMinutes > 0 ? (totalZone2Minutes / totalMinutes) * 100 : 0;
             const zone3Percent = totalMinutes > 0 ? (totalZone3Minutes / totalMinutes) * 100 : 0;
             
-            // Update combined stats display
-            document.getElementById('combined-zone1').textContent = Math.round(zone1Percent) + '%';
-            document.getElementById('combined-zone2').textContent = Math.round(zone2Percent) + '%';
-            document.getElementById('combined-zone3').textContent = Math.round(zone3Percent) + '%';
+            // Update combined stats display with percentages and absolute time
+            document.getElementById('combined-zone1').textContent = 
+                `${Math.round(zone1Percent)}% (${Math.round(totalZone1Minutes)}min)`;
+            document.getElementById('combined-zone2').textContent = 
+                `${Math.round(zone2Percent)}% (${Math.round(totalZone2Minutes)}min)`;
+            document.getElementById('combined-zone3').textContent = 
+                `${Math.round(zone3Percent)}% (${Math.round(totalZone3Minutes)}min)`;
             
             // Create or update combined chart
             const ctx = document.getElementById('combinedChart');
@@ -794,7 +819,21 @@
                             callbacks: {
                                 label: function(context) {
                                     const label = context.dataset.label || '';
-                                    return `${label}: ${context.parsed.y.toFixed(1)}%`;
+                                    const percentage = context.parsed.y.toFixed(1);
+                                    
+                                    // Add absolute time for current distribution only
+                                    if (label === 'Current') {
+                                        const zoneIndex = context.dataIndex;
+                                        let minutes = 0;
+                                        if (zoneIndex === 0) minutes = Math.round(totalZone1Minutes);
+                                        else if (zoneIndex === 1) minutes = Math.round(totalZone2Minutes);
+                                        else if (zoneIndex === 2) minutes = Math.round(totalZone3Minutes);
+                                        
+                                        const hours = (minutes / 60).toFixed(1);
+                                        return `${label}: ${percentage}% (${minutes}min / ${hours}h)`;
+                                    }
+                                    
+                                    return `${label}: ${percentage}%`;
                                 }
                             }
                         }
@@ -852,13 +891,21 @@
             const date = new Date(activity.date).toLocaleDateString();
             const duration = activity.duration_minutes;
             
+            // Calculate zone minutes based on duration and percentages
+            const zone1Minutes = Math.round(duration * (activity.zone1_percent / 100));
+            const zone2Minutes = Math.round(duration * (activity.zone2_percent / 100));
+            const zone3Minutes = Math.round(duration * (activity.zone3_percent / 100));
+            
             card.innerHTML = `
                 <div class="workout-header">
                     <h3 class="workout-title">${activity.name}</h3>
                     <div class="workout-date">${date}</div>
                 </div>
                 <div class="workout-stats">
-                    <span>Duration: ${duration} min</span>
+                    <span>Duration: ${duration} min (${(duration/60).toFixed(1)}h)</span>
+                    <span>Zone 1: ${zone1Minutes} min</span>
+                    <span>Zone 2: ${zone2Minutes} min</span>
+                    <span>Zone 3: ${zone3Minutes} min</span>
                 </div>
                 <div class="chart-container">
                     <canvas id="chart-${index}"></canvas>

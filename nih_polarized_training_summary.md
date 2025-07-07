@@ -22,10 +22,17 @@ Based on "Training Intensity Distribution in Endurance Athletes: Are We Asking t
 
 ### Practical Implementation Guidelines
 
+#### Volume Thresholds for Training Distribution
+- **Polarized Training**: Effective for athletes training >6-8 hours per week
+- **Pyramidal Training**: More appropriate for <6 hours per week (more Zone 2 threshold work)
+- **Elite Athletes**: Often train 15-25+ hours per week, making polarized distribution optimal
+- **Recreational Athletes**: May benefit from 70% Zone 1, 20% Zone 2, 10% Zone 3 if volume is limited
+
 #### Weekly Structure
 - **High-Intensity Sessions**: Approximately 2 per week (research-backed frequency)
 - **Low-Intensity Volume**: Majority of training time (aerobic base building)
 - **Threshold Work**: Minimal but targeted (avoid "gray zone" overuse)
+- **Minimum Volume**: Below 4-5 hours/week may require different approach
 
 #### Key Principles
 1. **Polarization**: Clear separation between easy and hard training

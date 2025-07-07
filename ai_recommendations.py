@@ -138,9 +138,24 @@ class AIRecommendationEngine:
         adherence_score = 100 - (abs(zone1_percent - 80) + abs(zone2_percent - 10) + abs(zone3_percent - 10)) / 2
         adherence_score = max(0, min(100, adherence_score))
         
+        # Add current day context for practical scheduling
+        from datetime import datetime
+        today = datetime.now()
+        day_of_week = today.strftime("%A")
+        current_date = today.strftime("%Y-%m-%d")
+        
+        # Check if user already worked out today
+        today_workouts = [a for a in recent_activities if a.get('date', '')[:10] == current_date]
+        already_worked_out_today = len(today_workouts) > 0
+        
         context.append(f"## Current Training Analysis (Last 14 Days)")
         context.append(f"- Total Activities: {len(recent_activities)}")
         context.append(f"- Total Training Time: {total_minutes:.0f} minutes")
+        context.append(f"- Today: {day_of_week} ({current_date})")
+        context.append(f"- Already worked out today: {'Yes' if already_worked_out_today else 'No'}")
+        if already_worked_out_today:
+            today_workout_names = [w.get('name', 'Unknown') for w in today_workouts]
+            context.append(f"- Today's workouts: {', '.join(today_workout_names)}")
         
         # Debug logging to see what the AI is receiving vs old distribution
         old_dist = training_data.get('distribution', {})
@@ -153,11 +168,35 @@ class AIRecommendationEngine:
         context.append(f"- Zone 3 (High): {zone3_percent:.1f}% [Target: 10%] {'❌ ABOVE TARGET' if zone3_percent > 10 else '✅ ADEQUATE'}")
         context.append(f"- Adherence Score: {adherence_score:.1f}/100")
         
-        # Add explicit training guidance
+        # Calculate weekly volume in hours for training approach guidance
+        weekly_hours = total_minutes / 60
+        context.append(f"- Weekly Volume: {weekly_hours:.1f} hours")
+        
+        # Volume-based training approach recommendations
+        if weekly_hours < 4:
+            context.append(f"📊 VOLUME GUIDANCE: <4 hours/week - Consider basic fitness approach with mixed intensities")
+            training_approach = "low-volume"
+        elif weekly_hours < 6:
+            context.append(f"📊 VOLUME GUIDANCE: {weekly_hours:.1f} hours/week - Pyramidal approach may be better (70% Z1, 20% Z2, 10% Z3)")
+            training_approach = "pyramidal"
+        else:
+            context.append(f"📊 VOLUME GUIDANCE: {weekly_hours:.1f} hours/week - Sufficient volume for polarized training (80% Z1, 10% Z2, 10% Z3)")
+            training_approach = "polarized"
+        
+        # Add explicit training guidance based on volume and current distribution
         if zone3_percent >= 10:
-            context.append(f"⚠️ IMPORTANT: Zone 3 is at/above target ({zone3_percent:.1f}%). NO high-intensity workouts needed.")
-        if zone1_percent < 80:
+            context.append(f"⚠️ CRITICAL: Zone 3 is ALREADY at {zone3_percent:.1f}% (target is 10%). ABSOLUTELY NO high-intensity workouts!")
+            context.append(f"🚫 ZONE 3 PROHIBITION: Current Z3 = {zone3_percent:.1f}% ≥ 10% target. Focus ONLY on Zone 1 aerobic base.")
+        elif zone3_percent >= 8:
+            context.append(f"⚠️ CAUTION: Zone 3 is at {zone3_percent:.1f}% (close to 10% target). Avoid high-intensity unless absolutely necessary.")
+            
+        if zone1_percent < 80 and training_approach == "polarized":
             context.append(f"🎯 PRIORITY: Increase Zone 1 from {zone1_percent:.1f}% to 80%. Focus on aerobic base building.")
+        elif zone1_percent < 70 and training_approach == "pyramidal":
+            context.append(f"🎯 PRIORITY: Increase Zone 1 from {zone1_percent:.1f}% to 70% (pyramidal approach for your volume).")
+        
+        # Add volume context to the analysis
+        context.append(f"- Training Approach: {training_approach.upper()} (based on {weekly_hours:.1f} hrs/week)")
         
         # Recent activities
         activities = training_data.get('activities', [])[-5:]  # Last 5 activities
@@ -224,7 +263,11 @@ Use activity-specific zone terminology:
 {training_context}
 
 ## Task
-Generate {num_recommendations} specific, actionable workout recommendations for the next week. 
+Generate {num_recommendations} specific, actionable workout recommendations appropriate for TODAY and the next few days. 
+Consider the current day of the week and whether they've already trained today.
+
+🚫 BEFORE RECOMMENDING ANY HIGH-INTENSITY WORKOUT: Double-check if Zone 3 percentage is ≥10%. If yes, recommend Zone 1 aerobic base instead.
+
 Each recommendation should be formatted as valid JSON with these fields:
 - workout_type: (e.g., "Power Zone Endurance Ride", "HR Zone Steady State Row", "Functional Strength")
 - duration_minutes: (integer)
@@ -242,18 +285,34 @@ Examples:
 
 Consider:
 1. Their specific goals (FTP improvement, multi-modal training)
-2. Current training distribution vs. polarized training targets:
-   - If Zone 1 < 80%: PRIORITIZE Zone 1 (aerobic base) workouts
-   - If Zone 3 > 10%: AVOID high intensity, focus on Zone 1
-   - If Zone 2 > 10%: AVOID threshold work, focus on Zone 1
-   - Only recommend Zone 3 if current Zone 3 < 8% AND Zone 1 > 75%
-3. Equipment preferences (Peloton, RowERG, dumbbells)
-4. Recovery needs based on recent training
-5. Progressive overload principles
-6. Variety to prevent boredom
-7. Use correct zone terminology for each activity type
+2. **VOLUME-BASED TRAINING APPROACH** (most important factor):
+   - **<4 hours/week**: Mixed approach, focus on general fitness
+   - **4-6 hours/week**: PYRAMIDAL approach (70% Z1, 20% Z2, 10% Z3) - More Zone 2 threshold work
+   - **>6 hours/week**: POLARIZED approach (80% Z1, 10% Z2, 10% Z3) - Minimal Zone 2
+3. Current training distribution vs. volume-appropriate targets:
+   - **Polarized (>6 hrs/week)**: If Zone 1 < 80% OR Zone 3 > 10%, focus on Zone 1
+   - **Pyramidal (4-6 hrs/week)**: If Zone 1 < 70% OR Zone 2 < 20%, adjust accordingly
+   - Only recommend Zone 3 if current Zone 3 is significantly below target
+4. Equipment preferences (Peloton, RowERG, dumbbells)
+5. Recovery needs based on recent training
+6. Progressive overload principles
+7. Variety to prevent boredom
+8. Use correct zone terminology for each activity type
 
-CRITICAL RULE: If Zone 3 percentage is already at or above 10%, DO NOT recommend high-intensity workouts. Focus on Zone 1 aerobic base building instead.
+CRITICAL RULES - READ CAREFULLY:
+- **Volume determines training approach**: Use pyramidal targets for <6 hrs/week, polarized for >6 hrs/week
+- **🚫 ZONE 3 PROHIBITION**: If current Zone 3 ≥ 10%, DO NOT recommend ANY high-intensity workouts (Power Zone 5-6, VO2 max, HIIT, intervals above threshold)
+- **ZONE 3 MATH CHECK**: If Zone 3 percentage is 10.0% or higher, the athlete has ENOUGH high-intensity. Focus on Zone 1 only.
+- **Zone 2 threshold work**: More appropriate for pyramidal (limited volume) athletes
+- **When Zone 3 is adequate**: Only recommend Zone 1 (aerobic base) and Zone 2 (threshold) workouts
+- **DAY-OF-WEEK SCHEDULING**:
+  - **Monday-Friday**: Recommend 30-75 minute workouts (work day constraints)
+  - **Saturday-Sunday**: Longer sessions (90+ minutes) are appropriate for weekend
+  - **Already worked out today**: Recommend recovery/easy day or suggest "rest day - try tomorrow"
+  - **Monday/Tuesday**: Good for high-intensity if needed (fresh start of week)
+  - **Wednesday/Thursday**: Mixed approach, consider mid-week recovery
+  - **Friday**: Lean toward easier sessions (end of work week)
+  - **Weekend**: Ideal for long Zone 1 aerobic base sessions
 
 Return only a JSON array of workout recommendations, no other text.
 """
