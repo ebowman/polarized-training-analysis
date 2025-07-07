@@ -196,11 +196,21 @@ Return only a JSON array of workout recommendations, no other text.
             # Parse the JSON response
             recommendations_json = response.choices[0].message.content.strip()
             
+            # Debug logging
+            print(f"AI Response length: {len(recommendations_json)} characters")
+            if len(recommendations_json) < 10:
+                print(f"AI Response content: {repr(recommendations_json)}")
+            
             # Clean up response (remove code blocks if present)
             if recommendations_json.startswith('```json'):
                 recommendations_json = recommendations_json[7:]
             if recommendations_json.endswith('```'):
                 recommendations_json = recommendations_json[:-3]
+            
+            recommendations_json = recommendations_json.strip()
+            
+            if not recommendations_json:
+                raise ValueError("AI returned empty response")
             
             recommendations_data = json.loads(recommendations_json)
             

@@ -263,8 +263,11 @@ def api_download_workouts():
         # Get download manager instance
         download_manager = DownloadManager()
         
+        # Check if force refresh requested
+        force_refresh = request.json and request.json.get('force', False)
+        
         # Try to start download
-        if not download_manager.start_download(client, days_back=30, min_days=14):
+        if not download_manager.start_download(client, days_back=30, min_days=14, force_check=force_refresh):
             return jsonify({
                 'status': 'already_downloading',
                 'message': 'Download already in progress',

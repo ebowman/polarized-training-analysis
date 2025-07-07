@@ -141,17 +141,29 @@ class DownloadManager:
                     if not activities:
                         break
                     
+                    # Log first page for debugging
+                    if page == 1:
+                        print(f"Debug: First page has {len(activities)} activities")
+                        if activities:
+                            newest = datetime.fromisoformat(activities[0]['start_date'].replace('Z', '+00:00'))
+                            oldest = datetime.fromisoformat(activities[-1]['start_date'].replace('Z', '+00:00'))
+                            print(f"Debug: Newest activity: {activities[0]['name']} at {newest}")
+                            print(f"Debug: Oldest on page: {activities[-1]['name']} at {oldest}")
+                            print(f"Debug: Date range: {start_date} to {end_date}")
+                    
                     # Filter activities within our date range
+                    found_old_activity = False
                     for activity in activities:
                         activity_date = datetime.fromisoformat(activity['start_date'].replace('Z', '+00:00'))
                         if activity_date >= start_date:
                             all_activities.append(activity)
                         else:
                             # We've gone past our date range
-                            break
+                            found_old_activity = True
                     
-                    # Check if we've gone past our date range
-                    if activities and datetime.fromisoformat(activities[-1]['start_date'].replace('Z', '+00:00')) < start_date:
+                    # Check if ALL activities on this page are past our date range
+                    if found_old_activity and len([a for a in activities 
+                        if datetime.fromisoformat(a['start_date'].replace('Z', '+00:00')) >= start_date]) == 0:
                         break
                     
                     page += 1
@@ -181,6 +193,10 @@ class DownloadManager:
             for activity in all_activities:
                 if activity['id'] not in current_activities:
                     new_activity_ids.append(activity['id'])
+            
+            print(f"Debug: Found {len(all_activities)} activities from Strava in date range")
+            print(f"Debug: Have {len(current_activities)} activities in cache")
+            print(f"Debug: Found {len(new_activity_ids)} new activities")
             
             if not new_activity_ids:
                 # Check if we have minimum required data
@@ -399,8 +415,15 @@ class DownloadManager:
                 progress=100
             )
     
-    def start_download(self, client, days_back: int = 30, min_days: int = 14) -> bool:
-        """Start download process if not already running"""
+    def start_download(self, client, days_back: int = 30, min_days: int = 14, force_check: bool = False) -> bool:
+        """Start download process if not already running
+        
+        Args:
+            client: StravaClient instance
+            days_back: Number of days to look back
+            min_days: Minimum number of activities required
+            force_check: If True, always fetch from Strava even if we think we're up to date
+        """
         with self._lock:
             if self.is_downloading():
                 return False

@@ -222,6 +222,8 @@
             📥 Download Latest Workouts
         </button>
         
+        <div id="lastCheckedInfo" style="margin-top: 10px; font-size: 0.9em; color: #666;"></div>
+        
         <div id="progressContainer" class="progress-container">
             <div class="progress-bar-wrapper">
                 <div id="progressBar" class="progress-bar"></div>
@@ -260,17 +262,20 @@
             }
         }
         
-        async function startDownload() {
+        async function startDownload(force = false) {
             if (isDownloading) return;
             
             const btn = document.getElementById('downloadBtn');
+            const lastCheckedInfo = document.getElementById('lastCheckedInfo');
+            lastCheckedInfo.textContent = '';
             
             try {
                 const response = await fetch('/api/download-workouts', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    body: JSON.stringify({ force: force })
                 });
                 
                 const data = await response.json();
@@ -353,6 +358,22 @@
                 case 'completed':
                     statusMessage.classList.add('status-success');
                     downloadBtn.innerHTML = '✅ Complete!';
+                    
+                    // Check if no new activities were found
+                    if (data.message && data.message.includes('No new activities found')) {
+                        statusMessage.classList.remove('status-success');
+                        statusMessage.classList.add('status-no-new');
+                        
+                        // Show force refresh option
+                        setTimeout(() => {
+                            downloadBtn.innerHTML = '🔄 Force Refresh';
+                            downloadBtn.disabled = false;
+                            downloadBtn.onclick = () => startDownload(true);
+                            
+                            const lastChecked = document.getElementById('lastCheckedInfo');
+                            lastChecked.textContent = 'All activities are up to date. Click Force Refresh to check again.';
+                        }, 2000);
+                    }
                     break;
                 case 'error':
                     statusMessage.classList.add('status-error');
