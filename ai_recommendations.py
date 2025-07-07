@@ -190,7 +190,6 @@ Return only a JSON array of workout recommendations, no other text.
                         "content": prompt
                     }
                 ],
-                temperature=0.7,
                 max_completion_tokens=2000
             )
             
