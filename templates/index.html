@@ -168,6 +168,21 @@
             text-align: center;
         }
         
+        .error .download-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 5px;
+            text-decoration: none;
+            margin-top: 15px;
+            transition: transform 0.2s;
+        }
+        
+        .error .download-button:hover {
+            transform: translateY(-2px);
+        }
+        
         .controls {
             display: flex;
             justify-content: space-between;
@@ -577,11 +592,55 @@
             
             try {
                 const response = await fetch('/api/workouts');
+                
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorData = await response.json();
+                    
+                    // Handle specific error cases
+                    if (response.status === 401 && errorData.needs_auth) {
+                        loadingDiv.style.display = 'none';
+                        errorDiv.style.display = 'block';
+                        errorDiv.innerHTML = `
+                            <p>📊 No data available yet. Please connect to Strava first.</p>
+                            <a href="${errorData.auth_url}" class="download-button">
+                                🔗 Connect to Strava
+                            </a>
+                        `;
+                        return;
+                    } else if (response.status === 404 && errorData.needs_download) {
+                        loadingDiv.style.display = 'none';
+                        errorDiv.style.display = 'block';
+                        errorDiv.innerHTML = `
+                            <p>📊 No training data found. Please download your workouts from Strava.</p>
+                            <a href="${errorData.download_url}" class="download-button">
+                                📥 Download Workouts
+                            </a>
+                        `;
+                        return;
+                    }
+                    
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
                 }
                 
                 workoutData = await response.json();
+                
+                // Check if data is still downloading
+                if (workoutData.downloading) {
+                    loadingDiv.style.display = 'none';
+                    errorDiv.style.display = 'block';
+                    errorDiv.innerHTML = `
+                        <p>📥 ${workoutData.message}</p>
+                        <p><strong>Progress:</strong> ${workoutData.download_state.progress}%</p>
+                        <p><strong>Status:</strong> ${workoutData.download_state.message}</p>
+                        <a href="/download-workouts" class="download-button">
+                            📊 View Download Progress
+                        </a>
+                    `;
+                    
+                    // Retry in a few seconds
+                    setTimeout(loadData, 3000);
+                    return;
+                }
                 
                 loadingDiv.style.display = 'none';
                 filterWorkouts(); // This will display everything based on current time range
@@ -590,7 +649,7 @@
                 console.error('Error loading data:', error);
                 loadingDiv.style.display = 'none';
                 errorDiv.style.display = 'block';
-                errorDiv.textContent = `Error loading data: ${error.message}. Make sure to run the analysis first.`;
+                errorDiv.textContent = `Error loading data: ${error.message}`;
             } finally {
                 refreshButton.disabled = false;
                 refreshButton.textContent = '🔄 Refresh Data';

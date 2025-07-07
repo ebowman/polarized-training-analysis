@@ -58,6 +58,9 @@ Based on the landmark NIH study: *"Training Intensity Distribution in Endurance 
 - OAuth2 integration for secure Strava connection
 - Intelligent caching (only downloads new workouts)
 - Background processing (no waiting for slow AI responses)
+- **NEW**: Real-time download progress with activity-by-activity updates
+- **NEW**: Automatic startup sync (downloads last 30 days if needed)
+- **NEW**: Graceful rate limit handling with visual countdown
 
 ## 🚀 Who Is This For?
 
@@ -120,12 +123,22 @@ FLASK_SECRET_KEY=your_secret_key_here
 # Start the web dashboard
 python web_server.py
 
+# Optional: Disable automatic download on startup
+python web_server.py --no-auto-download
+
 # Open browser to http://localhost:5000
-# Click "📥 Download Latest" to connect to Strava
-# Follow OAuth flow to authorize the app
+# The app will automatically check for data and start downloading if needed
+# Or click "📥 Download Latest" to manually sync with Strava
 ```
 
 ## 🎯 What You'll See
+
+### **Live Download Progress**
+- Real-time progress bar showing download percentage
+- Current activity name being downloaded
+- Animated list of new activities as they're downloaded
+- Rate limit countdown when Strava API limits are hit
+- Automatic retry with graceful error handling
 
 ### **Immediate Insights**
 - Your actual training distribution (e.g., "65% Zone 1, 25% Zone 2, 10% Zone 3")

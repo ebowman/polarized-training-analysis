@@ -18,9 +18,10 @@ import uuid
 import threading
 import time
 from datetime import datetime
-from flask import Flask, render_template, jsonify, request, redirect, session, url_for
+from flask import Flask, render_template, jsonify, request, redirect, session, url_for, Response
 from training_analysis import TrainingAnalyzer
 from strava_client import StravaClient
+from download_manager import DownloadManager
 
 app = Flask(__name__, template_folder='templates')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -176,83 +177,18 @@ def get_training_data(force_refresh=False):
                 cache_timestamp = current_time
                 return data
         
-        # If no analysis file exists, generate new analysis
-        print("No existing analysis found, generating new analysis...")
+        # If no analysis file exists, check if download is in progress
+        download_manager = DownloadManager()
+        if download_manager.is_downloading():
+            # Return a placeholder indicating download in progress
+            return {
+                'downloading': True,
+                'download_state': download_manager.get_state(),
+                'message': 'Data is currently being downloaded. Please wait...'
+            }
         
-        # Initialize Strava client
-        client = StravaClient()
-        if not client.access_token:
-            raise ValueError("No Strava access token found. Please run: python strava_fetch.py --authorize")
-        
-        # Get recent activities
-        activities = client.get_recent_activities_with_details(30)
-        if not activities:
-            raise ValueError("No activities found")
-        
-        # Analyze activities
-        analyzer = TrainingAnalyzer()
-        analyses = analyzer.analyze_activities(activities)
-        
-        if not analyses:
-            raise ValueError("No analyzable activities found")
-        
-        # Calculate distribution
-        distribution = analyzer.calculate_training_distribution(analyses)
-        
-        # Get workout recommendations (uses fixed 14-day window internally)
-        recommendations = analyzer.get_workout_recommendations(analyses)
-        
-        # Format data for web interface
-        data = {
-            'config': {
-                'max_hr': analyzer.max_hr,
-                'ftp': analyzer.ftp,
-                'generated_at': datetime.now().isoformat()
-            },
-            'distribution': {
-                'total_activities': distribution.total_activities,
-                'total_minutes': distribution.total_minutes,
-                'zone1_percent': distribution.zone1_percent,
-                'zone2_percent': distribution.zone2_percent,
-                'zone3_percent': distribution.zone3_percent,
-                'adherence_score': distribution.adherence_score,
-                'recommendations': distribution.recommendations
-            },
-            'workout_recommendations': [
-                {
-                    'workout_type': rec.workout_type.value,
-                    'primary_zone': rec.primary_zone,
-                    'duration_minutes': rec.duration_minutes,
-                    'description': rec.description,
-                    'structure': rec.structure,
-                    'reasoning': rec.reasoning,
-                    'priority': rec.priority
-                }
-                for rec in recommendations
-            ],
-            'activities': [
-                {
-                    'id': a.activity_id,
-                    'name': a.name,
-                    'date': a.date,
-                    'duration_minutes': a.duration_minutes,
-                    'zone1_percent': a.zone1_percent,
-                    'zone2_percent': a.zone2_percent,
-                    'zone3_percent': a.zone3_percent,
-                    'average_hr': a.average_hr,
-                    'average_power': a.average_power
-                }
-                for a in analyses
-            ]
-        }
-        
-        # Save to file for future use
-        with open(analysis_file, 'w') as f:
-            json.dump(data, f, indent=2)
-        
-        cached_data = data
-        cache_timestamp = current_time
-        return data
+        # Otherwise, raise an error indicating no data
+        raise FileNotFoundError("No training data found. Please download workouts from Strava.")
         
     except Exception as e:
         print(f"Error getting training data: {e}")
@@ -317,114 +253,72 @@ def download_progress():
 
 @app.route('/api/download-workouts', methods=['POST'])
 def api_download_workouts():
-    """API endpoint to download latest workouts from Strava"""
+    """API endpoint to start downloading latest workouts from Strava"""
     try:
         client = StravaClient()
         
         # Ensure we have valid tokens
         client._ensure_valid_token()
         
-        # Get current cached activities to compare
-        current_activities = set()
-        if os.path.exists('training_analysis_report.json'):
-            with open('training_analysis_report.json', 'r') as f:
-                existing_data = json.load(f)
-                current_activities = {a['id'] for a in existing_data.get('activities', [])}
+        # Get download manager instance
+        download_manager = DownloadManager()
         
-        # Fetch latest activities from Strava
-        print("Fetching latest activities from Strava...")
-        latest_activities = client.get_recent_activities_with_details(30)
-        
-        # Check for new activities
-        new_activity_ids = {a['id'] for a in latest_activities} - current_activities
-        
-        if not new_activity_ids:
+        # Try to start download
+        if not download_manager.start_download(client, days_back=30, min_days=14):
             return jsonify({
-                'status': 'no_new_data',
-                'message': 'No new workouts found. Cache is up to date.',
-                'total_activities': len(latest_activities),
-                'new_activities': 0
+                'status': 'already_downloading',
+                'message': 'Download already in progress',
+                'state': download_manager.get_state()
             })
         
-        print(f"Found {len(new_activity_ids)} new activities, regenerating analysis...")
-        
-        # Regenerate analysis with new data
-        analyzer = TrainingAnalyzer()
-        analyses = analyzer.analyze_activities(latest_activities)
-        
-        if not analyses:
-            return jsonify({'error': 'No analyzable activities found'}), 400
-        
-        # Calculate distribution
-        distribution = analyzer.calculate_training_distribution(analyses)
-        
-        # Get workout recommendations
-        recommendations = analyzer.get_workout_recommendations(analyses)
-        
-        # Format data for web interface
-        data = {
-            'config': {
-                'max_hr': analyzer.max_hr,
-                'ftp': analyzer.ftp,
-                'generated_at': datetime.now().isoformat()
-            },
-            'distribution': {
-                'total_activities': distribution.total_activities,
-                'total_minutes': distribution.total_minutes,
-                'zone1_percent': distribution.zone1_percent,
-                'zone2_percent': distribution.zone2_percent,
-                'zone3_percent': distribution.zone3_percent,
-                'adherence_score': distribution.adherence_score,
-                'recommendations': distribution.recommendations
-            },
-            'workout_recommendations': [
-                {
-                    'workout_type': rec.workout_type.value,
-                    'primary_zone': rec.primary_zone,
-                    'duration_minutes': rec.duration_minutes,
-                    'description': rec.description,
-                    'structure': rec.structure,
-                    'reasoning': rec.reasoning,
-                    'priority': rec.priority
-                }
-                for rec in recommendations
-            ],
-            'activities': [
-                {
-                    'id': a.activity_id,
-                    'name': a.name,
-                    'date': a.date,
-                    'duration_minutes': a.duration_minutes,
-                    'zone1_percent': a.zone1_percent,
-                    'zone2_percent': a.zone2_percent,
-                    'zone3_percent': a.zone3_percent,
-                    'average_hr': a.average_hr,
-                    'average_power': a.average_power
-                }
-                for a in analyses
-            ]
-        }
-        
-        # Save updated analysis
-        with open('training_analysis_report.json', 'w') as f:
-            json.dump(data, f, indent=2)
-        
-        # Clear cached data to force reload
-        global cached_data, cache_timestamp
-        cached_data = None
-        cache_timestamp = None
-        
         return jsonify({
-            'status': 'success',
-            'message': 'Workouts downloaded and analysis updated successfully!',
-            'total_activities': len(latest_activities),
-            'new_activities': len(new_activity_ids),
-            'new_activity_names': [a['name'] for a in latest_activities if a['id'] in new_activity_ids]
+            'status': 'started',
+            'message': 'Download started',
+            'state': download_manager.get_state()
         })
         
     except Exception as e:
-        print(f"Error downloading workouts: {e}")
+        print(f"Error starting download: {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/download-progress')
+def download_progress_stream():
+    """SSE endpoint for real-time download progress updates"""
+    def generate():
+        download_manager = DownloadManager()
+        
+        # Send initial state
+        state = download_manager.get_state()
+        yield f"data: {json.dumps(state)}\n\n"
+        
+        # Subscribe to updates
+        last_state = state
+        while True:
+            current_state = download_manager.get_state()
+            
+            # Only send if state changed
+            if current_state != last_state:
+                yield f"data: {json.dumps(current_state)}\n\n"
+                last_state = current_state
+                
+                # If download is complete or errored, stop streaming
+                if current_state['status'] in ['completed', 'error', 'idle']:
+                    # Clear cache if successful
+                    if current_state['status'] == 'completed':
+                        global cached_data, cache_timestamp
+                        cached_data = None
+                        cache_timestamp = None
+                    break
+            
+            time.sleep(0.5)  # Check for updates every 500ms
+    
+    return Response(generate(), mimetype='text/event-stream')
+
+@app.route('/api/download-status')
+def download_status():
+    """Get current download status"""
+    download_manager = DownloadManager()
+    return jsonify(download_manager.get_state())
 
 @app.route('/')
 def index():
@@ -467,6 +361,21 @@ def api_workouts():
     try:
         data = get_training_data()
         return jsonify(data)
+    except ValueError as e:
+        # Check if it's an auth error
+        if "No Strava access token" in str(e):
+            return jsonify({
+                'error': 'No data available. Please connect to Strava first.',
+                'needs_auth': True,
+                'auth_url': '/download-workouts'
+            }), 401
+        return jsonify({'error': str(e)}), 500
+    except FileNotFoundError:
+        return jsonify({
+            'error': 'No training data found. Please download workouts from Strava.',
+            'needs_download': True,
+            'download_url': '/download-workouts'
+        }), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -584,6 +493,86 @@ def signal_handler(sig, frame):
     """Handle shutdown signals gracefully"""
     cleanup_and_exit()
 
+def check_and_start_initial_download():
+    """Check if we have sufficient data, if not start an automatic download"""
+    try:
+        # Check if we have any cached data
+        if not os.path.exists('training_analysis_report.json'):
+            print("📊 No training data found. Starting initial download...")
+            start_auto_download()
+            return
+        
+        # Check age and quantity of data
+        with open('training_analysis_report.json', 'r') as f:
+            data = json.load(f)
+            activities = data.get('activities', [])
+            
+            if len(activities) < 14:
+                print(f"📊 Only {len(activities)} activities found. Need at least 14 days for analysis.")
+                print("Starting automatic download...")
+                start_auto_download()
+                return
+            
+            # Check if data is recent (optional - check oldest activity)
+            if activities:
+                newest_date = activities[0].get('date', '')
+                if newest_date:
+                    from datetime import datetime, timedelta
+                    newest = datetime.fromisoformat(newest_date.replace('Z', '+00:00'))
+                    if datetime.now(newest.tzinfo) - newest > timedelta(days=7):
+                        print("📊 Latest activity is more than 7 days old. Starting download...")
+                        start_auto_download()
+                        return
+            
+            print(f"✅ Found {len(activities)} activities in cache. Ready to analyze!")
+            
+    except Exception as e:
+        print(f"⚠️  Error checking training data: {e}")
+        print("Starting fresh download...")
+        start_auto_download()
+
+def start_auto_download():
+    """Start automatic download in background"""
+    try:
+        client = StravaClient()
+        
+        # Check if we have valid tokens
+        if not client.access_token:
+            print("⚠️  No Strava authentication found. Please visit /download-workouts to connect.")
+            return
+        
+        try:
+            client._ensure_valid_token()
+        except:
+            print("⚠️  Strava token expired. Please visit /download-workouts to reconnect.")
+            return
+        
+        # Start download
+        download_manager = DownloadManager()
+        if download_manager.start_download(client, days_back=30, min_days=14):
+            print("🚀 Background download started. Check progress at /download-workouts")
+            
+            # Monitor progress in background
+            def monitor_progress():
+                while download_manager.is_downloading():
+                    state = download_manager.get_state()
+                    print(f"📥 Download progress: {state['progress']}% - {state['message']}")
+                    time.sleep(5)
+                
+                state = download_manager.get_state()
+                if state['status'] == 'completed':
+                    print(f"✅ Download completed! Downloaded {len(state['new_activities'])} new activities.")
+                elif state['status'] == 'error':
+                    print(f"❌ Download failed: {state['error']}")
+            
+            monitor_thread = threading.Thread(target=monitor_progress, daemon=True)
+            monitor_thread.start()
+        else:
+            print("⚠️  Download already in progress")
+            
+    except Exception as e:
+        print(f"❌ Failed to start auto-download: {e}")
+
 def main():
     # Set up signal handlers for clean shutdown
     signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
@@ -593,6 +582,7 @@ def main():
     parser.add_argument("--port", type=int, default=5000, help="Port to run the server on")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind the server to")
     parser.add_argument("--debug", action="store_true", help="Run in debug mode")
+    parser.add_argument("--no-auto-download", action="store_true", help="Disable automatic download on startup")
     
     args = parser.parse_args()
     
@@ -602,6 +592,12 @@ def main():
     print(f"Starting server on http://{args.host}:{args.port}")
     print("Press Ctrl+C to stop the server")
     print("=" * 60)
+    
+    # Check data and start auto-download if needed
+    if not args.no_auto_download:
+        check_and_start_initial_download()
+    else:
+        print("ℹ️  Auto-download disabled")
     
     try:
         app.run(host=args.host, port=args.port, debug=args.debug, threaded=True)

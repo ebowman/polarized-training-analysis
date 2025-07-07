@@ -57,6 +57,44 @@
             transform: none;
         }
         
+        .progress-container {
+            margin: 30px 0;
+            display: none;
+        }
+        
+        .progress-bar-wrapper {
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            height: 30px;
+            overflow: hidden;
+            margin: 20px 0;
+            position: relative;
+        }
+        
+        .progress-bar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            min-width: 50px;
+        }
+        
+        .progress-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            line-height: 30px;
+            color: #333;
+            font-weight: bold;
+            pointer-events: none;
+        }
+        
         .status-message {
             margin: 20px 0;
             padding: 15px;
@@ -88,6 +126,19 @@
             border: 1px solid #ffcdd2;
         }
         
+        .status-rate-limited {
+            background-color: #fff8e1;
+            color: #f9a825;
+            border: 1px solid #ffeb3b;
+        }
+        
+        .current-activity {
+            font-style: italic;
+            color: #666;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        
         .activity-list {
             background-color: #f8f9fa;
             border: 1px solid #e9ecef;
@@ -95,6 +146,8 @@
             padding: 15px;
             margin: 20px 0;
             text-align: left;
+            max-height: 300px;
+            overflow-y: auto;
         }
         
         .activity-list h3 {
@@ -105,6 +158,12 @@
         .activity-item {
             padding: 5px 0;
             border-bottom: 1px solid #e9ecef;
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
         }
         
         .activity-item:last-child {
@@ -130,6 +189,21 @@
             text-decoration: none;
             color: white;
         }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -142,14 +216,25 @@
         </div>
         
         <p>Click the button below to download your latest workouts from Strava and update your analysis.</p>
-        <p><small>This will check for new activities and only download what's needed.</small></p>
+        <p><small>This will check for new activities from the last 30 days.</small></p>
         
-        <button id="downloadBtn" class="download-button" onclick="downloadWorkouts()">
+        <button id="downloadBtn" class="download-button" onclick="startDownload()">
             📥 Download Latest Workouts
         </button>
         
-        <div id="statusMessage" class="status-message" style="display: none;"></div>
-        <div id="activityList" class="activity-list" style="display: none;"></div>
+        <div id="progressContainer" class="progress-container">
+            <div class="progress-bar-wrapper">
+                <div id="progressBar" class="progress-bar"></div>
+                <div id="progressText" class="progress-text">0%</div>
+            </div>
+            <div id="statusMessage" class="status-message status-loading"></div>
+            <div id="currentActivity" class="current-activity"></div>
+        </div>
+        
+        <div id="activityList" class="activity-list" style="display: none;">
+            <h3>New Activities Downloaded:</h3>
+            <div id="activityItems"></div>
+        </div>
         
         <div>
             <a href="/" class="back-button">← Back to Analysis</a>
@@ -157,18 +242,28 @@
     </div>
 
     <script>
-        async function downloadWorkouts() {
-            const btn = document.getElementById('downloadBtn');
-            const statusDiv = document.getElementById('statusMessage');
-            const activityListDiv = document.getElementById('activityList');
+        let eventSource = null;
+        let isDownloading = false;
+        
+        async function checkExistingDownload() {
+            try {
+                const response = await fetch('/api/download-status');
+                const data = await response.json();
+                
+                if (data.status !== 'idle') {
+                    // Download already in progress, start monitoring
+                    startProgressMonitoring();
+                    updateUI(data);
+                }
+            } catch (error) {
+                console.error('Error checking download status:', error);
+            }
+        }
+        
+        async function startDownload() {
+            if (isDownloading) return;
             
-            // Reset UI
-            btn.disabled = true;
-            btn.textContent = '⏳ Downloading...';
-            statusDiv.style.display = 'block';
-            statusDiv.className = 'status-message status-loading';
-            statusDiv.textContent = 'Connecting to Strava and checking for new workouts...';
-            activityListDiv.style.display = 'none';
+            const btn = document.getElementById('downloadBtn');
             
             try {
                 const response = await fetch('/api/download-workouts', {
@@ -184,38 +279,126 @@
                     throw new Error(data.error || 'Download failed');
                 }
                 
-                if (data.status === 'no_new_data') {
-                    statusDiv.className = 'status-message status-no-new';
-                    statusDiv.textContent = `${data.message} (${data.total_activities} activities checked)`;
-                } else if (data.status === 'success') {
-                    statusDiv.className = 'status-message status-success';
-                    statusDiv.textContent = `${data.message} (${data.new_activities} new out of ${data.total_activities} total)`;
-                    
-                    // Show new activities if any
-                    if (data.new_activity_names && data.new_activity_names.length > 0) {
-                        activityListDiv.style.display = 'block';
-                        activityListDiv.innerHTML = `
-                            <h3>New Activities Downloaded:</h3>
-                            ${data.new_activity_names.map(name => `<div class="activity-item">• ${name}</div>`).join('')}
-                        `;
-                    }
+                if (data.status === 'already_downloading') {
+                    updateUI(data.state);
                 }
                 
-                btn.textContent = '✅ Complete!';
-                
-                // Auto redirect to main page after 3 seconds
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 3000);
+                // Start monitoring progress
+                startProgressMonitoring();
                 
             } catch (error) {
-                console.error('Error downloading workouts:', error);
-                statusDiv.className = 'status-message status-error';
-                statusDiv.textContent = `Error: ${error.message}`;
-                btn.textContent = '❌ Failed - Try Again';
-                btn.disabled = false;
+                console.error('Error starting download:', error);
+                showError(error.message);
             }
         }
+        
+        function startProgressMonitoring() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            isDownloading = true;
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('downloadBtn').disabled = true;
+            
+            eventSource = new EventSource('/api/download-progress');
+            
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                updateUI(data);
+                
+                if (data.status === 'completed' || data.status === 'error' || data.status === 'idle') {
+                    eventSource.close();
+                    isDownloading = false;
+                    
+                    if (data.status === 'completed') {
+                        // Auto redirect after 3 seconds
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 3000);
+                    }
+                }
+            };
+            
+            eventSource.onerror = function(error) {
+                console.error('SSE error:', error);
+                eventSource.close();
+                isDownloading = false;
+                showError('Lost connection to server');
+            };
+        }
+        
+        function updateUI(data) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const statusMessage = document.getElementById('statusMessage');
+            const currentActivity = document.getElementById('currentActivity');
+            const downloadBtn = document.getElementById('downloadBtn');
+            
+            // Update progress bar
+            progressBar.style.width = data.progress + '%';
+            progressText.textContent = data.progress + '%';
+            
+            // Update status message
+            statusMessage.textContent = data.message;
+            statusMessage.className = 'status-message';
+            
+            switch (data.status) {
+                case 'initializing':
+                case 'downloading':
+                case 'processing':
+                    statusMessage.classList.add('status-loading');
+                    downloadBtn.innerHTML = '<span class="spinner"></span>Downloading...';
+                    break;
+                case 'completed':
+                    statusMessage.classList.add('status-success');
+                    downloadBtn.innerHTML = '✅ Complete!';
+                    break;
+                case 'error':
+                    statusMessage.classList.add('status-error');
+                    downloadBtn.innerHTML = '❌ Failed - Try Again';
+                    downloadBtn.disabled = false;
+                    break;
+                case 'rate_limited':
+                    statusMessage.classList.add('status-rate-limited');
+                    downloadBtn.innerHTML = '<span class="spinner"></span>Rate Limited...';
+                    break;
+            }
+            
+            // Update current activity
+            if (data.current_activity_name) {
+                currentActivity.textContent = `Currently downloading: ${data.current_activity_name}`;
+                currentActivity.style.display = 'block';
+            } else {
+                currentActivity.style.display = 'none';
+            }
+            
+            // Update activity list
+            if (data.new_activities && data.new_activities.length > 0) {
+                const activityList = document.getElementById('activityList');
+                const activityItems = document.getElementById('activityItems');
+                
+                activityList.style.display = 'block';
+                activityItems.innerHTML = data.new_activities
+                    .map(name => `<div class="activity-item">• ${name}</div>`)
+                    .join('');
+            }
+        }
+        
+        function showError(message) {
+            const statusMessage = document.getElementById('statusMessage');
+            const downloadBtn = document.getElementById('downloadBtn');
+            
+            statusMessage.textContent = `Error: ${message}`;
+            statusMessage.className = 'status-message status-error';
+            statusMessage.style.display = 'block';
+            
+            downloadBtn.innerHTML = '❌ Failed - Try Again';
+            downloadBtn.disabled = false;
+        }
+        
+        // Check for existing downloads on page load
+        window.addEventListener('load', checkExistingDownload);
     </script>
 </body>
 </html>
