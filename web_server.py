@@ -582,7 +582,7 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)  # Termination signal
     
     parser = argparse.ArgumentParser(description="Web server for training analysis visualization")
-    parser.add_argument("--port", type=int, default=5000, help="Port to run the server on")
+    parser.add_argument("--port", type=int, default=8080, help="Port to run the server on")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind the server to")
     parser.add_argument("--debug", action="store_true", help="Run in debug mode")
     parser.add_argument("--no-auto-download", action="store_true", help="Disable automatic download on startup")
