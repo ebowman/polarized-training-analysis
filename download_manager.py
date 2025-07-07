@@ -107,13 +107,13 @@ class DownloadManager:
                 progress=0
             )
             
-            # Get current cached activities
-            current_activities = {}
+            # Get current cached activities IDs (just need IDs to check what's new)
+            current_activity_ids = set()
             if os.path.exists('cache/training_analysis_report.json'):
                 with open('cache/training_analysis_report.json', 'r') as f:
                     existing_data = json.load(f)
                     for activity in existing_data.get('activities', []):
-                        current_activities[activity['id']] = activity
+                        current_activity_ids.add(activity['id'])
             
             # Calculate date range (use UTC to match Strava's timezone)
             end_date = datetime.now(timezone.utc)
@@ -191,19 +191,19 @@ class DownloadManager:
             # Identify new activities
             new_activity_ids = []
             for activity in all_activities:
-                if activity['id'] not in current_activities:
+                if activity['id'] not in current_activity_ids:
                     new_activity_ids.append(activity['id'])
             
             print(f"Debug: Found {len(all_activities)} activities from Strava in date range")
-            print(f"Debug: Have {len(current_activities)} activities in cache")
+            print(f"Debug: Have {len(current_activity_ids)} activities in cache")
             print(f"Debug: Found {len(new_activity_ids)} new activities")
             
             if not new_activity_ids:
                 # Check if we have minimum required data
-                if len(current_activities) < min_days:
+                if len(current_activity_ids) < min_days:
                     self._update_state(
                         status=DownloadStatus.ERROR,
-                        message=f"Insufficient data: Only {len(current_activities)} activities found, need at least {min_days} days",
+                        message=f"Insufficient data: Only {len(current_activity_ids)} activities found, need at least {min_days} days",
                         progress=100,
                         error="Insufficient data for analysis"
                     )
@@ -329,13 +329,39 @@ class DownloadManager:
                 progress=85
             )
             
-            # Merge with existing activities
-            all_detailed_activities = list(current_activities.values())
-            all_detailed_activities.extend(detailed_activities)
+            # For full analysis, we need to get ALL activities with details, not just new ones
+            # This is because the cached data is simplified and doesn't have all the raw data
+            print(f"Debug: Downloaded {len(detailed_activities)} new activities")
+            print(f"Debug: Need to fetch all {len(all_activities)} activities for complete analysis")
+            
+            # Get detailed data for ALL activities (not just new ones)
+            all_detailed_activities = []
+            for idx, activity in enumerate(all_activities):
+                activity_id = activity['id']
+                
+                # Check if we already have this activity in cache
+                cache_file = os.path.join('cache', f'_activities_{activity_id}_.json')
+                if os.path.exists(cache_file) and activity_id not in [a['id'] for a in detailed_activities]:
+                    # Use cached version
+                    try:
+                        with open(cache_file, 'r') as f:
+                            cached_activity = json.load(f)
+                            all_detailed_activities.append(cached_activity)
+                            continue
+                    except:
+                        pass
+                
+                # Use the already downloaded version if it's a new activity
+                existing_detail = next((a for a in detailed_activities if a['id'] == activity_id), None)
+                if existing_detail:
+                    all_detailed_activities.append(existing_detail)
+                else:
+                    # This shouldn't happen, but just in case
+                    print(f"Warning: Activity {activity_id} not found in detailed activities")
             
             # Sort by date (newest first)
             all_detailed_activities.sort(
-                key=lambda x: x['start_date'], 
+                key=lambda x: x.get('start_date', ''), 
                 reverse=True
             )
             
