@@ -3,7 +3,7 @@ import json
 from collections import Counter
 
 # Load recent activities and check for duplicates
-with open('recent_activities.json', 'r') as f:
+with open('cache/recent_activities.json', 'r') as f:
     activities = json.load(f)
 
 print(f'Total activities: {len(activities)}')
@@ -49,7 +49,7 @@ if len(ids) != len(unique_ids):
     print(f'\nCleaned activities: {len(unique_activities)}')
     
     # Save cleaned data
-    with open('recent_activities.json', 'w') as f:
+    with open('cache/recent_activities.json', 'w') as f:
         json.dump(unique_activities, f, indent=2)
     
     print('✅ Duplicates removed and saved!')

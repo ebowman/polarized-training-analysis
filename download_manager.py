@@ -109,8 +109,8 @@ class DownloadManager:
             
             # Get current cached activities
             current_activities = {}
-            if os.path.exists('training_analysis_report.json'):
-                with open('training_analysis_report.json', 'r') as f:
+            if os.path.exists('cache/training_analysis_report.json'):
+                with open('cache/training_analysis_report.json', 'r') as f:
                     existing_data = json.load(f)
                     for activity in existing_data.get('activities', []):
                         current_activities[activity['id']] = activity
@@ -381,7 +381,7 @@ class DownloadManager:
             }
             
             # Save to file
-            with open('training_analysis_report.json', 'w') as f:
+            with open('cache/training_analysis_report.json', 'w') as f:
                 json.dump(data, f, indent=2)
             
             self._update_state(

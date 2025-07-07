@@ -69,7 +69,7 @@ def fetch_data(client, num_activities=10):
             else:
                 print("   No stream data available")
         
-        output_file = "recent_activities.json"
+        output_file = "cache/recent_activities.json"
         with open(output_file, 'w') as f:
             json.dump(activities, f, indent=2)
         

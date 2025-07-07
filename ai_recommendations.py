@@ -238,7 +238,7 @@ Return only a JSON array of workout recommendations, no other text.
             )]
     
     def save_recommendation_history(self, recommendations: List[AIWorkoutRecommendation], 
-                                  filename: str = "ai_recommendation_history.json"):
+                                  filename: str = "cache/ai_recommendation_history.json"):
         """Save AI recommendations to history file"""
         history_entry = {
             "timestamp": datetime.now().isoformat(),
@@ -264,7 +264,7 @@ Return only a JSON array of workout recommendations, no other text.
         with open(filename, 'w') as f:
             json.dump(history, f, indent=2)
     
-    def load_recommendation_history(self, filename: str = "ai_recommendation_history.json") -> List[Dict]:
+    def load_recommendation_history(self, filename: str = "cache/ai_recommendation_history.json") -> List[Dict]:
         """Load AI recommendation history"""
         try:
             with open(filename, 'r') as f:

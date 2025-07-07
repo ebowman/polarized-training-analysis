@@ -54,8 +54,6 @@ logs/
 
 # Output files
 training_analysis_report.txt
-training_analysis_report.json
-recent_activities.json
 
 # Cache directory (keep structure but ignore contents)
 cache/
@@ -77,5 +75,7 @@ instance/
 # Backup files
 *.bak
 *.backup
-*~.claude/settings.local.json
-ai_recommendation_history.json
+*~
+
+# Claude settings
+.claude/settings.local.json

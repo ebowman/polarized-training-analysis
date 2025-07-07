@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Analyze training data directly from recent_activities.json file
+Analyze training data directly from cache/recent_activities.json file
 """
 
 import json
@@ -27,11 +27,11 @@ def main():
     
     # Load activities from file
     try:
-        with open('recent_activities.json', 'r') as f:
+        with open('cache/recent_activities.json', 'r') as f:
             activities = json.load(f)
         print(f"Loaded {len(activities)} activities from file")
     except FileNotFoundError:
-        print("❌ recent_activities.json not found. Run strava_fetch.py first.")
+        print("❌ cache/recent_activities.json not found. Run strava_fetch.py first.")
         return
     
     # Filter activities by date range

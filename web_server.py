@@ -169,7 +169,7 @@ def get_training_data(force_refresh=False):
     
     try:
         # Try to load from existing analysis file first
-        analysis_file = 'training_analysis_report.json'
+        analysis_file = 'cache/training_analysis_report.json'
         if os.path.exists(analysis_file):
             with open(analysis_file, 'r') as f:
                 data = json.load(f)
@@ -497,13 +497,13 @@ def check_and_start_initial_download():
     """Check if we have sufficient data, if not start an automatic download"""
     try:
         # Check if we have any cached data
-        if not os.path.exists('training_analysis_report.json'):
+        if not os.path.exists('cache/training_analysis_report.json'):
             print("📊 No training data found. Starting initial download...")
             start_auto_download()
             return
         
         # Check age and quantity of data
-        with open('training_analysis_report.json', 'r') as f:
+        with open('cache/training_analysis_report.json', 'r') as f:
             data = json.load(f)
             activities = data.get('activities', [])
             
