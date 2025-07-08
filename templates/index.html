@@ -286,6 +286,50 @@
             margin-top: 5px;
         }
         
+        .volume-tracking {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .volume-info {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 20px;
+        }
+        
+        .volume-chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 20px;
+        }
+        
+        .volume-stats {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .volume-stat {
+            flex: 1;
+        }
+        
+        .volume-label {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+        }
+        
+        .volume-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
         .recommendations {
             background: white;
             border: 1px solid #ddd;
@@ -543,6 +587,30 @@
             </div>
         </div>
         
+        <div id="volume-tracking" class="volume-tracking" style="display: none;">
+            <h2>📊 Weekly Training Volume Tracking</h2>
+            <div class="volume-info">
+                <p>Target: 360 minutes/week (6 hours) for optimal polarized training</p>
+            </div>
+            <div class="volume-chart-container">
+                <canvas id="volumeChart"></canvas>
+            </div>
+            <div class="volume-stats">
+                <div class="volume-stat">
+                    <div class="volume-label">Past 7 Days</div>
+                    <div class="volume-value" id="past-volume">-</div>
+                </div>
+                <div class="volume-stat">
+                    <div class="volume-label">Daily Average Needed</div>
+                    <div class="volume-value" id="daily-needed">-</div>
+                </div>
+                <div class="volume-stat">
+                    <div class="volume-label">Weekly Deficit/Surplus</div>
+                    <div class="volume-value" id="weekly-deficit">-</div>
+                </div>
+            </div>
+        </div>
+        
         <div id="ai-recommendations" class="recommendations" style="display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h2>🎯 Choose Your Next Workout</h2>
@@ -572,6 +640,7 @@
         let workoutData = null;
         let filteredActivities = [];
         let combinedChart = null;
+        let volumeChart = null;
         let aiSessionId = '{{ ai_session_id }}';
         let aiPollingInterval = null;
         
@@ -975,6 +1044,9 @@
             });
             
             combinedChartDiv.style.display = 'block';
+            
+            // Display volume tracking chart
+            displayVolumeTracking();
         }
         
         
@@ -1271,6 +1343,140 @@
                 historyDiv.style.display = 'none';
                 historyBtn.textContent = '📋 History';
             }
+        }
+        
+        function displayVolumeTracking() {
+            const volumeDiv = document.getElementById('volume-tracking');
+            const volumeCanvas = document.getElementById('volumeChart');
+            
+            if (!filteredActivities || filteredActivities.length === 0) {
+                volumeDiv.style.display = 'none';
+                return;
+            }
+            
+            // Calculate volume data for past 14 days
+            const today = new Date();
+            const daysToShow = 14;
+            const targetWeeklyMinutes = 360; // 6 hours
+            const dailyData = [];
+            
+            // Initialize daily data
+            for (let i = daysToShow - 1; i >= 0; i--) {
+                const date = new Date(today);
+                date.setDate(date.getDate() - i);
+                dailyData.push({
+                    date: date,
+                    dateStr: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                    minutes: 0,
+                    isPast: i > 0,
+                    isToday: i === 0
+                });
+            }
+            
+            // Populate with actual activity data
+            filteredActivities.forEach(activity => {
+                const activityDate = new Date(activity.date);
+                const daysDiff = Math.floor((today - activityDate) / (1000 * 60 * 60 * 24));
+                
+                if (daysDiff >= 0 && daysDiff < daysToShow) {
+                    const dayIndex = daysToShow - 1 - daysDiff;
+                    if (dailyData[dayIndex]) {
+                        dailyData[dayIndex].minutes += activity.duration_minutes;
+                    }
+                }
+            });
+            
+            // Calculate past 7 days volume
+            const past7DaysMinutes = dailyData
+                .slice(-8, -1) // Last 7 days, excluding today
+                .reduce((sum, day) => sum + day.minutes, 0);
+            
+            // Add today's minutes if any
+            const todayMinutes = dailyData[dailyData.length - 1].minutes;
+            const currentWeekTotal = past7DaysMinutes + todayMinutes;
+            
+            // Calculate what's needed
+            const remainingDays = 7; // Looking forward 7 days
+            const minutesNeeded = Math.max(0, targetWeeklyMinutes - currentWeekTotal);
+            const dailyAvgNeeded = minutesNeeded / remainingDays;
+            
+            // Project future days
+            for (let i = 1; i <= 7; i++) {
+                const date = new Date(today);
+                date.setDate(date.getDate() + i);
+                dailyData.push({
+                    date: date,
+                    dateStr: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                    minutes: dailyAvgNeeded,
+                    isPast: false,
+                    isFuture: true
+                });
+            }
+            
+            // Update stats
+            document.getElementById('past-volume').textContent = `${Math.round(past7DaysMinutes)} min`;
+            document.getElementById('daily-needed').textContent = `${Math.round(dailyAvgNeeded)} min`;
+            const deficit = targetWeeklyMinutes - currentWeekTotal;
+            const deficitElement = document.getElementById('weekly-deficit');
+            deficitElement.textContent = deficit > 0 ? `-${Math.round(deficit)} min` : `+${Math.round(Math.abs(deficit))} min`;
+            deficitElement.style.color = deficit > 0 ? '#e74c3c' : '#27ae60';
+            
+            // Create chart
+            if (volumeChart) {
+                volumeChart.destroy();
+            }
+            
+            volumeChart = new Chart(volumeCanvas, {
+                type: 'bar',
+                data: {
+                    labels: dailyData.map(d => d.dateStr),
+                    datasets: [{
+                        label: 'Actual Minutes',
+                        data: dailyData.map(d => d.isPast || d.isToday ? d.minutes : 0),
+                        backgroundColor: dailyData.map(d => 
+                            d.isToday ? '#3498db' : 
+                            d.isPast ? '#27ae60' : 
+                            'transparent'
+                        ),
+                        borderColor: '#27ae60',
+                        borderWidth: 1
+                    }, {
+                        label: 'Projected Minutes',
+                        data: dailyData.map(d => d.isFuture ? d.minutes : 0),
+                        backgroundColor: 'rgba(52, 152, 219, 0.3)',
+                        borderColor: '#3498db',
+                        borderWidth: 2,
+                        borderDash: [5, 5]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Minutes'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        title: {
+                            display: true,
+                            text: `Daily Target: ${Math.round(targetWeeklyMinutes / 7)} minutes`,
+                            position: 'bottom',
+                            color: '#e74c3c'
+                        }
+                    }
+                }
+            });
+            
+            volumeDiv.style.display = 'block';
         }
         
         function displayAIRecommendations(recommendations) {
