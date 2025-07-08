@@ -159,7 +159,7 @@ class TrainingDataAnalyzer:
         
         # Sort activities by date (newest first)
         sorted_activities = sorted(activities, 
-                                 key=lambda x: datetime.fromisoformat(x['date'].replace('Z', '+00:00')), 
+                                 key=lambda x: datetime.fromisoformat(x['date'].replace('Z', '+00:00')).replace(tzinfo=None), 
                                  reverse=True)
         
         # Check if trained today
@@ -192,7 +192,9 @@ class TrainingDataAnalyzer:
         three_days_ago = now - timedelta(days=3)
         for activity in sorted_activities:
             activity_date = datetime.fromisoformat(activity['date'].replace('Z', '+00:00'))
-            if activity_date >= three_days_ago:
+            # Convert to naive datetime for comparison
+            activity_date_naive = activity_date.replace(tzinfo=None)
+            if activity_date_naive >= three_days_ago:
                 duration = activity.get('duration_minutes', 0)
                 zone3_percent = activity.get('zone3_percent', 0)
                 metrics['total_minutes_last_3_days'] += duration
@@ -211,8 +213,10 @@ class TrainingDataAnalyzer:
         tomorrow_volume = 0
         for activity in sorted_activities:
             activity_date = datetime.fromisoformat(activity['date'].replace('Z', '+00:00'))
+            # Convert to naive datetime for comparison
+            activity_date_naive = activity_date.replace(tzinfo=None)
             # Include activities from 6 days before tomorrow through tomorrow (which won't have any)
-            if seven_days_from_tomorrow <= activity_date < tomorrow:
+            if seven_days_from_tomorrow <= activity_date_naive < tomorrow:
                 tomorrow_volume += activity.get('duration_minutes', 0)
         
         metrics['tomorrow_volume_after_rolloff'] = tomorrow_volume
@@ -220,11 +224,11 @@ class TrainingDataAnalyzer:
         # Calculate weekly volume change
         this_week_volume = sum(act.get('duration_minutes', 0) 
                               for act in sorted_activities 
-                              if datetime.fromisoformat(act['date'].replace('Z', '+00:00')) >= now - timedelta(days=7))
+                              if datetime.fromisoformat(act['date'].replace('Z', '+00:00')).replace(tzinfo=None) >= now - timedelta(days=7))
         
         last_week_volume = sum(act.get('duration_minutes', 0) 
                               for act in sorted_activities 
-                              if now - timedelta(days=14) <= datetime.fromisoformat(act['date'].replace('Z', '+00:00')) < now - timedelta(days=7))
+                              if now - timedelta(days=14) <= datetime.fromisoformat(act['date'].replace('Z', '+00:00')).replace(tzinfo=None) < now - timedelta(days=7))
         
         if last_week_volume > 0:
             metrics['weekly_volume_change'] = ((this_week_volume - last_week_volume) / last_week_volume) * 100
