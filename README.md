@@ -2,7 +2,7 @@
 
 **Are you training too hard in the middle zones? This science-backed tool analyzes your Strava data to optimize your training for maximum performance gains.**
 
-![Polarized Training Dashboard](https://img.shields.io/badge/Training-Science%20Based-brightgreen) ![Strava Integration](https://img.shields.io/badge/Strava-Integrated-orange) ![AI Powered](https://img.shields.io/badge/AI-OpenAI%20o3-blue)
+![Polarized Training Dashboard](https://img.shields.io/badge/Training-Science%20Based-brightgreen) ![Strava Integration](https://img.shields.io/badge/Strava-Integrated-orange) ![AI Powered](https://img.shields.io/badge/AI-OpenAI%20GPT--4o-blue)
 
 ## 🤔 What Problem Does This Solve?
 
@@ -49,7 +49,7 @@ Based on the landmark NIH study: *"Training Intensity Distribution in Endurance 
 - Adherence scoring (0-100) to track improvement
 
 ### 🤖 **AI-Powered Workout Recommendations**
-- Uses OpenAI's advanced o3 model
+- Uses OpenAI's advanced GPT-4o model
 - Generates personalized workouts based on your data
 - Considers your equipment (Peloton, rowing machine, etc.)
 - Provides detailed workout structure and scientific reasoning

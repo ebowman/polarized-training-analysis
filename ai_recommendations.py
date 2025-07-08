@@ -451,8 +451,8 @@ class AIRecommendationEngine:
             raise ValueError("Please set your OpenAI API key in the .env file")
         
         self.client = openai.OpenAI(api_key=api_key)
-        self.model = "o3"
-        self.fallback_model = "gpt-4o"
+        self.model = "gpt-4o"
+        self.fallback_model = "gpt-4o-mini"
         self.prompt_builder = PromptBuilder()
         
         # Default retry configuration

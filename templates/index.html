@@ -749,6 +749,19 @@
             summaryDiv.style.display = 'grid';
         }
         
+        function getSelectedDays() {
+            const timeRange = document.getElementById('timeRange').value;
+            const daysMap = {
+                '7': 7,
+                '14': 14,
+                '30': 30,
+                '90': 90,
+                '365': 365,
+                'all': 365 // Approximate for weekly calculation
+            };
+            return daysMap[timeRange] || 14;
+        }
+        
         function displayCombinedChart(activities) {
             const combinedChartDiv = document.getElementById('combined-chart');
             
@@ -774,6 +787,12 @@
             const zone2Percent = totalMinutes > 0 ? (totalZone2Minutes / totalMinutes) * 100 : 0;
             const zone3Percent = totalMinutes > 0 ? (totalZone3Minutes / totalMinutes) * 100 : 0;
             
+            // Calculate weekly totals for time validation
+            const totalWeeklyMinutes = totalMinutes * (7 / getSelectedDays()); // Extrapolate to weekly
+            const polarizedMinimumMinutes = 360; // 6 hours/week minimum for effective polarized training
+            const generalHealthMinutes = 150; // NIH general health recommendation
+            const maxHealthyWeeklyMinutes = 600; // 10 hours/week overtraining threshold
+            
             // Update combined stats display with percentages and absolute time
             document.getElementById('combined-zone1').textContent = 
                 `${Math.round(zone1Percent)}% (${Math.round(totalZone1Minutes)}min)`;
@@ -781,6 +800,30 @@
                 `${Math.round(zone2Percent)}% (${Math.round(totalZone2Minutes)}min)`;
             document.getElementById('combined-zone3').textContent = 
                 `${Math.round(zone3Percent)}% (${Math.round(totalZone3Minutes)}min)`;
+            
+            // Add time validation warning
+            const timeWarningElement = document.getElementById('time-warning') || (() => {
+                const warning = document.createElement('div');
+                warning.id = 'time-warning';
+                warning.style.cssText = 'margin-top: 10px; padding: 10px; border-radius: 5px; font-weight: bold;';
+                document.querySelector('#combined-chart').appendChild(warning);
+                return warning;
+            })();
+            
+            const weeklyHours = (totalWeeklyMinutes / 60).toFixed(1);
+            if (totalWeeklyMinutes < generalHealthMinutes) {
+                timeWarningElement.style.cssText += 'background-color: #ffebee; color: #c62828; border: 1px solid #ef5350;';
+                timeWarningElement.textContent = `🚨 Below health minimum: ${Math.round(totalWeeklyMinutes)}min/week (${weeklyHours}h) - Need ${generalHealthMinutes}min/week for basic health`;
+            } else if (totalWeeklyMinutes < polarizedMinimumMinutes) {
+                timeWarningElement.style.cssText += 'background-color: #fff3e0; color: #f57c00; border: 1px solid #ffb74d;';
+                timeWarningElement.textContent = `⚠️ Below polarized minimum: ${Math.round(totalWeeklyMinutes)}min/week (${weeklyHours}h) - Need ${polarizedMinimumMinutes}min/week for effective polarized training`;
+            } else if (totalWeeklyMinutes > maxHealthyWeeklyMinutes) {
+                timeWarningElement.style.cssText += 'background-color: #fff3e0; color: #f57c00; border: 1px solid #ffb74d;';
+                timeWarningElement.textContent = `⚠️ Risk of overtraining: ${Math.round(totalWeeklyMinutes)}min/week (${weeklyHours}h) - Consider reducing volume`;
+            } else {
+                timeWarningElement.style.cssText += 'background-color: #e8f5e8; color: #2e7d32; border: 1px solid #4caf50;';
+                timeWarningElement.textContent = `✅ Optimal polarized volume: ${Math.round(totalWeeklyMinutes)}min/week (${weeklyHours}h)`;
+            }
             
             // Create or update combined chart
             const ctx = document.getElementById('combinedChart');
@@ -791,20 +834,45 @@
             combinedChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Zone 1\n(Low Intensity)', 'Zone 2\n(Threshold)', 'Zone 3\n(High Intensity)'],
+                    labels: ['Zone 1\n(Low Intensity)', 'Zone 2\n(Threshold)', 'Zone 3\n(High Intensity)', 'Weekly Time\n(Minutes)'],
                     datasets: [{
                         label: 'Combined Time Distribution',
-                        data: [zone1Percent, zone2Percent, zone3Percent],
-                        backgroundColor: ['#4CAF50', '#FF9800', '#F44336'],
-                        borderColor: ['#388E3C', '#F57C00', '#D32F2F'],
-                        borderWidth: 2
+                        data: [zone1Percent, zone2Percent, zone3Percent, null],
+                        backgroundColor: ['#4CAF50', '#FF9800', '#F44336', 'transparent'],
+                        borderColor: ['#388E3C', '#F57C00', '#D32F2F', 'transparent'],
+                        borderWidth: 2,
+                        yAxisID: 'y'
                     }, {
                         label: 'Target Distribution',
-                        data: [80, 10, 10],
-                        backgroundColor: ['rgba(76, 175, 80, 0.3)', 'rgba(255, 152, 0, 0.3)', 'rgba(244, 67, 54, 0.3)'],
-                        borderColor: ['#388E3C', '#F57C00', '#D32F2F'],
+                        data: [80, 10, 10, null],
+                        backgroundColor: ['rgba(76, 175, 80, 0.3)', 'rgba(255, 152, 0, 0.3)', 'rgba(244, 67, 54, 0.3)', 'transparent'],
+                        borderColor: ['#388E3C', '#F57C00', '#D32F2F', 'transparent'],
                         borderWidth: 2,
-                        borderDash: [5, 5]
+                        borderDash: [5, 5],
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Actual Weekly Time',
+                        data: [null, null, null, Math.round(totalWeeklyMinutes)],
+                        backgroundColor: [null, null, null, totalWeeklyMinutes < generalHealthMinutes ? '#F44336' : totalWeeklyMinutes < polarizedMinimumMinutes ? '#FF9800' : totalWeeklyMinutes > maxHealthyWeeklyMinutes ? '#FF9800' : '#4CAF50'],
+                        borderColor: [null, null, null, totalWeeklyMinutes < generalHealthMinutes ? '#D32F2F' : totalWeeklyMinutes < polarizedMinimumMinutes ? '#F57C00' : totalWeeklyMinutes > maxHealthyWeeklyMinutes ? '#F57C00' : '#388E3C'],
+                        borderWidth: 2,
+                        yAxisID: 'y1'
+                    }, {
+                        label: 'Health Min (150min)',
+                        data: [null, null, null, generalHealthMinutes],
+                        backgroundColor: [null, null, null, 'rgba(244, 67, 54, 0.3)'],
+                        borderColor: [null, null, null, '#D32F2F'],
+                        borderWidth: 1,
+                        borderDash: [3, 3],
+                        yAxisID: 'y1'
+                    }, {
+                        label: 'Polarized Min (360min)',
+                        data: [null, null, null, polarizedMinimumMinutes],
+                        backgroundColor: [null, null, null, 'rgba(76, 175, 80, 0.3)'],
+                        borderColor: [null, null, null, '#388E3C'],
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        yAxisID: 'y1'
                     }]
                 },
                 options: {
@@ -819,10 +887,32 @@
                             callbacks: {
                                 label: function(context) {
                                     const label = context.dataset.label || '';
-                                    const percentage = context.parsed.y.toFixed(1);
+                                    const value = context.parsed.y;
+                                    
+                                    // Handle time-based datasets (y1 axis)
+                                    if (context.dataset.yAxisID === 'y1') {
+                                        if (label.includes('Weekly Time')) {
+                                            const hours = (value / 60).toFixed(1);
+                                            let status = '';
+                                            if (value < generalHealthMinutes) {
+                                                status = ' (Below health minimum)';
+                                            } else if (value < polarizedMinimumMinutes) {
+                                                status = ' (Below polarized minimum)';
+                                            } else if (value > maxHealthyWeeklyMinutes) {
+                                                status = ' (Risk of overtraining)';
+                                            } else {
+                                                status = ' (Optimal for polarized training)';
+                                            }
+                                            return `${label}: ${Math.round(value)}min (${hours}h)${status}`;
+                                        }
+                                        return `${label}: ${Math.round(value)}min`;
+                                    }
+                                    
+                                    // Handle percentage-based datasets (y axis)
+                                    const percentage = value.toFixed(1);
                                     
                                     // Add absolute time for current distribution only
-                                    if (label === 'Current') {
+                                    if (label === 'Combined Time Distribution') {
                                         const zoneIndex = context.dataIndex;
                                         let minutes = 0;
                                         if (zoneIndex === 0) minutes = Math.round(totalZone1Minutes);
@@ -840,6 +930,9 @@
                     },
                     scales: {
                         y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
                             beginAtZero: true,
                             max: 100,
                             ticks: {
@@ -850,6 +943,25 @@
                             title: {
                                 display: true,
                                 text: 'Percentage of Time'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            beginAtZero: true,
+                            max: Math.max(700, totalWeeklyMinutes * 1.2),
+                            ticks: {
+                                callback: function(value) {
+                                    return Math.round(value) + 'min';
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Weekly Minutes'
+                            },
+                            grid: {
+                                drawOnChartArea: false
                             }
                         },
                         x: {
