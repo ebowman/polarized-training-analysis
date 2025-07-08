@@ -591,13 +591,14 @@
             <h2>📊 Weekly Training Volume Tracking</h2>
             <div class="volume-info">
                 <p>Target: 360 minutes/week (6 hours) for optimal polarized training</p>
+                <p style="font-size: 0.9em; color: #95a5a6;">Rolling 7-day window (today + previous 6 days)</p>
             </div>
             <div class="volume-chart-container">
                 <canvas id="volumeChart"></canvas>
             </div>
             <div class="volume-stats">
                 <div class="volume-stat">
-                    <div class="volume-label">Past 7 Days (excl. today)</div>
+                    <div class="volume-label">Last 7 Days</div>
                     <div class="volume-value" id="past-volume">-</div>
                 </div>
                 <div class="volume-stat">
@@ -1395,22 +1396,23 @@
             // Find today's index in the dailyData array
             const todayIndex = dailyData.findIndex(day => day.isToday);
             
-            // Calculate past 7 days (not including today)
-            let past7DaysMinutes = 0;
-            if (todayIndex >= 7) {
-                // Sum the 7 days before today
-                for (let i = todayIndex - 7; i < todayIndex; i++) {
-                    past7DaysMinutes += dailyData[i].minutes;
+            // Calculate rolling 7-day total (including today)
+            let rollingWeekMinutes = 0;
+            if (todayIndex >= 6) {
+                // Sum today and the 6 days before (7 days total)
+                for (let i = todayIndex - 6; i <= todayIndex; i++) {
+                    rollingWeekMinutes += dailyData[i].minutes;
+                }
+            } else {
+                // If we have less than 7 days of history, sum what we have
+                for (let i = 0; i <= todayIndex; i++) {
+                    rollingWeekMinutes += dailyData[i].minutes;
                 }
             }
             
-            // Get today's minutes
-            const todayMinutes = todayIndex >= 0 ? dailyData[todayIndex].minutes : 0;
-            const currentWeekTotal = past7DaysMinutes + todayMinutes;
-            
             // Calculate what's needed
             const remainingDays = 7; // Looking forward 7 days
-            const minutesNeeded = Math.max(0, targetWeeklyMinutes - currentWeekTotal);
+            const minutesNeeded = Math.max(0, targetWeeklyMinutes - rollingWeekMinutes);
             const dailyAvgNeeded = minutesNeeded / remainingDays;
             
             // Project future days
@@ -1427,9 +1429,9 @@
             }
             
             // Update stats
-            document.getElementById('past-volume').textContent = `${Math.round(past7DaysMinutes)} min`;
+            document.getElementById('past-volume').textContent = `${Math.round(rollingWeekMinutes)} min`;
             document.getElementById('daily-needed').textContent = `${Math.round(dailyAvgNeeded)} min`;
-            const deficit = targetWeeklyMinutes - currentWeekTotal;
+            const deficit = targetWeeklyMinutes - rollingWeekMinutes;
             const deficitElement = document.getElementById('weekly-deficit');
             deficitElement.textContent = deficit > 0 ? `-${Math.round(deficit)} min` : `+${Math.round(Math.abs(deficit))} min`;
             deficitElement.style.color = deficit > 0 ? '#e74c3c' : '#27ae60';
