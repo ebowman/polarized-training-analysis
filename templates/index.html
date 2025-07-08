@@ -1349,7 +1349,8 @@
             const volumeDiv = document.getElementById('volume-tracking');
             const volumeCanvas = document.getElementById('volumeChart');
             
-            if (!filteredActivities || filteredActivities.length === 0) {
+            // Use all activities for volume tracking, not filtered ones
+            if (!workoutData || !workoutData.activities || workoutData.activities.length === 0) {
                 volumeDiv.style.display = 'none';
                 return;
             }
@@ -1373,15 +1374,19 @@
                 });
             }
             
-            // Populate with actual activity data
-            filteredActivities.forEach(activity => {
+            // Populate with actual activity data - use ALL activities, not just filtered
+            workoutData.activities.forEach(activity => {
                 const activityDate = new Date(activity.date);
-                const daysDiff = Math.floor((today - activityDate) / (1000 * 60 * 60 * 24));
                 
-                if (daysDiff >= 0 && daysDiff < daysToShow) {
-                    const dayIndex = daysToShow - 1 - daysDiff;
-                    if (dailyData[dayIndex]) {
-                        dailyData[dayIndex].minutes += activity.duration_minutes;
+                // Compare dates in local timezone by using date strings
+                const activityDateStr = activityDate.toLocaleDateString('en-US');
+                
+                // Find which day this activity belongs to
+                for (let i = 0; i < dailyData.length; i++) {
+                    const dayDateStr = dailyData[i].date.toLocaleDateString('en-US');
+                    if (activityDateStr === dayDateStr && (dailyData[i].isPast || dailyData[i].isToday)) {
+                        dailyData[i].minutes += activity.duration_minutes;
+                        break;
                     }
                 }
             });
