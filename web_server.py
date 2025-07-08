@@ -203,6 +203,9 @@ def download_workouts():
         if client.access_token:
             try:
                 client._ensure_valid_token()
+                # Set session state for users with existing valid tokens
+                session['auth_success'] = True
+                session['athlete_name'] = 'Athlete'  # Default name for existing tokens
                 return redirect(url_for('download_progress'))
             except ValueError:
                 # Token invalid, need to re-authorize
