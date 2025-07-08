@@ -112,6 +112,15 @@ class TrainingDataAnalyzer:
     def calculate_adherence_score(self, zone1_percent: float, zone2_percent: float, 
                                 zone3_percent: float, training_approach: str) -> float:
         """Calculate adherence score based on training approach targets"""
+        # For low-volume training, use a more flexible approach
+        if training_approach == "low-volume":
+            # Low volume doesn't have strict targets, so give a moderate score
+            # based on having some variety in training
+            if zone1_percent > 50 and zone3_percent < 30:
+                return 75.0  # Reasonable distribution for low volume
+            else:
+                return 50.0  # Could use improvement
+        
         targets = self.targets[training_approach]
         
         zone1_deviation = abs(zone1_percent - targets['zone1'])
