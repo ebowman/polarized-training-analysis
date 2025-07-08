@@ -107,13 +107,26 @@ class DownloadManager:
                 progress=0
             )
             
-            # Get current cached activities IDs (just need IDs to check what's new)
+            # Get current cached activities IDs by checking actual cache files
             current_activity_ids = set()
-            if os.path.exists('cache/training_analysis_report.json'):
-                with open('cache/training_analysis_report.json', 'r') as f:
-                    existing_data = json.load(f)
-                    for activity in existing_data.get('activities', []):
-                        current_activity_ids.add(activity['id'])
+            cache_dir = 'cache'
+            if os.path.exists(cache_dir):
+                import glob
+                activity_files = glob.glob(os.path.join(cache_dir, '_activities_*.json'))
+                activity_files = [f for f in activity_files if 'streams' not in f]
+                
+                for file_path in activity_files:
+                    try:
+                        # Extract activity ID from filename
+                        filename = os.path.basename(file_path)
+                        # Format: _activities_12345_.json
+                        activity_id_str = filename.replace('_activities_', '').replace('_.json', '')
+                        if activity_id_str.isdigit():
+                            current_activity_ids.add(int(activity_id_str))
+                    except Exception as e:
+                        print(f"Warning: Could not parse activity ID from {file_path}: {e}")
+            
+            print(f"Debug: Found {len(current_activity_ids)} activities in cache directory")
             
             # Calculate date range (use UTC to match Strava's timezone)
             end_date = datetime.now(timezone.utc)
