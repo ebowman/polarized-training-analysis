@@ -230,6 +230,8 @@ class TrainingDataAnalyzer:
                               for act in sorted_activities 
                               if now - timedelta(days=14) <= datetime.fromisoformat(act['date'].replace('Z', '+00:00')).replace(tzinfo=None) < now - timedelta(days=7))
         
+        metrics['this_week_volume'] = this_week_volume
+        
         if last_week_volume > 0:
             metrics['weekly_volume_change'] = ((this_week_volume - last_week_volume) / last_week_volume) * 100
         else:
@@ -432,6 +434,16 @@ class PromptBuilder:
             context.append(f"- Weekly volume change: {recovery_metrics['weekly_volume_change']:+.1f}%")
             context.append(f"- Tomorrow's projected volume: {recovery_metrics['tomorrow_volume_after_rolloff']} min")
             
+            # Debug logging
+            print(f"🐛 Recovery Metrics Debug:")
+            print(f"  - Current week volume: {recovery_metrics.get('this_week_volume', 0)} min")
+            print(f"  - Consecutive days: {recovery_metrics['consecutive_training_days']}")
+            print(f"  - Zone 3 last 3 days: {recovery_metrics['zone3_percent_last_3_days']:.1f}%")
+            print(f"  - Weekly volume change: {recovery_metrics['weekly_volume_change']:.1f}%")
+            print(f"  - Tomorrow's volume: {recovery_metrics['tomorrow_volume_after_rolloff']} min")
+            print(f"  - Trained today: {recovery_metrics['trained_today']}")
+            print(f"  - Today's minutes: {recovery_metrics['today_minutes']}")
+            
             # Recovery recommendations based on metrics
             if recovery_metrics['consecutive_training_days'] >= 5:
                 context.append(f"⚠️ REST DAY RECOMMENDED: {recovery_metrics['consecutive_training_days']} consecutive training days")
@@ -520,6 +532,14 @@ Consider the current day of the week and whether they've already trained today.
 🚫 CRITICAL ZONE 3 CHECK: Current Zone 3 = {analysis.zone3_percent:.1f}%
 - IF Zone 3 ≥ 10.0%: ABSOLUTELY NO HIGH-INTENSITY WORKOUTS (no Power Zone 5-6, no VO2-max, no intervals above threshold)
 - CURRENT STATUS: {'ZONE 3 IS ABOVE TARGET - NO HIGH INTENSITY ALLOWED' if analysis.zone3_percent >= 10 else 'Zone 3 below target - high intensity appropriate if needed'}
+
+🛑 REST DAY PRIORITY CHECK:
+- Current rolling 7-day volume: {recovery_metrics.get('this_week_volume', 'unknown') if recovery_metrics else 'unknown'} minutes
+- Tomorrow's projected volume: {recovery_metrics.get('tomorrow_volume_after_rolloff', 'unknown') if recovery_metrics else 'unknown'} minutes
+- IF current volume > 360 min AND consecutive days ≥ 5: RECOMMEND REST DAY as first option
+- IF current volume > 360 min AND Zone 1 > 85%: Consider short Zone 3 workout (15-20 min) OR rest day  
+- IF tomorrow's volume will still be > 360 min: Strongly consider rest day
+- REST DAY recommendation format: {{"workout_type": "Rest Day", "duration_minutes": 0, "description": "Complete rest to allow adaptation", "structure": "No training - focus on recovery, hydration, and sleep", "reasoning": "[explain why based on current metrics]", "equipment": "None", "intensity_zones": [], "priority": "high"}}
 
 Each recommendation should be formatted as valid JSON with these fields:
 - workout_type: (e.g., "Power Zone Endurance Ride", "HR Zone Steady State Row", "Functional Strength")
