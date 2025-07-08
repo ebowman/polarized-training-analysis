@@ -597,15 +597,15 @@
             </div>
             <div class="volume-stats">
                 <div class="volume-stat">
-                    <div class="volume-label">Past 7 Days</div>
+                    <div class="volume-label">Past 7 Days (excl. today)</div>
                     <div class="volume-value" id="past-volume">-</div>
                 </div>
                 <div class="volume-stat">
-                    <div class="volume-label">Daily Average Needed</div>
+                    <div class="volume-label">Avg/Day Needed (next 7d)</div>
                     <div class="volume-value" id="daily-needed">-</div>
                 </div>
                 <div class="volume-stat">
-                    <div class="volume-label">Weekly Deficit/Surplus</div>
+                    <div class="volume-label">Current Week vs Target</div>
                     <div class="volume-value" id="weekly-deficit">-</div>
                 </div>
             </div>
@@ -1392,12 +1392,20 @@
             });
             
             // Calculate past 7 days volume
-            const past7DaysMinutes = dailyData
-                .slice(-8, -1) // Last 7 days, excluding today
-                .reduce((sum, day) => sum + day.minutes, 0);
+            // Find today's index in the dailyData array
+            const todayIndex = dailyData.findIndex(day => day.isToday);
             
-            // Add today's minutes if any
-            const todayMinutes = dailyData[dailyData.length - 1].minutes;
+            // Calculate past 7 days (not including today)
+            let past7DaysMinutes = 0;
+            if (todayIndex >= 7) {
+                // Sum the 7 days before today
+                for (let i = todayIndex - 7; i < todayIndex; i++) {
+                    past7DaysMinutes += dailyData[i].minutes;
+                }
+            }
+            
+            // Get today's minutes
+            const todayMinutes = todayIndex >= 0 ? dailyData[todayIndex].minutes : 0;
             const currentWeekTotal = past7DaysMinutes + todayMinutes;
             
             // Calculate what's needed
