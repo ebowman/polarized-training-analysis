@@ -97,6 +97,28 @@ def main():
         'config': {
             'max_hr': analyzer.max_hr,
             'ftp': analyzer.ftp,
+            'lthr': analyzer.lthr,
+            'ftp_power': analyzer.ftp_power,
+            'hr_zones': {
+                'zone1_max': analyzer.hr_zones.zone1_max,
+                'zone2_max': analyzer.hr_zones.zone2_max,
+                'zone3_max': analyzer.hr_zones.zone3_max,
+                'zone4_max': analyzer.hr_zones.zone4_max,
+                'zone5a_max': analyzer.hr_zones.zone5a_max,
+                'zone5b_max': analyzer.hr_zones.zone5b_max,
+                'zone5c_min': analyzer.hr_zones.zone5c_min,
+                'lthr': analyzer.hr_zones.lthr
+            },
+            'power_zones': {
+                'zone1_max': analyzer.power_zones.zone1_max,
+                'zone2_max': analyzer.power_zones.zone2_max,
+                'zone3_max': analyzer.power_zones.zone3_max,
+                'zone4_max': analyzer.power_zones.zone4_max,
+                'zone5_max': analyzer.power_zones.zone5_max,
+                'zone6_max': analyzer.power_zones.zone6_max,
+                'zone7_min': analyzer.power_zones.zone7_min,
+                'ftp': analyzer.power_zones.ftp
+            },
             'generated_at': datetime.now().isoformat()
         },
         'distribution': {

@@ -111,6 +111,12 @@ STRAVA_CLIENT_SECRET=your_client_secret_here
 MAX_HEART_RATE=180
 FTP=250
 
+# FTP Test Data (optional - for LTHR-based HR zones)
+# Fill these from your most recent 20-minute FTP test
+AVERAGE_FTP_HR=0  # Average HR during FTP test (this is your LTHR)
+MAX_FTP_HR=0      # Max HR during FTP test
+AVERAGE_FTP_POWER=0  # Average power during 20-min test
+
 # Optional: Get from https://platform.openai.com/api-keys
 OPENAI_API_KEY=your_openai_api_key_here
 
@@ -265,6 +271,31 @@ The tool supports both default and personal preferences for maximum flexibility:
 - **Display analysis**: User-selected time range for historical trends
 - **AI recommendations**: Always based on last 14 days for relevance
 - **Dual-window approach**: Balances long-term trends with immediate needs
+
+### **Advanced Zone Systems**
+The app supports both simplified and advanced zone models:
+
+#### **Heart Rate Zones**
+- **LTHR-based (7-zone)**: When you have FTP test data
+  - Z1 Recovery: <81% LTHR
+  - Z2 Aerobic: 81-89% LTHR  
+  - Z3 Tempo: 90-93% LTHR
+  - Z4 Threshold: 94-99% LTHR
+  - Z5 VO2max/Anaerobic: 100-106% LTHR
+- **Max HR-based (3-zone)**: Simplified fallback model
+  - Zone 1: ≤82% Max HR (aerobic base)
+  - Zone 2: 82-87% Max HR (threshold)
+  - Zone 3: >87% Max HR (high intensity)
+
+#### **Power Zones (Cycling)**
+- 7-zone Coggan model based on FTP
+- Automatically used for cycling activities
+- Falls back to HR if no power data
+
+#### **Sport-Specific Analysis**
+- **Cycling**: Power zones preferred, HR fallback
+- **Running/Rowing**: Heart rate zones only
+- **Strength Training**: Excluded from zone analysis
 
 ### **API Endpoints**
 ```

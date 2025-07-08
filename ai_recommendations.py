@@ -315,20 +315,81 @@ class PromptBuilder:
         
         return "No user preferences file found. Using general recommendations."
     
+    def _get_hr_zone_definitions(self, training_data: Dict) -> str:
+        """Get HR zone definitions based on LTHR or max HR"""
+        lthr = int(os.getenv("AVERAGE_FTP_HR", "0"))
+        max_hr = training_data.get('config', {}).get('max_hr', 171)
+        
+        if lthr > 0:
+            # Use LTHR-based 7-zone model
+            z1_max = int(lthr * 0.81)
+            z2_max = int(lthr * 0.89)
+            z3_max = int(lthr * 0.93)
+            z4_max = int(lthr * 0.99)
+            z5a_max = int(lthr * 1.02)
+            z5b_max = int(lthr * 1.06)
+            
+            return f"""- HR Zone 1 (Recovery): <{z1_max} bpm = Polarized Zone 1 (aerobic base)
+- HR Zone 2 (Aerobic): {z1_max}-{z2_max} bpm = Polarized Zone 1 (aerobic base)
+- HR Zone 3 (Tempo): {z2_max+1}-{z3_max} bpm = Polarized Zone 2 (threshold)
+- HR Zone 4 (Threshold): {z3_max+1}-{z4_max} bpm = Polarized Zone 2 (threshold)
+- HR Zone 5a (VO2max): {z4_max+1}-{z5a_max} bpm = Polarized Zone 3 (high intensity)
+- HR Zone 5b (Anaerobic): {z5a_max+1}-{z5b_max} bpm = Polarized Zone 3 (high intensity)
+- HR Zone 5c (Neuromuscular): >{z5b_max} bpm = Polarized Zone 3 (high intensity)
+- Current LTHR: {lthr} bpm (from FTP test)
+- Current Max HR: {max_hr} bpm"""
+        else:
+            # Fall back to simplified 3-zone model based on max HR
+            z1_max = int(max_hr * 0.82)
+            z2_max = int(max_hr * 0.87)
+            
+            return f"""- HR Zone 1-2: {int(max_hr * 0.5)}-{z1_max} bpm = Polarized Zone 1 (aerobic base)
+- HR Zone 3-4: {z1_max+1}-{z2_max} bpm = Polarized Zone 2 (threshold)
+- HR Zone 5: >{z2_max} bpm = Polarized Zone 3 (high intensity)
+- Current Max HR: {max_hr} bpm"""
+    
+    def _get_example_hr_range(self, training_data: Dict) -> str:
+        """Get example HR range for Zone 2"""
+        lthr = int(os.getenv("AVERAGE_FTP_HR", "0"))
+        max_hr = training_data.get('config', {}).get('max_hr', 171)
+        
+        if lthr > 0:
+            # Use LTHR-based zones
+            z1_max = int(lthr * 0.81)
+            z2_max = int(lthr * 0.89)
+            return f"{z1_max}-{z2_max} bpm"
+        else:
+            # Fall back to max HR
+            return f"{int(max_hr * 0.70)}-{int(max_hr * 0.82)} bpm"
+    
     def _process_hr_ranges(self, content: str) -> str:
-        """Replace static HR ranges with dynamic ones based on current max HR"""
+        """Replace static HR ranges with dynamic ones based on LTHR or max HR"""
         max_hr = int(os.getenv("MAX_HEART_RATE", "171"))
+        lthr = int(os.getenv("AVERAGE_FTP_HR", "0"))
         
-        # Calculate and substitute dynamic HR ranges
-        hr2_range = f"{int(max_hr * 0.70)}-{int(max_hr * 0.82)} bpm"
-        hr34_range = f"{int(max_hr * 0.82)}-{int(max_hr * 0.93)} bpm"
-        hr5_range = f"{int(max_hr * 0.93)}+ bpm"
-        
-        # Replace any hardcoded ranges with dynamic ones
-        content = content.replace("120-140 bpm", hr2_range)
-        content = content.replace("140-159 bpm", hr34_range)
-        content = content.replace("159+ bpm", hr5_range)
-        content = content.replace("171 bpm", f"{max_hr} bpm")
+        if lthr > 0:
+            # Use LTHR-based zones
+            hr1_range = f"<{int(lthr * 0.81)} bpm"  # Z1 Recovery
+            hr2_range = f"{int(lthr * 0.81)}-{int(lthr * 0.89)} bpm"  # Z2 Aerobic
+            hr3_range = f"{int(lthr * 0.90)}-{int(lthr * 0.93)} bpm"  # Z3 Tempo
+            hr4_range = f"{int(lthr * 0.94)}-{int(lthr * 0.99)} bpm"  # Z4 Threshold
+            hr5_range = f"{int(lthr * 1.00)}-{int(lthr * 1.06)} bpm"  # Z5 VO2max/Anaerobic
+            
+            # Replace with LTHR-based ranges
+            content = content.replace("120-140 bpm", hr2_range)
+            content = content.replace("140-159 bpm", f"{hr3_range} or {hr4_range}")
+            content = content.replace("159+ bpm", hr5_range)
+            content = content.replace("171 bpm", f"{max_hr} bpm (LTHR: {lthr} bpm)")
+        else:
+            # Fall back to max HR-based zones
+            hr2_range = f"{int(max_hr * 0.70)}-{int(max_hr * 0.82)} bpm"
+            hr34_range = f"{int(max_hr * 0.82)}-{int(max_hr * 0.93)} bpm"
+            hr5_range = f"{int(max_hr * 0.93)}+ bpm"
+            
+            content = content.replace("120-140 bpm", hr2_range)
+            content = content.replace("140-159 bpm", hr34_range)
+            content = content.replace("159+ bpm", hr5_range)
+            content = content.replace("171 bpm", f"{max_hr} bpm")
         
         return content
     
@@ -510,10 +571,7 @@ Use activity-specific zone terminology:
 
 **For Rowing (HR-based):**
 - Use "HR Zone X" terminology with actual BPM ranges
-- HR Zone 1-2 ({int(training_data.get('config', {}).get('max_hr', 171) * 0.5)}-{int(training_data.get('config', {}).get('max_hr', 171) * 0.82)} bpm) = Polarized Zone 1 (aerobic base)
-- HR Zone 3-4 ({int(training_data.get('config', {}).get('max_hr', 171) * 0.82)}-{int(training_data.get('config', {}).get('max_hr', 171) * 0.93)} bpm) = Polarized Zone 2 (threshold)
-- HR Zone 5 ({int(training_data.get('config', {}).get('max_hr', 171) * 0.93)}+ bpm) = Polarized Zone 3 (high intensity)
-- Current Max HR: {training_data.get('config', {}).get('max_hr', 171)} bpm
+{self._get_hr_zone_definitions(training_data)}
 
 **For Strength Training:**
 - Use RPE (Rate of Perceived Exertion) 1-10 scale
@@ -553,7 +611,7 @@ Each recommendation should be formatted as valid JSON with these fields:
 
 Examples:
 - Cycling: "Power Zone 2 endurance ride (65-75% FTP) for 90 minutes"
-- Rowing: "HR Zone 2 steady state ({int(training_data.get('config', {}).get('max_hr', 171) * 0.70)}-{int(training_data.get('config', {}).get('max_hr', 171) * 0.82)} bpm) for 45 minutes"
+- Rowing: "HR Zone 2 steady state ({self._get_example_hr_range(training_data)}) for 45 minutes"
 - Strength: "Functional strength circuit at RPE 6-7 for 30 minutes"
 
 Consider:
