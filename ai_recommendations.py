@@ -141,6 +141,98 @@ class TrainingDataAnalyzer:
         else:
             return "polarized"
     
+    def calculate_recovery_metrics(self, activities: List[Dict]) -> Dict:
+        """Calculate recovery-related metrics for overtraining prevention"""
+        now = datetime.now()
+        
+        # Initialize metrics
+        metrics = {
+            'consecutive_training_days': 0,
+            'zone3_last_3_days': 0,
+            'total_minutes_last_3_days': 0,
+            'trained_today': False,
+            'today_minutes': 0,
+            'last_rest_day': None,
+            'weekly_volume_change': 0,
+            'tomorrow_volume_after_rolloff': 0
+        }
+        
+        # Sort activities by date (newest first)
+        sorted_activities = sorted(activities, 
+                                 key=lambda x: datetime.fromisoformat(x['date'].replace('Z', '+00:00')), 
+                                 reverse=True)
+        
+        # Check if trained today
+        today_str = now.strftime('%Y-%m-%d')
+        for activity in sorted_activities:
+            if today_str in activity['date']:
+                metrics['trained_today'] = True
+                metrics['today_minutes'] += activity.get('duration_minutes', 0)
+        
+        # Count consecutive training days
+        current_date = now.date()
+        consecutive_days = 0
+        
+        for i in range(14):  # Look back up to 2 weeks
+            day_to_check = current_date - timedelta(days=i)
+            day_str = day_to_check.strftime('%Y-%m-%d')
+            
+            # Check if any activity on this day
+            day_has_activity = any(day_str in act['date'] for act in sorted_activities)
+            
+            if day_has_activity:
+                consecutive_days += 1
+            else:
+                metrics['last_rest_day'] = day_str
+                break
+        
+        metrics['consecutive_training_days'] = consecutive_days
+        
+        # Calculate Zone 3 accumulation in last 3 days
+        three_days_ago = now - timedelta(days=3)
+        for activity in sorted_activities:
+            activity_date = datetime.fromisoformat(activity['date'].replace('Z', '+00:00'))
+            if activity_date >= three_days_ago:
+                duration = activity.get('duration_minutes', 0)
+                zone3_percent = activity.get('zone3_percent', 0)
+                metrics['total_minutes_last_3_days'] += duration
+                metrics['zone3_last_3_days'] += duration * (zone3_percent / 100)
+        
+        # Calculate Zone 3 percentage for last 3 days
+        if metrics['total_minutes_last_3_days'] > 0:
+            metrics['zone3_percent_last_3_days'] = (metrics['zone3_last_3_days'] / metrics['total_minutes_last_3_days']) * 100
+        else:
+            metrics['zone3_percent_last_3_days'] = 0
+        
+        # Calculate what volume will be tomorrow (after today rolls off the 7-day window)
+        tomorrow = now + timedelta(days=1)
+        seven_days_from_tomorrow = tomorrow - timedelta(days=7)
+        
+        tomorrow_volume = 0
+        for activity in sorted_activities:
+            activity_date = datetime.fromisoformat(activity['date'].replace('Z', '+00:00'))
+            # Include activities from 6 days before tomorrow through tomorrow (which won't have any)
+            if seven_days_from_tomorrow <= activity_date < tomorrow:
+                tomorrow_volume += activity.get('duration_minutes', 0)
+        
+        metrics['tomorrow_volume_after_rolloff'] = tomorrow_volume
+        
+        # Calculate weekly volume change
+        this_week_volume = sum(act.get('duration_minutes', 0) 
+                              for act in sorted_activities 
+                              if datetime.fromisoformat(act['date'].replace('Z', '+00:00')) >= now - timedelta(days=7))
+        
+        last_week_volume = sum(act.get('duration_minutes', 0) 
+                              for act in sorted_activities 
+                              if now - timedelta(days=14) <= datetime.fromisoformat(act['date'].replace('Z', '+00:00')) < now - timedelta(days=7))
+        
+        if last_week_volume > 0:
+            metrics['weekly_volume_change'] = ((this_week_volume - last_week_volume) / last_week_volume) * 100
+        else:
+            metrics['weekly_volume_change'] = 0
+            
+        return metrics
+    
     def analyze_training_data(self, training_data: Dict) -> TrainingAnalysis:
         """Complete analysis of training data"""
         activities = training_data.get('activities', [])
@@ -243,7 +335,8 @@ class PromptBuilder:
             return "NIH research summary not available."
     
     def create_training_context(self, analysis: TrainingAnalysis, 
-                              scheduling: SchedulingContext, training_data: Dict) -> str:
+                              scheduling: SchedulingContext, training_data: Dict, 
+                              recovery_metrics: Dict = None) -> str:
         """Create comprehensive training context for AI"""
         context = []
         
@@ -327,6 +420,27 @@ class PromptBuilder:
         elif analysis.zone1_percent < 70 and analysis.training_approach == "pyramidal":
             context.append(f"🎯 PRIORITY: Increase Zone 1 from {analysis.zone1_percent:.1f}% to 70% (pyramidal approach for your volume).")
         
+        # Add recovery metrics if available
+        if recovery_metrics:
+            context.append(f"\\n## Recovery & Training Load Assessment")
+            context.append(f"- Consecutive training days: {recovery_metrics['consecutive_training_days']}")
+            context.append(f"- Zone 3 in last 3 days: {recovery_metrics['zone3_percent_last_3_days']:.1f}%")
+            context.append(f"- Weekly volume change: {recovery_metrics['weekly_volume_change']:+.1f}%")
+            context.append(f"- Tomorrow's projected volume: {recovery_metrics['tomorrow_volume_after_rolloff']} min")
+            
+            # Recovery recommendations based on metrics
+            if recovery_metrics['consecutive_training_days'] >= 5:
+                context.append(f"⚠️ REST DAY RECOMMENDED: {recovery_metrics['consecutive_training_days']} consecutive training days")
+            
+            if recovery_metrics['zone3_percent_last_3_days'] > 15:
+                context.append(f"⚠️ HIGH INTENSITY OVERLOAD: Zone 3 at {recovery_metrics['zone3_percent_last_3_days']:.1f}% in last 3 days")
+            
+            if recovery_metrics['weekly_volume_change'] > 30:
+                context.append(f"⚠️ VOLUME SPIKE: {recovery_metrics['weekly_volume_change']:.1f}% increase from last week")
+            
+            if recovery_metrics['tomorrow_volume_after_rolloff'] > 360:
+                context.append(f"📊 Tomorrow you'll still be at {recovery_metrics['tomorrow_volume_after_rolloff']} min (above 360 target)")
+        
         # Recent activities
         recent_activities = analysis.recent_activities[:5]  # First 5 activities (most recent)
         if recent_activities:
@@ -353,10 +467,13 @@ class PromptBuilder:
         analysis = self.analyzer.analyze_training_data(training_data)
         scheduling = self.scheduling_provider.get_current_context(analysis.recent_activities)
         
+        # Calculate recovery metrics
+        recovery_metrics = self.analyzer.calculate_recovery_metrics(training_data.get('activities', []))
+        
         # Load context components
         user_preferences = self.load_user_preferences()
         nih_research = self.load_nih_research_summary()
-        training_context = self.create_training_context(analysis, scheduling, training_data)
+        training_context = self.create_training_context(analysis, scheduling, training_data, recovery_metrics)
         
         # Build complete prompt
         prompt = f"""
@@ -437,6 +554,12 @@ CRITICAL RULES - READ CAREFULLY:
 - **ZONE 3 MATH CHECK**: If Zone 3 percentage is 10.0% or higher, the athlete has ENOUGH high-intensity. Focus on Zone 1 only.
 - **Zone 2 threshold work**: More appropriate for pyramidal (limited volume) athletes
 - **When Zone 3 is adequate**: Only recommend Zone 1 (aerobic base) and Zone 2 (threshold) workouts
+- **🛑 RECOVERY RULES**:
+  - **5+ consecutive training days**: MUST recommend rest day or very light recovery (max 30 min Zone 1)
+  - **Zone 3 > 15% in last 3 days**: NO high-intensity work, focus on Zone 1 recovery
+  - **Weekly volume increase > 30%**: Reduce intensity and volume to prevent overtraining
+  - **Tomorrow's volume > 360 min**: If they'll still be above target tomorrow, recommend rest or very light activity
+  - **Already trained today**: Be conservative with additional recommendations
 - **DAY-OF-WEEK SCHEDULING**:
   - **Monday-Friday**: Recommend 30-75 minute workouts (work day constraints)
   - **Saturday-Sunday**: Longer sessions (90+ minutes) are appropriate for weekend
