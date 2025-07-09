@@ -7,6 +7,7 @@ from enum import Enum
 import json
 import os
 import requests
+from cache_manager import CacheManager
 
 
 class DownloadStatus(Enum):
@@ -347,30 +348,9 @@ class DownloadManager:
             print(f"Debug: Downloaded {len(detailed_activities)} new activities")
             print(f"Debug: Need to fetch all {len(all_activities)} activities for complete analysis")
             
-            # Get detailed data for ALL activities (not just new ones)
-            all_detailed_activities = []
-            for idx, activity in enumerate(all_activities):
-                activity_id = activity['id']
-                
-                # Check if we already have this activity in cache
-                cache_file = os.path.join('cache', f'_activities_{activity_id}_.json')
-                if os.path.exists(cache_file) and activity_id not in [a['id'] for a in detailed_activities]:
-                    # Use cached version
-                    try:
-                        with open(cache_file, 'r') as f:
-                            cached_activity = json.load(f)
-                            all_detailed_activities.append(cached_activity)
-                            continue
-                    except:
-                        pass
-                
-                # Use the already downloaded version if it's a new activity
-                existing_detail = next((a for a in detailed_activities if a['id'] == activity_id), None)
-                if existing_detail:
-                    all_detailed_activities.append(existing_detail)
-                else:
-                    # This shouldn't happen, but just in case
-                    print(f"Warning: Activity {activity_id} not found in detailed activities")
+            # Use CacheManager to properly merge new activities with all cached ones
+            cache_manager = CacheManager()
+            all_detailed_activities = cache_manager.merge_with_new_activities(detailed_activities)
             
             # Sort by date (newest first)
             all_detailed_activities.sort(
@@ -457,9 +437,8 @@ class DownloadManager:
                 ]
             }
             
-            # Save to file
-            with open('cache/training_analysis_report.json', 'w') as f:
-                json.dump(data, f, indent=2)
+            # Save to file using CacheManager
+            cache_manager.save_analysis_report(data)
             
             self._update_state(
                 status=DownloadStatus.COMPLETED,

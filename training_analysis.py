@@ -82,7 +82,7 @@ class PowerZones:
             zone1_max=int(ftp * 0.55),   # Recovery
             zone2_max=int(ftp * 0.75),   # Endurance
             zone3_max=int(ftp * 0.90),   # Tempo
-            zone4_max=int(ftp * 0.105),  # Threshold
+            zone4_max=int(ftp * 1.05),   # Threshold
             zone5_max=int(ftp * 1.20),   # VO2max
             zone6_max=int(ftp * 1.50),   # Anaerobic
             zone7_min=int(ftp * 1.50),   # Neuromuscular

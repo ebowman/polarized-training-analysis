@@ -22,6 +22,7 @@ from flask import Flask, render_template, jsonify, request, redirect, session, u
 from training_analysis import TrainingAnalyzer
 from strava_client import StravaClient
 from download_manager import DownloadManager
+from cache_manager import CacheManager
 
 app = Flask(__name__, template_folder='templates')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -168,16 +169,26 @@ def get_training_data(force_refresh=False):
             return cached_data
     
     try:
-        # Try to load from existing analysis file first
-        analysis_file = 'cache/training_analysis_report.json'
-        if os.path.exists(analysis_file):
-            with open(analysis_file, 'r') as f:
-                data = json.load(f)
-                cached_data = data
-                cache_timestamp = current_time
-                return data
+        # First, try to load existing analysis report
+        cache_manager = CacheManager()
+        existing_report = cache_manager.load_analysis_report()
         
-        # If no analysis file exists, check if download is in progress
+        if existing_report:
+            # Verify it has the expected structure
+            if 'distribution' in existing_report and 'activities' in existing_report:
+                cached_data = existing_report
+                cache_timestamp = current_time
+                return existing_report
+        
+        # If no valid report exists, try to regenerate from cached activities
+        report_data = cache_manager.ensure_analysis_includes_all_activities()
+        
+        if report_data:
+            cached_data = report_data
+            cache_timestamp = current_time
+            return report_data
+        
+        # If no cached activities exist, check if download is in progress
         download_manager = DownloadManager()
         if download_manager.is_downloading():
             # Return a placeholder indicating download in progress
