@@ -14,7 +14,7 @@ class TestStravaClient:
     """Test the StravaClient class"""
     
     @pytest.fixture
-    def client(self):
+    def client(self, mock_env):
         """Create a StravaClient instance"""
         return StravaClient()
     

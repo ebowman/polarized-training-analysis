@@ -17,9 +17,26 @@ class TestAIRecommendations:
     @pytest.fixture
     def ai_engine(self):
         """Create an AI recommendation engine instance"""
-        with patch('ai_recommendations.openai'):
-            engine = AIRecommendationEngine()
-            return engine
+        # Mock the provider
+        mock_provider = MagicMock()
+        mock_provider.get_provider_name.return_value = "MockProvider"
+        mock_provider.generate_completion.return_value = json.dumps([
+            {
+                "workout_type": "easy_aerobic",
+                "primary_zone": 1,
+                "duration_minutes": 60,
+                "description": "Easy recovery run",
+                "structure": "60 minutes at easy pace",
+                "reasoning": "Recovery from recent hard efforts",
+                "equipment": "Running shoes",
+                "intensity_zones": [1],
+                "priority": "high"
+            }
+        ])
+        
+        # Create engine with mocked provider
+        engine = AIRecommendationEngine(provider=mock_provider)
+        return engine
     
     @pytest.fixture
     def sample_training_analysis(self):
@@ -47,63 +64,40 @@ class TestAIRecommendations:
             ]
         }
     
-    @patch('ai_recommendations.openai.OpenAI')
-    def test_generate_recommendations_success(self, mock_openai_class, ai_engine, sample_training_analysis):
+    def test_generate_recommendations_success(self, ai_engine, sample_training_analysis):
         """Test successful AI recommendation generation"""
-        # Create mock client instance
-        mock_client = MagicMock()
-        mock_openai_class.return_value = mock_client
-        
-        # Mock the chat completions response
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = """[
-            {
-                "workout_type": "Easy Recovery Run",
-                "duration_minutes": 45,
-                "description": "Zone 1 intensity (65-75% LTHR)",
-                "structure": "Focus on relaxed form",
-                "reasoning": "Recovery from previous workouts",
-                "equipment": "None",
-                "intensity_zones": [1],
-                "priority": "high"
-            }
-        ]"""
-        
-        mock_client.chat.completions.create.return_value = mock_response
-        
-        # Reinitialize engine to use mocked client
-        ai_engine.__init__()
-        
-        recommendations = ai_engine.generate_recommendations(sample_training_analysis)
+        # Generate recommendations using mocked provider
+        recommendations = ai_engine.generate_ai_recommendations(sample_training_analysis)
         
         # Verify recommendations were generated
         assert recommendations is not None
-        assert 'Weekly Training Plan' in recommendations
-        assert 'Easy Recovery Run' in recommendations
+        assert isinstance(recommendations, list)
+        assert len(recommendations) > 0
         
-        # Verify OpenAI was called
-        mock_client.chat.completions.create.assert_called()
+        # Verify structure of first recommendation
+        rec = recommendations[0]
+        assert rec.workout_type == "easy_aerobic"
+        assert 1 in rec.intensity_zones
+        assert rec.duration_minutes == 60
+        assert rec.priority == "high"
+        
+        # Verify provider was called
+        ai_engine.provider.generate_completion.assert_called()
     
-    @patch('ai_recommendations.openai.OpenAI')
-    def test_generate_recommendations_api_error(self, mock_openai_class, ai_engine, sample_training_analysis):
-        """Test handling of OpenAI API errors"""
-        # Create mock client instance
-        mock_client = MagicMock()
-        mock_openai_class.return_value = mock_client
+    def test_generate_recommendations_api_error(self, ai_engine, sample_training_analysis):
+        """Test handling of AI provider API errors"""
+        # Make the provider raise an exception
+        ai_engine.provider.generate_completion.side_effect = Exception("API Error: Rate limit exceeded")
         
-        # Make the API call raise an exception
-        mock_client.chat.completions.create.side_effect = Exception("API Error: Rate limit exceeded")
+        # The method should handle the error gracefully and return fallback recommendations
+        recommendations = ai_engine.generate_ai_recommendations(sample_training_analysis)
         
-        # Reinitialize engine to use mocked client
-        ai_engine.__init__()
-        
-        # The method should handle the error and return fallback recommendations
-        recommendations = ai_engine.generate_recommendations(sample_training_analysis)
-        
-        # Should still return something (fallback recommendations)
+        # Should return a list with at least one fallback recommendation
         assert recommendations is not None
-        assert 'Weekly Training Plan' in recommendations
+        assert isinstance(recommendations, list)
+        assert len(recommendations) > 0
+        # Check it's a fallback recommendation
+        assert recommendations[0].workout_type in ["easy_aerobic", "recovery", "Fallback Workout"]
     
     def test_format_analysis_for_ai(self, ai_engine, sample_training_analysis):
         """Test formatting training data for AI prompt"""

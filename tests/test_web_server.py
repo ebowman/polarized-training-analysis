@@ -172,9 +172,17 @@ class TestWebServer:
         response = client.post('/api/ai-recommendations/refresh')
         assert response.status_code == 401
     
+    @patch('web_server.ai_engine', new=MagicMock())
+    @patch('web_server.get_training_data')
     @patch('web_server.start_ai_generation')
-    def test_api_ai_recommendations_refresh(self, mock_start_generation, mock_session):
+    def test_api_ai_recommendations_refresh(self, mock_start_generation, mock_get_training_data, mock_session):
         """Test AI recommendations refresh endpoint"""
+        # Mock training data
+        mock_get_training_data.return_value = {
+            'distribution': {'zone1_percent': 70, 'zone2_percent': 20, 'zone3_percent': 10},
+            'activities': []
+        }
+        
         response = mock_session.post('/api/ai-recommendations/refresh')
         assert response.status_code == 200
         data = json.loads(response.data)
@@ -200,6 +208,7 @@ class TestWebServer:
         data = json.loads(response.data)
         assert 'recommendations' in data or data.get('recommendations') == 'Test workout plan'
     
+    @patch('web_server.ai_engine', new=MagicMock())
     def test_api_ai_status_not_found(self, client):
         """Test AI status for non-existent session"""
         response = client.get('/api/ai-status/nonexistent')

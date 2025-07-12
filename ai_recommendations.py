@@ -761,6 +761,123 @@ class AIRecommendationEngine:
         # If we get here, all retries failed
         return self._create_fallback_recommendations(f"All {self.max_retries} attempts failed")
     
+    def generate_pathway_recommendations(self, training_data: Dict, pathways: List[Dict]) -> Dict[str, AIWorkoutRecommendation]:
+        """Generate AI recommendations for multiple recovery pathways in a single call"""
+        
+        # Build special prompt for pathway recommendations
+        prompt = self._build_pathway_prompt(training_data, pathways)
+        
+        try:
+            provider_name = self.provider.get_provider_name()
+            print(f"🤖 Generating pathway recommendations using {provider_name}...")
+            
+            # Call AI provider
+            response_json = self.provider.generate_completion(prompt, temperature=0.5)
+            
+            # Parse response
+            parsed_data = json.loads(response_json)
+            
+            # Convert to recommendations by pathway type
+            pathway_recs = {}
+            for pathway in pathways:
+                pathway_type = pathway['type']
+                if pathway_type in parsed_data:
+                    rec_data = parsed_data[pathway_type]
+                    if rec_data:
+                        pathway_recs[pathway_type] = AIWorkoutRecommendation(
+                            workout_type=rec_data.get('workout_type', 'Unknown'),
+                            duration_minutes=rec_data.get('duration_minutes', pathway['todayMinutes']),
+                            description=rec_data.get('description', ''),
+                            structure=rec_data.get('structure', ''),
+                            reasoning=rec_data.get('reasoning', ''),
+                            equipment=rec_data.get('equipment', 'General'),
+                            intensity_zones=rec_data.get('intensity_zones', [1]),
+                            priority=rec_data.get('priority', 'medium'),
+                            generated_at=datetime.now().isoformat()
+                        )
+            
+            return pathway_recs
+            
+        except Exception as e:
+            print(f"Error generating pathway recommendations: {e}")
+            # Return fallback recommendations for each pathway
+            fallback_recs = {}
+            for pathway in pathways:
+                if pathway['todayMinutes'] == 0:
+                    fallback_recs[pathway['type']] = AIWorkoutRecommendation(
+                        workout_type="Rest Day",
+                        duration_minutes=0,
+                        description="Complete rest for recovery",
+                        structure="No training - focus on recovery",
+                        reasoning="Rest day selected for this pathway",
+                        equipment="None",
+                        intensity_zones=[],
+                        priority="high",
+                        generated_at=datetime.now().isoformat()
+                    )
+                else:
+                    fallback_recs[pathway['type']] = self._create_fallback_recommendations(str(e))[0]
+                    fallback_recs[pathway['type']].duration_minutes = pathway['todayMinutes']
+            
+            return fallback_recs
+    
+    def _build_pathway_prompt(self, training_data: Dict, pathways: List[Dict]) -> str:
+        """Build prompt for pathway-specific recommendations"""
+        # Get base training context
+        analyzer = TrainingDataAnalyzer()
+        analysis = analyzer.analyze_training_data(training_data)
+        
+        prompt = f"""You are an expert endurance coach. The athlete needs workout recommendations for different recovery pathway options.
+
+Current Training Status:
+- Zone distribution: Zone 1: {analysis.zone1_percent:.1f}%, Zone 2: {analysis.zone2_percent:.1f}%, Zone 3: {analysis.zone3_percent:.1f}%
+- Rolling 7-day volume: {analysis.total_minutes} minutes
+- Equipment available: Peloton bike, running shoes, rowing machine
+
+Generate specific workout recommendations for EACH of these recovery pathways:
+
+"""
+        
+        for pathway in pathways:
+            prompt += f"""
+{pathway['name']} ({pathway['type']}):
+- Today: {pathway['todayMinutes']} minutes
+- Tomorrow: {pathway['tomorrowMinutes']} minutes
+"""
+        
+        prompt += """
+For each pathway, recommend an appropriate workout that:
+1. Matches the exact duration for today
+2. Considers the athlete's current zone distribution
+3. Is appropriate for the recovery approach (gentle/steady/aggressive)
+4. For 0 minute days, confirm it's a rest day
+
+Return ONLY a JSON object with this structure:
+{
+"""
+        
+        for i, pathway in enumerate(pathways):
+            if i > 0:
+                prompt += ","
+            prompt += f"""
+  "{pathway['type']}": {{
+    "workout_type": "string",
+    "duration_minutes": {pathway['todayMinutes']},
+    "description": "string",
+    "structure": "string",
+    "reasoning": "string",
+    "equipment": "string",
+    "intensity_zones": [array],
+    "priority": "string"
+  }}"""
+        
+        prompt += """
+}
+
+Return ONLY the JSON, no other text."""
+        
+        return prompt
+    
     def _parse_response(self, response_json: str) -> List[AIWorkoutRecommendation]:
         """Parse and validate AI response"""
         provider_name = self.provider.get_provider_name()
