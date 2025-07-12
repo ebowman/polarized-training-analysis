@@ -89,21 +89,25 @@ class TestWebServer:
         assert response.status_code == 302  # Redirect
         assert 'strava.com/oauth/authorize' in response.location
     
-    @patch('web_server.strava_client.get_access_token')
-    def test_strava_callback(self, mock_get_token, client):
+    @patch('web_server.strava_client')
+    def test_strava_callback(self, mock_strava_client, client):
         """Test Strava OAuth callback handling"""
-        mock_get_token.return_value = {
+        # Mock the global strava_client
+        mock_strava_client.get_access_token.return_value = {
             'access_token': 'new_token',
             'refresh_token': 'refresh_token',
-            'athlete': {'id': 12345}
+            'athlete': {'id': 12345, 'firstname': 'Test'}
         }
         
         response = client.get('/strava-callback?code=test_code')
-        assert response.status_code == 302  # Redirect to home
+        assert response.status_code == 302  # Redirect to download_progress
+        assert response.location.endswith('/download-progress')
         
         # Verify session was updated
         with client.session_transaction() as sess:
             assert sess.get('strava_access_token') == 'new_token'
+            assert sess.get('auth_success') == True
+            assert sess.get('athlete_name') == 'Test'
     
     def test_strava_callback_error(self, client):
         """Test Strava callback with error"""
@@ -113,22 +117,30 @@ class TestWebServer:
         assert 'error' in data
         assert 'access_denied' in data['error']
     
+    @patch('strava_client.StravaClient')
     @patch('web_server.DownloadManager')
-    def test_api_download_workouts(self, mock_dm_class, mock_session):
+    def test_api_download_workouts(self, mock_dm_class, mock_client_class, mock_session):
         """Test download workouts API endpoint"""
         mock_dm_instance = MagicMock()
-        mock_dm_instance.download_workouts.return_value = 'download_123'
+        mock_dm_instance.start_download.return_value = True
         mock_dm_class.return_value = mock_dm_instance
+        
+        mock_client_instance = MagicMock()
+        mock_client_instance._save_tokens = MagicMock()  # Mock the _save_tokens method
+        mock_client_class.return_value = mock_client_instance
         
         response = mock_session.post('/api/download-workouts',
                                     json={'days': 30})
+        if response.status_code != 200:
+            print(f"Response status: {response.status_code}")
+            print(f"Response data: {response.data}")
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['status'] == 'started'
-        assert data['download_id'] == 'download_123'
+        assert data['message'] == 'Download started'
         
         # Verify download was called with correct params
-        mock_dm_instance.download_workouts.assert_called_once()
+        mock_dm_instance.start_download.assert_called_once()
     
     def test_api_download_workouts_unauthorized(self, client):
         """Test download endpoint without authentication"""

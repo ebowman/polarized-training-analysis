@@ -421,10 +421,6 @@ def api_download_workouts():
         return jsonify({'error': 'Not authenticated with Strava'}), 401
         
     try:
-        # Use global strava_client
-        if strava_client is None:
-            return jsonify({'error': 'Strava client not initialized'}), 500
-        
         # Get request data
         data = request.get_json() or {}
         days = data.get('days', 30)
