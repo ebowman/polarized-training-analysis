@@ -137,6 +137,68 @@ def start_ai_generation(session_id: str, training_data: dict):
     
     return session_id
 
+def start_pathway_ai_generation(session_id: str, training_data: dict, pathways: list):
+    """Start AI recommendation generation for multiple recovery pathways"""
+    def generate():
+        try:
+            with ai_sessions_lock:
+                ai_sessions[session_id] = {
+                    "status": "pending",
+                    "timestamp": time.time()
+                }
+            
+            # Generate AI recommendations for each pathway
+            pathway_recommendations = ai_engine.generate_pathway_recommendations(training_data, pathways)
+            
+            # Convert to dict format
+            recommendations_dict = {}
+            for pathway_type, rec in pathway_recommendations.items():
+                if rec:
+                    recommendations_dict[pathway_type] = {
+                        'workout_type': rec.workout_type,
+                        'duration_minutes': rec.duration_minutes,
+                        'description': rec.description,
+                        'structure': rec.structure,
+                        'reasoning': rec.reasoning,
+                        'equipment': rec.equipment,
+                        'intensity_zones': rec.intensity_zones,
+                        'priority': rec.priority
+                    }
+            
+            with ai_sessions_lock:
+                ai_sessions[session_id] = {
+                    "status": "ready",
+                    "data": {
+                        'pathway_recommendations': recommendations_dict,
+                        'generated_at': datetime.now().isoformat()
+                    },
+                    "timestamp": time.time()
+                }
+                
+        except Exception as e:
+            print(f"Error in pathway AI generation: {e}")
+            error_message = str(e)
+            
+            # Provide more specific error messages
+            if "service" in error_message.lower() and "unavailable" in error_message.lower():
+                error_message = "AI service is temporarily unavailable. Please try again in a few moments."
+            elif "rate limit" in error_message.lower():
+                error_message = "AI rate limit reached. Please wait a minute before trying again."
+            
+            with ai_sessions_lock:
+                ai_sessions[session_id] = {
+                    "status": "error",
+                    "error": error_message,
+                    "timestamp": time.time()
+                }
+    
+    # Start background thread
+    thread = threading.Thread(target=generate)
+    thread.daemon = True
+    thread.start()
+    
+    return session_id
+
 def get_zone_calculations():
     """Helper function to calculate zone ranges from .env values"""
     import os
@@ -275,6 +337,13 @@ def auth_callback():
         session['auth_success'] = True
         session['athlete_name'] = token_data.get('athlete', {}).get('firstname', 'Athlete')
         session['strava_access_token'] = token_data.get('access_token')  # For auth checks
+        session.permanent = True  # Make session persistent
+        
+        # Debug logging
+        print(f"OAuth callback - Setting session data:")
+        print(f"  - auth_success: {session.get('auth_success')}")
+        print(f"  - athlete_name: {session.get('athlete_name')}")
+        print(f"  - access_token exists: {bool(session.get('strava_access_token'))}")
         
         return redirect(url_for('download_progress'))
         
@@ -306,8 +375,17 @@ def strava_callback():
         session['strava_access_token'] = token_data.get('access_token')
         session['strava_refresh_token'] = token_data.get('refresh_token')
         session['athlete_id'] = token_data.get('athlete', {}).get('id')
+        session['auth_success'] = True
+        session['athlete_name'] = token_data.get('athlete', {}).get('firstname', 'Athlete')
+        session.permanent = True  # Make session persistent
         
-        return redirect(url_for('index'))
+        # Debug logging
+        print(f"Strava callback - Setting session data:")
+        print(f"  - auth_success: {session.get('auth_success')}")
+        print(f"  - athlete_name: {session.get('athlete_name')}")
+        print(f"  - access_token exists: {bool(session.get('strava_access_token'))}")
+        
+        return redirect(url_for('download_progress'))
         
     except Exception as e:
         return jsonify({'error': f'Failed to complete OAuth: {str(e)}'}), 500
@@ -315,6 +393,13 @@ def strava_callback():
 @app.route('/download-progress')
 def download_progress():
     """Show download progress page"""
+    # Debug logging
+    print(f"Download progress page - Session check:")
+    print(f"  - Session keys: {list(session.keys())}")
+    print(f"  - auth_success: {session.get('auth_success')}")
+    print(f"  - athlete_name: {session.get('athlete_name')}")
+    print(f"  - access_token exists: {bool(session.get('strava_access_token'))}")
+    
     if not session.get('auth_success'):
         return redirect(url_for('index'))
     
@@ -324,6 +409,13 @@ def download_progress():
 @app.route('/api/download-workouts', methods=['POST'])
 def api_download_workouts():
     """API endpoint to start downloading latest workouts from Strava"""
+    # Debug logging
+    print(f"Download API - Session check:")
+    print(f"  - Session keys: {list(session.keys())}")
+    print(f"  - auth_success: {session.get('auth_success')}")
+    print(f"  - athlete_name: {session.get('athlete_name')}")
+    print(f"  - access_token exists: {bool(session.get('strava_access_token'))}")
+    
     # Check if user is authorized
     if not session.get('strava_access_token'):
         return jsonify({'error': 'Not authenticated with Strava'}), 401
@@ -336,16 +428,37 @@ def api_download_workouts():
         # Get request data
         data = request.get_json() or {}
         days = data.get('days', 30)
+        force = data.get('force', False)
+        
+        # Create a StravaClient with the session token
+        from strava_client import StravaClient
+        client = StravaClient()
+        # Override the cached token with the session token
+        access_token = session.get('strava_access_token')
+        refresh_token = session.get('strava_refresh_token')
+        
+        if access_token:
+            client.access_token = access_token
+            if refresh_token:
+                client.refresh_token = refresh_token
+            # Save tokens to cache so subsequent operations work
+            client._save_tokens()
         
         # Get download manager instance
         download_manager = DownloadManager()
         
-        # Mock download for testing
-        download_id = download_manager.download_workouts(session.get('strava_access_token'), days)
+        # Start the download
+        started = download_manager.start_download(client, days_back=days, force_check=force)
+        
+        if not started:
+            # Already downloading
+            return jsonify({
+                'status': 'already_downloading',
+                'state': download_manager.get_state()
+            })
         
         return jsonify({
             'status': 'started',
-            'download_id': download_id,
             'message': 'Download started'
         })
         
@@ -495,6 +608,51 @@ def api_ai_status(session_id):
         })
     else:
         return jsonify({'error': 'Invalid session status'}), 500
+
+@app.route('/api/ai-recommendations/pathways', methods=['POST'])
+def api_ai_recommendations_pathways():
+    """API endpoint to generate AI recommendations for recovery pathways"""
+    # This endpoint works with already-loaded data, so we just check if data exists
+    if not os.path.exists('cache/training_analysis_report.json'):
+        return jsonify({'error': 'No training data available'}), 404
+        
+    # Try to reinitialize AI engine if it's not available
+    global ai_engine
+    if not ai_engine:
+        try:
+            from ai_recommendations import AIRecommendationEngine
+            ai_engine = AIRecommendationEngine()
+            print("✅ AI recommendations re-enabled")
+        except ValueError as e:
+            return jsonify({'error': 'AI recommendations are not configured. Check your AI API key in .env file.'}), 503
+        except Exception as e:
+            return jsonify({'error': f'AI service initialization failed: {str(e)}'}), 503
+    
+    try:
+        # Get pathway data from request
+        data = request.get_json()
+        pathways = data.get('pathways', [])
+        
+        if not pathways:
+            return jsonify({'error': 'No pathways provided'}), 400
+            
+        # Get training data
+        training_data = get_training_data()
+        
+        # Generate new session ID
+        session_id = str(uuid.uuid4())
+        
+        # Start AI generation for pathways in background
+        start_pathway_ai_generation(session_id, training_data, pathways)
+        
+        return jsonify({
+            'status': 'generating',
+            'session_id': session_id,
+            'message': 'AI pathway recommendations generation started'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/ai-recommendations/refresh', methods=['POST'])
 def api_ai_recommendations_refresh():

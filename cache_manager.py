@@ -37,6 +37,19 @@ class CacheManager:
                     with open(filepath, 'r') as f:
                         activity = json.load(f)
                         if isinstance(activity, dict) and 'id' in activity:
+                            # Try to load associated streams
+                            activity_id = activity['id']
+                            streams_pattern = f'_activities_{activity_id}_streams_'
+                            for stream_file in os.listdir(self.cache_dir):
+                                if stream_file.startswith(streams_pattern) and stream_file.endswith('.json'):
+                                    try:
+                                        stream_path = os.path.join(self.cache_dir, stream_file)
+                                        with open(stream_path, 'r') as sf:
+                                            streams = json.load(sf)
+                                            activity['streams'] = streams
+                                            break
+                                    except Exception as e:
+                                        print(f"Error loading streams for activity {activity_id}: {e}")
                             all_activities.append(activity)
                 except Exception as e:
                     print(f"Error loading cache file {filename}: {e}")
@@ -116,8 +129,8 @@ class CacheManager:
         if analyzed_activities:
             distribution = analyzer.calculate_training_distribution(analyzed_activities)
             
-            # Generate summary statistics
-            summary = analyzer.generate_summary(analyzed_activities, distribution)
+            # Generate summary statistics (method doesn't exist, using distribution instead)
+            summary = distribution
             
             # Get workout recommendations
             recommendations = analyzer.get_workout_recommendations(analyzed_activities)
@@ -162,11 +175,13 @@ class CacheManager:
                 },
                 'workout_recommendations': [
                     {
-                        'type': rec.workout_type,
-                        'zone': rec.zone,
-                        'duration': rec.duration_range,
-                        'intensity': rec.intensity_description,
-                        'notes': rec.notes
+                        'type': rec.workout_type.value if hasattr(rec.workout_type, 'value') else str(rec.workout_type),
+                        'primary_zone': rec.primary_zone,
+                        'duration_minutes': rec.duration_minutes,
+                        'description': rec.description,
+                        'structure': rec.structure,
+                        'reasoning': rec.reasoning,
+                        'priority': rec.priority
                     }
                     for rec in recommendations
                 ],
