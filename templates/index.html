@@ -1269,6 +1269,11 @@
             aiRecommendationsDiv.style.display = 'block';
         }
         
+        // Alias for the retry button in error messages
+        function generateAIRecommendations() {
+            refreshAIRecommendations();
+        }
+        
         async function refreshAIRecommendations() {
             const refreshBtn = document.getElementById('refresh-ai-btn');
             const originalText = refreshBtn.textContent;
@@ -1287,7 +1292,7 @@
                 
                 const data = await response.json();
                 
-                if (data.status === 'started' && data.session_id) {
+                if (data.status === 'generating' && data.session_id) {
                     // Update session ID and start polling
                     aiSessionId = data.session_id;
                     
