@@ -1356,9 +1356,9 @@
                 return;
             }
             
-            // Calculate volume data for past 14 days
+            // Calculate volume data for past 7 days (rolling week)
             const today = new Date();
-            const daysToShow = 14;
+            const daysToShow = 7;
             const targetWeeklyMinutes = 360; // 6 hours
             const dailyData = [];
             
@@ -1411,26 +1411,69 @@
             }
             
             // Calculate what's needed
-            const remainingDays = 7; // Looking forward 7 days
+            // For rolling 7-day window: we need to maintain the target over the next 7 days
+            // considering that past days will drop off
             const minutesNeeded = Math.max(0, targetWeeklyMinutes - rollingWeekMinutes);
-            const dailyAvgNeeded = minutesNeeded / remainingDays;
             
-            // Project future days
-            for (let i = 1; i <= 7; i++) {
-                const date = new Date(today);
-                date.setDate(date.getDate() + i);
+            // Calculate projection for today if not yet completed
+            const todayData = dailyData[todayIndex];
+            let todayProjection = 0;
+            if (todayData && todayData.minutes === 0) {
+                // If no activity today yet, show projection for today
+                todayProjection = minutesNeeded / 7; // Spread evenly over next 7 days including today
+            }
+            
+            // For future days: need to account for days dropping off the rolling window
+            const futureDays = [];
+            let projectedRollingTotal = rollingWeekMinutes;
+            
+            // First, add today's projection if needed
+            if (todayProjection > 0) {
+                todayData.projectedMinutes = todayProjection;
+                projectedRollingTotal += todayProjection;
+            }
+            
+            // Project next 6 days (not 7, to keep total display reasonable)
+            for (let i = 1; i <= 6; i++) {
+                const futureDate = new Date(today);
+                futureDate.setDate(futureDate.getDate() + i);
+                
+                // Calculate what drops off (7 days before this future date)
+                const dropOffDate = new Date(futureDate);
+                dropOffDate.setDate(dropOffDate.getDate() - 7);
+                
+                // Find minutes that will drop off
+                let droppingMinutes = 0;
+                const dropOffIndex = dailyData.findIndex(day => 
+                    day.date.toLocaleDateString('en-US') === dropOffDate.toLocaleDateString('en-US')
+                );
+                if (dropOffIndex >= 0) {
+                    droppingMinutes = dailyData[dropOffIndex].minutes;
+                }
+                
+                // Calculate needed minutes for this future day
+                projectedRollingTotal -= droppingMinutes;
+                const stillNeeded = Math.max(0, targetWeeklyMinutes - projectedRollingTotal);
+                const daysRemaining = 7 - i + 1; // Days remaining in the rolling window
+                const dailyNeeded = stillNeeded / daysRemaining;
+                
                 dailyData.push({
-                    date: date,
-                    dateStr: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                    minutes: dailyAvgNeeded,
+                    date: futureDate,
+                    dateStr: futureDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                    minutes: dailyNeeded,
                     isPast: false,
-                    isFuture: true
+                    isFuture: true,
+                    projectedMinutes: dailyNeeded
                 });
+                
+                projectedRollingTotal += dailyNeeded;
             }
             
             // Update stats
             document.getElementById('past-volume').textContent = `${Math.round(rollingWeekMinutes)} min`;
-            document.getElementById('daily-needed').textContent = `${Math.round(dailyAvgNeeded)} min`;
+            // Calculate simple daily average for display
+            const simpleDailyAvg = minutesNeeded / 7;
+            document.getElementById('daily-needed').textContent = `${Math.round(simpleDailyAvg)} min`;
             const deficit = targetWeeklyMinutes - rollingWeekMinutes;
             const deficitElement = document.getElementById('weekly-deficit');
             deficitElement.textContent = deficit > 0 ? `-${Math.round(deficit)} min` : `+${Math.round(Math.abs(deficit))} min`;
@@ -1447,9 +1490,9 @@
                     labels: dailyData.map(d => d.dateStr),
                     datasets: [{
                         label: 'Actual Minutes',
-                        data: dailyData.map(d => d.isPast || d.isToday ? d.minutes : 0),
+                        data: dailyData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.minutes : 0),
                         backgroundColor: dailyData.map(d => 
-                            d.isToday ? '#3498db' : 
+                            d.isToday && d.minutes > 0 ? '#3498db' : 
                             d.isPast ? '#27ae60' : 
                             'transparent'
                         ),
@@ -1457,7 +1500,11 @@
                         borderWidth: 1
                     }, {
                         label: 'Projected Minutes',
-                        data: dailyData.map(d => d.isFuture ? d.minutes : 0),
+                        data: dailyData.map(d => {
+                            if (d.isFuture) return d.minutes;
+                            if (d.isToday && d.projectedMinutes) return d.projectedMinutes;
+                            return 0;
+                        }),
                         backgroundColor: 'rgba(52, 152, 219, 0.3)',
                         borderColor: '#3498db',
                         borderWidth: 2,
@@ -1595,12 +1642,35 @@
             const aiRecommendationsDiv = document.getElementById('ai-recommendations');
             const cardsDiv = document.getElementById('ai-recommendation-cards');
             
-            cardsDiv.innerHTML = `
-                <div class="error">
-                    AI recommendations unavailable: ${message}
-                    <br><small>Make sure your OpenAI API key is set in .env file</small>
-                </div>
-            `;
+            // Customize error display based on error type
+            let errorHtml = `<div class="error">`;
+            
+            if (message.includes('temporarily unavailable')) {
+                errorHtml += `
+                    ${message}
+                    <br><button onclick="generateAIRecommendations()" class="btn btn-primary" style="margin-top: 10px;">
+                        🔄 Retry Now
+                    </button>
+                `;
+            } else if (message.includes('rate limit')) {
+                errorHtml += `
+                    ${message}
+                    <br><small>Please wait before retrying</small>
+                `;
+            } else if (message.includes('not configured')) {
+                errorHtml += `
+                    ${message}
+                    <br><small>Set OPENAI_API_KEY in your .env file</small>
+                `;
+            } else {
+                errorHtml += `
+                    AI recommendations error: ${message}
+                    <br><small>Check console for details</small>
+                `;
+            }
+            
+            errorHtml += `</div>`;
+            cardsDiv.innerHTML = errorHtml;
             
             aiRecommendationsDiv.style.display = 'block';
         }

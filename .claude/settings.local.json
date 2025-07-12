@@ -8,7 +8,9 @@
       "Bash(python3:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(pytest:*)",
+      "Bash(python:*)"
     ],
     "deny": []
   }

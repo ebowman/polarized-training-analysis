@@ -24,8 +24,10 @@ class TestStravaClient:
         monkeypatch.setenv('STRAVA_CLIENT_ID', 'test_client_id')
         monkeypatch.setenv('STRAVA_CLIENT_SECRET', 'test_client_secret')
     
-    def test_initialization(self, client, mock_env):
+    def test_initialization(self, mock_env):
         """Test client initialization with environment variables"""
+        # Create client after mocking environment
+        client = StravaClient()
         assert client.client_id == 'test_client_id'
         assert client.client_secret == 'test_client_secret'
         assert client.redirect_uri == 'http://localhost:5000/strava-callback'
@@ -106,10 +108,14 @@ class TestStravaClient:
             }
         ]
         
-        mock_response = Mock()
-        mock_response.json.return_value = mock_activities
-        mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
+        # First response returns activities, second returns empty list to stop pagination
+        mock_responses = [Mock(), Mock()]
+        mock_responses[0].json.return_value = mock_activities
+        mock_responses[0].raise_for_status = Mock()
+        mock_responses[1].json.return_value = []  # Empty response to stop pagination
+        mock_responses[1].raise_for_status = Mock()
+        
+        mock_get.side_effect = mock_responses
         
         activities = client.fetch_activities('test_token')
         
@@ -117,9 +123,9 @@ class TestStravaClient:
         assert activities[0]['name'] == 'Morning Run'
         assert activities[1]['name'] == 'Evening Ride'
         
-        # Verify API call
-        mock_get.assert_called_once()
-        call_args = mock_get.call_args
+        # Verify API calls (should be 2 due to pagination)
+        assert mock_get.call_count == 2
+        call_args = mock_get.call_args_list[0]
         assert 'https://www.strava.com/api/v3/athlete/activities' in call_args[0][0]
         assert call_args[1]['headers']['Authorization'] == 'Bearer test_token'
     
