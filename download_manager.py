@@ -150,6 +150,7 @@ class DownloadManager:
                         progress=min(10 + (page - 1) * 5, 30)
                     )
                     
+                    # Use get_activities which goes through _api_request and handles token refresh
                     activities = client.get_activities(per_page=per_page, page=page)
                     
                     if not activities:

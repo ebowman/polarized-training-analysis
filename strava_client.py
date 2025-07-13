@@ -150,13 +150,16 @@ class StravaClient:
                 print(f"Auth error ({e.response.status_code}), attempting to refresh token...")
                 try:
                     self.refresh_access_token()
+                    print("Token refreshed successfully, retrying request...")
                     # Retry with new token
                     headers = {"Authorization": f"Bearer {self.access_token}"}
                     response = requests.get(url, headers=headers, params=params)
                     response.raise_for_status()
+                    print(f"Request succeeded after token refresh")
                 except Exception as refresh_error:
                     print(f"Failed to refresh token: {refresh_error}")
-                    raise e  # Re-raise original error
+                    print("You may need to re-authorize the application")
+                    raise ValueError(f"Token refresh failed: {refresh_error}. Please re-authorize the application.") from refresh_error
             else:
                 raise
         
@@ -231,13 +234,8 @@ class StravaClient:
             if after:
                 params['after'] = after
                 
-            url = "https://www.strava.com/api/v3/athlete/activities"
-            headers = {"Authorization": f"Bearer {access_token}"}
-            
-            response = requests.get(url, headers=headers, params=params)
-            response.raise_for_status()
-            
-            return response.json()
+            # Use the _api_request method which handles token refresh
+            return self._api_request("/athlete/activities", params, cache_hours=0)
         
         # Otherwise do full pagination
         all_activities = []
@@ -251,14 +249,8 @@ class StravaClient:
             if after:
                 params['after'] = after
                 
-            # Use direct API call without caching for test compatibility
-            url = "https://www.strava.com/api/v3/athlete/activities"
-            headers = {"Authorization": f"Bearer {access_token}"}
-            
-            response = requests.get(url, headers=headers, params=params)
-            response.raise_for_status()
-            
-            activities = response.json()
+            # Use _api_request method which handles token refresh and 401 errors
+            activities = self._api_request("/athlete/activities", params, cache_hours=0)
             
             all_activities.extend(activities)
             
@@ -272,27 +264,18 @@ class StravaClient:
     
     def fetch_activity_details(self, activity_id: int, access_token: str) -> Dict:
         """Fetch detailed activity data (test compatibility)"""
-        url = f"https://www.strava.com/api/v3/activities/{activity_id}"
-        headers = {"Authorization": f"Bearer {access_token}"}
-        
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        
-        return response.json()
+        # Use the _api_request method which handles token refresh
+        return self._api_request(f"/activities/{activity_id}", cache_hours=24)
     
     def fetch_activity_streams(self, activity_id: int, access_token: str, keys: List[str] = None) -> Dict:
         """Fetch activity streams (test compatibility)"""
         if keys is None:
             keys = ["time", "heartrate", "watts"]
             
-        url = f"https://www.strava.com/api/v3/activities/{activity_id}/streams"
-        headers = {"Authorization": f"Bearer {access_token}"}
         params = {
             "keys": ",".join(keys),
             "key_by_type": True
         }
         
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()
-        
-        return response.json()
+        # Use the _api_request method which handles token refresh
+        return self._api_request(f"/activities/{activity_id}/streams", params, cache_hours=24)

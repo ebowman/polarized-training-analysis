@@ -303,6 +303,11 @@ def download_workouts():
                 # Set session state for users with existing valid tokens
                 session['auth_success'] = True
                 session['athlete_name'] = 'Athlete'  # Default name for existing tokens
+                # Copy tokens to session so download API can use them
+                session['strava_access_token'] = strava_client.access_token
+                session['strava_refresh_token'] = strava_client.refresh_token
+                session['strava_expires_at'] = strava_client.token_expires_at
+                session.permanent = True
                 return redirect(url_for('download_progress'))
             except ValueError:
                 # Token invalid, need to re-authorize
@@ -337,6 +342,8 @@ def auth_callback():
         session['auth_success'] = True
         session['athlete_name'] = token_data.get('athlete', {}).get('firstname', 'Athlete')
         session['strava_access_token'] = token_data.get('access_token')  # For auth checks
+        session['strava_refresh_token'] = token_data.get('refresh_token')  # For token refresh
+        session['strava_expires_at'] = token_data.get('expires_at')  # For expiration check
         session.permanent = True  # Make session persistent
         
         # Debug logging
@@ -344,6 +351,8 @@ def auth_callback():
         print(f"  - auth_success: {session.get('auth_success')}")
         print(f"  - athlete_name: {session.get('athlete_name')}")
         print(f"  - access_token exists: {bool(session.get('strava_access_token'))}")
+        print(f"  - refresh_token exists: {bool(session.get('strava_refresh_token'))}")
+        print(f"  - expires_at: {session.get('strava_expires_at')}")
         
         return redirect(url_for('download_progress'))
         
@@ -374,6 +383,7 @@ def strava_callback():
         # Store in session
         session['strava_access_token'] = token_data.get('access_token')
         session['strava_refresh_token'] = token_data.get('refresh_token')
+        session['strava_expires_at'] = token_data.get('expires_at')  # Add missing expires_at
         session['athlete_id'] = token_data.get('athlete', {}).get('id')
         session['auth_success'] = True
         session['athlete_name'] = token_data.get('athlete', {}).get('firstname', 'Athlete')
@@ -384,6 +394,8 @@ def strava_callback():
         print(f"  - auth_success: {session.get('auth_success')}")
         print(f"  - athlete_name: {session.get('athlete_name')}")
         print(f"  - access_token exists: {bool(session.get('strava_access_token'))}")
+        print(f"  - refresh_token exists: {bool(session.get('strava_refresh_token'))}")
+        print(f"  - expires_at: {session.get('strava_expires_at')}")
         
         return redirect(url_for('download_progress'))
         
@@ -415,6 +427,8 @@ def api_download_workouts():
     print(f"  - auth_success: {session.get('auth_success')}")
     print(f"  - athlete_name: {session.get('athlete_name')}")
     print(f"  - access_token exists: {bool(session.get('strava_access_token'))}")
+    print(f"  - refresh_token exists: {bool(session.get('strava_refresh_token'))}")
+    print(f"  - expires_at: {session.get('strava_expires_at')}")
     
     # Check if user is authorized
     if not session.get('strava_access_token'):
@@ -432,13 +446,17 @@ def api_download_workouts():
         # Override the cached token with the session token
         access_token = session.get('strava_access_token')
         refresh_token = session.get('strava_refresh_token')
+        expires_at = session.get('strava_expires_at')
         
         if access_token:
             client.access_token = access_token
             if refresh_token:
                 client.refresh_token = refresh_token
+            if expires_at:
+                client.token_expires_at = expires_at
             # Save tokens to cache so subsequent operations work
             client._save_tokens()
+            print(f"Setup client with tokens: access={bool(access_token)}, refresh={bool(refresh_token)}, expires_at={expires_at}")
         
         # Get download manager instance
         download_manager = DownloadManager()
