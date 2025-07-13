@@ -5,6 +5,7 @@ numpy
 flask
 openai>=1.30.0
 anthropic>=0.18.0
+httpx<0.28  # Prevent incompatible version that breaks openai client
 
 # Testing dependencies
 pytest==8.3.3

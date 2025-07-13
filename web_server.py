@@ -39,11 +39,14 @@ ai_sessions_lock = threading.Lock()
 # AI recommendation engine (initialize with error handling)
 ai_engine = None
 try:
+    print("🔄 Initializing AI engine at startup...")
     from ai_recommendations import AIRecommendationEngine
     ai_engine = AIRecommendationEngine()
     print("✅ AI recommendations enabled")
 except Exception as e:
-    print(f"⚠️  AI recommendations disabled: {e}")
+    print(f"⚠️  AI recommendations disabled: {type(e).__name__}: {e}")
+    import traceback
+    traceback.print_exc()
     ai_engine = None
 
 # Global strava client instance (for test compatibility)
@@ -309,9 +312,13 @@ def download_workouts():
                 session['strava_expires_at'] = strava_client.token_expires_at
                 session.permanent = True
                 return redirect(url_for('download_progress'))
-            except ValueError:
-                # Token invalid, need to re-authorize
-                pass
+            except Exception as e:
+                # Token invalid or refresh failed, need to re-authorize
+                print(f"Token validation/refresh failed: {e}")
+                # Clear invalid tokens
+                strava_client.access_token = None
+                strava_client.refresh_token = None
+                strava_client.token_expires_at = None
         
         # Generate OAuth URL with our callback
         redirect_uri = request.url_root.rstrip('/') + '/strava-callback'
@@ -491,6 +498,20 @@ def api_download_progress(download_id):
     
     return jsonify(progress)
 
+@app.route('/api/reset-download', methods=['POST'])
+def api_reset_download():
+    """Reset download state to allow new downloads"""
+    try:
+        download_manager = DownloadManager()
+        download_manager.reset_state()
+        return jsonify({
+            'status': 'success',
+            'message': 'Download state reset'
+        })
+    except Exception as e:
+        print(f"Error resetting download state: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/download-progress')
 def download_progress_stream():
     """SSE endpoint for real-time download progress updates"""
@@ -634,12 +655,17 @@ def api_ai_recommendations_pathways():
     global ai_engine
     if not ai_engine:
         try:
+            print("🔄 Attempting to initialize AI engine...")
             from ai_recommendations import AIRecommendationEngine
             ai_engine = AIRecommendationEngine()
             print("✅ AI recommendations re-enabled")
         except ValueError as e:
+            print(f"❌ AI engine ValueError: {e}")
             return jsonify({'error': 'AI recommendations are not configured. Check your AI API key in .env file.'}), 503
         except Exception as e:
+            print(f"❌ AI engine initialization error: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
             return jsonify({'error': f'AI service initialization failed: {str(e)}'}), 503
     
     try:

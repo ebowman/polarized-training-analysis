@@ -246,6 +246,8 @@
             padding: 20px;
             margin-bottom: 30px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 1;
         }
         
         .combined-chart h2 {
@@ -293,6 +295,8 @@
             padding: 20px;
             margin-bottom: 30px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 1;
         }
         
         .recovery-pathways {
@@ -389,6 +393,16 @@
             animation: spinner-border .75s linear infinite;
         }
         
+        .spinner-border > * {
+            animation: none !important;
+        }
+        
+        /* Ensure text next to spinners doesn't spin */
+        .spinner-border + span {
+            animation: none !important;
+            transform: none !important;
+        }
+        
         .spinner-border-sm {
             width: 1rem;
             height: 1rem;
@@ -396,6 +410,7 @@
         }
         
         @keyframes spinner-border {
+            from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
         
@@ -638,7 +653,7 @@
         
         <div class="controls">
             <div class="time-range-controls">
-                <label for="timeRange">Time Range:</label>
+                <label for="timeRange">Workout History Display:</label>
                 <select id="timeRange" onchange="filterWorkouts()">
                     <option value="7">Last 7 days</option>
                     <option value="14" selected>Last 14 days</option>
@@ -677,14 +692,15 @@
                 <h3>Zone Distribution</h3>
                 <div class="value" id="zone-distribution">-</div>
                 <div class="label">Z1 / Z2 / Z3</div>
+                <div class="label" style="font-size: 0.7em; margin-top: 5px;">(for selected time range)</div>
             </div>
         </div>
         
         <div id="loading" class="loading">Loading workout data...</div>
         <div id="error" class="error" style="display: none;"></div>
         
-        <div id="combined-chart" class="combined-chart" style="display: none;">
-            <h2>Combined Training Distribution</h2>
+        <div id="combined-chart" class="combined-chart">
+            <h2>Last 7 Days Training Distribution</h2>
             <div class="combined-chart-container">
                 <canvas id="combinedChart"></canvas>
             </div>
@@ -710,7 +726,7 @@
             </div>
         </div>
         
-        <div id="volume-tracking" class="volume-tracking" style="display: none;">
+        <div id="volume-tracking" class="volume-tracking">
             <h2>📊 Weekly Training Volume Tracking</h2>
             <div class="volume-info">
                 <p>Target: 360 minutes/week (6 hours) for optimal polarized training</p>
@@ -786,6 +802,7 @@
             workoutsDiv.innerHTML = '';
             summaryDiv.style.display = 'none';
             combinedChartDiv.style.display = 'none';
+            document.getElementById('volume-tracking').style.display = 'none';
             refreshButton.disabled = true;
             refreshButton.textContent = '🔄 Loading...';
             
@@ -856,7 +873,11 @@
         }
         
         function filterWorkouts() {
-            if (!workoutData) return;
+            console.log('filterWorkouts called');
+            if (!workoutData) {
+                console.log('No workoutData available');
+                return;
+            }
             
             const timeRange = document.getElementById('timeRange').value;
             const now = new Date();
@@ -873,16 +894,21 @@
                 return activityDate >= cutoffDate;
             });
             
+            console.log('Calling displaySummary with', filteredActivities.length, 'activities');
             displaySummary(filteredActivities);
-            displayCombinedChart(filteredActivities);
+            console.log('Calling displayCombinedChart');
+            displayCombinedChart(workoutData.activities); // Pass all activities, not filtered
             // Only load AI recommendations if we have training data
             if (workoutData && workoutData.activities && workoutData.activities.length > 0) {
+                console.log('Loading AI recommendations');
                 loadAIRecommendations();
             }
+            console.log('Calling displayWorkouts');
             displayWorkouts(filteredActivities);
         }
         
         function displaySummary(activities) {
+            console.log('displaySummary called with', activities.length, 'activities');
             const summaryDiv = document.getElementById('summary');
             
             // Calculate summary stats for filtered activities
@@ -944,7 +970,19 @@
             document.getElementById('zone-distribution').textContent = 
                 `${Math.round(zone1Percent)}% / ${Math.round(zone2Percent)}% / ${Math.round(zone3Percent)}%`;
             
+            console.log('Summary calculations:', {
+                totalActivities,
+                totalMinutes,
+                zone1Percent,
+                zone2Percent,
+                zone3Percent,
+                totalZone1Minutes,
+                totalZone2Minutes,
+                totalZone3Minutes
+            });
+            
             summaryDiv.style.display = 'grid';
+            console.log('Summary div display set to grid');
         }
         
         function getSelectedDays() {
@@ -961,20 +999,44 @@
         }
         
         function displayCombinedChart(activities) {
+            console.log('displayCombinedChart called with', activities?.length, 'activities');
             const combinedChartDiv = document.getElementById('combined-chart');
+            console.log('Combined chart div:', combinedChartDiv);
             
-            if (activities.length === 0) {
+            if (!combinedChartDiv) {
+                console.error('Combined chart div not found!');
+                return;
+            }
+            
+            // ALWAYS use last 7 days for combined chart
+            const today = new Date();
+            today.setHours(23, 59, 59, 999); // End of today
+            const sevenDaysAgo = new Date(today);
+            sevenDaysAgo.setDate(today.getDate() - 6);
+            sevenDaysAgo.setHours(0, 0, 0, 0); // Start of 7 days ago
+            
+            // Filter to last 7 days from ALL activities - always use the full dataset
+            const allActivities = window.workoutData?.activities || activities || [];
+            console.log('All activities:', allActivities.length);
+            const last7DaysActivities = allActivities.filter(activity => {
+                const activityDate = new Date(activity.date);
+                return activityDate >= sevenDaysAgo && activityDate <= today;
+            });
+            console.log('Last 7 days activities:', last7DaysActivities.length);
+            
+            if (last7DaysActivities.length === 0) {
+                console.log('No activities in last 7 days, hiding chart');
                 combinedChartDiv.style.display = 'none';
                 return;
             }
             
-            // Calculate combined zone percentages
-            const totalMinutes = activities.reduce((sum, a) => sum + a.duration_minutes, 0);
+            // Calculate combined zone percentages for last 7 days
+            const totalMinutes = last7DaysActivities.reduce((sum, a) => sum + a.duration_minutes, 0);
             let totalZone1Minutes = 0;
             let totalZone2Minutes = 0;
             let totalZone3Minutes = 0;
             
-            activities.forEach(activity => {
+            last7DaysActivities.forEach(activity => {
                 const activityMinutes = activity.duration_minutes;
                 totalZone1Minutes += activityMinutes * (activity.zone1_percent / 100);
                 totalZone2Minutes += activityMinutes * (activity.zone2_percent / 100);
@@ -985,8 +1047,25 @@
             const zone2Percent = totalMinutes > 0 ? (totalZone2Minutes / totalMinutes) * 100 : 0;
             const zone3Percent = totalMinutes > 0 ? (totalZone3Minutes / totalMinutes) * 100 : 0;
             
-            // Calculate weekly totals for time validation
-            const totalWeeklyMinutes = totalMinutes * (7 / getSelectedDays()); // Extrapolate to weekly
+            console.log('Zone calculations:', {
+                totalMinutes,
+                totalZone1Minutes,
+                totalZone2Minutes,
+                totalZone3Minutes,
+                zone1Percent,
+                zone2Percent,
+                zone3Percent,
+                activities: last7DaysActivities.length,
+                sevenDaysAgo: sevenDaysAgo.toISOString(),
+                today: today.toISOString()
+            });
+            
+            console.log('About to show combined chart div');
+            console.log('Combined chart div element:', combinedChartDiv);
+            console.log('Current display style:', combinedChartDiv.style.display);
+            
+            // Weekly total is just the total from last 7 days
+            const totalWeeklyMinutes = totalMinutes;
             const polarizedMinimumMinutes = 360; // 6 hours/week minimum for effective polarized training
             const generalHealthMinutes = 150; // NIH general health recommendation
             const maxHealthyWeeklyMinutes = 600; // 10 hours/week overtraining threshold
@@ -1008,23 +1087,34 @@
                 return warning;
             })();
             
+            // Update the chart title to show total minutes
+            const chartTitle = document.querySelector('#combined-chart h2');
+            if (chartTitle) {
+                chartTitle.textContent = `Last 7 Days Training Distribution (${Math.round(totalMinutes)} minutes)`;
+            }
+            
             const weeklyHours = (totalWeeklyMinutes / 60).toFixed(1);
             if (totalWeeklyMinutes < generalHealthMinutes) {
                 timeWarningElement.style.cssText += 'background-color: #ffebee; color: #c62828; border: 1px solid #ef5350;';
-                timeWarningElement.textContent = `🚨 Below health minimum: ${Math.round(totalWeeklyMinutes)}min/week (${weeklyHours}h) - Need ${generalHealthMinutes}min/week for basic health`;
+                timeWarningElement.textContent = `🚨 Below health minimum: ${Math.round(totalMinutes)}min/week (${weeklyHours}h) - Need ${generalHealthMinutes}min/week for basic health`;
             } else if (totalWeeklyMinutes < polarizedMinimumMinutes) {
                 timeWarningElement.style.cssText += 'background-color: #fff3e0; color: #f57c00; border: 1px solid #ffb74d;';
-                timeWarningElement.textContent = `⚠️ Below polarized minimum: ${Math.round(totalWeeklyMinutes)}min/week (${weeklyHours}h) - Need ${polarizedMinimumMinutes}min/week for effective polarized training`;
+                timeWarningElement.textContent = `⚠️ Below polarized minimum: ${Math.round(totalMinutes)}min/week (${weeklyHours}h) - Need ${polarizedMinimumMinutes}min/week for effective polarized training`;
             } else if (totalWeeklyMinutes > maxHealthyWeeklyMinutes) {
                 timeWarningElement.style.cssText += 'background-color: #fff3e0; color: #f57c00; border: 1px solid #ffb74d;';
-                timeWarningElement.textContent = `⚠️ Risk of overtraining: ${Math.round(totalWeeklyMinutes)}min/week (${weeklyHours}h) - Consider reducing volume`;
+                timeWarningElement.textContent = `⚠️ Risk of overtraining: ${Math.round(totalMinutes)}min/week (${weeklyHours}h) - Consider reducing volume`;
             } else {
                 timeWarningElement.style.cssText += 'background-color: #e8f5e8; color: #2e7d32; border: 1px solid #4caf50;';
-                timeWarningElement.textContent = `✅ Optimal polarized volume: ${Math.round(totalWeeklyMinutes)}min/week (${weeklyHours}h)`;
+                timeWarningElement.textContent = `✅ Optimal polarized volume: ${Math.round(totalMinutes)}min/week (${weeklyHours}h)`;
             }
             
             // Create or update combined chart
             const ctx = document.getElementById('combinedChart');
+            console.log('Combined chart canvas context:', ctx);
+            if (!ctx) {
+                console.error('Could not find combinedChart canvas element!');
+                return;
+            }
             if (combinedChart) {
                 combinedChart.destroy();
             }
@@ -1076,6 +1166,17 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        onComplete: function() {
+                            console.log('Combined chart animation complete');
+                            // Ensure the chart div stays visible
+                            const chartDiv = document.getElementById('combined-chart');
+                            if (chartDiv && chartDiv.style.display !== 'block') {
+                                console.warn('Chart div was hidden after animation, showing it again');
+                                chartDiv.style.display = 'block';
+                            }
+                        }
+                    },
                     plugins: {
                         legend: {
                             display: true,
@@ -1173,6 +1274,22 @@
             });
             
             combinedChartDiv.style.display = 'block';
+            console.log('Combined chart div display set to block');
+            console.log('New display style:', combinedChartDiv.style.display);
+            
+            // Force a reflow to ensure the display change takes effect
+            combinedChartDiv.offsetHeight;
+            
+            // Check if the chart was created successfully
+            setTimeout(() => {
+                console.log('After timeout - Combined chart div visible?', combinedChartDiv.style.display);
+                console.log('Combined chart instance:', combinedChart);
+                if (combinedChart) {
+                    console.log('Chart canvas:', combinedChart.canvas);
+                    console.log('Chart width:', combinedChart.width);
+                    console.log('Chart height:', combinedChart.height);
+                }
+            }, 100);
             
             // Display volume tracking chart
             displayVolumeTracking();
@@ -1480,8 +1597,11 @@
         }
         
         function displayVolumeTracking() {
+            console.log('displayVolumeTracking called');
             const volumeDiv = document.getElementById('volume-tracking');
             const volumeCanvas = document.getElementById('volumeChart');
+            console.log('Volume div:', volumeDiv);
+            console.log('Volume canvas:', volumeCanvas);
             
             // Use all activities for volume tracking, not filtered ones
             if (!workoutData || !workoutData.activities || workoutData.activities.length === 0) {
@@ -1610,14 +1730,21 @@
             // Update stats
             document.getElementById('past-volume').textContent = `${Math.round(rollingWeekMinutes)} min`;
             // Calculate simple daily average for display
-            const simpleDailyAvg = minutesNeeded / 7;
-            document.getElementById('daily-needed').textContent = `${Math.round(simpleDailyAvg)} min`;
+            // For small deficits, show the actual deficit instead of dividing by 7
+            const simpleDailyAvg = minutesNeeded < 60 ? minutesNeeded : minutesNeeded / 7;
+            const avgText = minutesNeeded < 60 ? `${Math.round(simpleDailyAvg)} min total` : `${Math.round(simpleDailyAvg)} min`;
+            document.getElementById('daily-needed').textContent = avgText;
             const deficit = targetWeeklyMinutes - rollingWeekMinutes;
             const deficitElement = document.getElementById('weekly-deficit');
             deficitElement.textContent = deficit > 0 ? `-${Math.round(deficit)} min` : `+${Math.round(Math.abs(deficit))} min`;
             deficitElement.style.color = deficit > 0 ? '#e74c3c' : '#27ae60';
             
             // Create chart
+            console.log('Creating volume chart with canvas:', volumeCanvas);
+            if (!volumeCanvas) {
+                console.error('Could not find volumeChart canvas element!');
+                return;
+            }
             if (volumeChart) {
                 volumeChart.destroy();
             }
@@ -1697,6 +1824,7 @@
             });
             
             volumeDiv.style.display = 'block';
+            console.log('Volume div display set to block');
             
             // Calculate and display recovery pathways if behind target
             if (deficit > 0) {
@@ -1707,6 +1835,10 @@
         function calculateRecoveryPathways(currentMinutes, targetMinutes, dailyData, todayIndex) {
             const deficit = targetMinutes - currentMinutes;
             const today = new Date();
+            
+            // Check if we already worked out today
+            const todayMinutes = dailyData[todayIndex]?.minutes || 0;
+            const alreadyWorkedOutToday = todayMinutes > 0;
             
             // Check consecutive rest days
             let consecutiveRestDays = 0;
@@ -1748,52 +1880,48 @@
             const pathways = [];
             
             // Debug logging
-            console.log('Recovery pathway calculation:', {
+            console.log('Recovery pathway calculation v2:', {
+                version: 'v2-fixed',
                 deficit,
                 avgWorkoutMinutes,
                 consecutiveRestDays,
                 consecutiveTrainingDays,
-                currentMinutes
+                currentMinutes,
+                pastWorkouts,
+                todayIndex
             });
             
-            // Add rest day option if appropriate
-            if (consecutiveTrainingDays >= 5 || currentMinutes > 300) {
-                pathways.push({
-                    type: 'rest',
-                    name: 'Rest Day',
-                    icon: '😴',
-                    recommended: consecutiveTrainingDays >= 6,
-                    days: [
-                        { day: 'Today', minutes: 0 },
-                        { day: 'Tomorrow', minutes: Math.min(avgWorkoutMinutes * 1.2, 90) }
-                    ],
-                    backOnTrack: Math.ceil(deficit / avgWorkoutMinutes) + 1,
-                    reasoning: consecutiveTrainingDays >= 5 
-                        ? `You've trained ${consecutiveTrainingDays} days straight. Recovery is crucial.`
-                        : 'High volume week - rest will help adaptation.'
-                });
+            // If already at or above target, no recovery needed
+            if (deficit <= 0) {
+                displayRecoveryPathways([], consecutiveRestDays, deficit, alreadyWorkedOutToday, todayMinutes);
+                return;
             }
             
-            // Always show gentle option
-            pathways.push(calculateGentlePathway(deficit, avgWorkoutMinutes, consecutiveRestDays, currentMinutes, pastWorkouts));
+            // Check if another workout today is advisable
+            let anotherWorkoutAdvisable = true;
+            let anotherWorkoutReason = '';
             
-            // Show steady option
-            pathways.push(calculateSteadyPathway(deficit, avgWorkoutMinutes, consecutiveRestDays, currentMinutes, pastWorkouts));
-            
-            // Show aggressive if feasible (deficit can be made up in 3-4 days)
-            const maxDailyWorkout = Math.min(avgWorkoutMinutes * 2, 120);
-            const daysToMakeUp = deficit / maxDailyWorkout;
-            
-            if (daysToMakeUp <= 4 && consecutiveRestDays < 4) {
-                pathways.push(calculateAggressivePathway(deficit, avgWorkoutMinutes, consecutiveRestDays, currentMinutes, pastWorkouts));
+            if (alreadyWorkedOutToday) {
+                if (consecutiveTrainingDays >= 5) {
+                    anotherWorkoutAdvisable = false;
+                    anotherWorkoutReason = `You've trained ${consecutiveTrainingDays} days straight. Rest is crucial.`;
+                } else if (todayMinutes >= 120) {
+                    anotherWorkoutAdvisable = false;
+                    anotherWorkoutReason = 'You already had a long session today. Recovery is important.';
+                } else if (currentMinutes + 60 > targetMinutes * 1.2) {
+                    anotherWorkoutAdvisable = false;
+                    anotherWorkoutReason = 'Another workout would put you well above target. Save energy for tomorrow.';
+                } else {
+                    anotherWorkoutReason = 'A second workout today is fine if you feel good.';
+                }
             }
             
-            // Add moderate option if we have a gap between gentle and aggressive
-            if (pathways.length === 2 && deficit > avgWorkoutMinutes * 2) {
-                pathways.splice(1, 0, calculateModeratePathway(deficit, avgWorkoutMinutes, consecutiveRestDays, currentMinutes, pastWorkouts));
-            }
+            // Create three recovery pathways
+            pathways.push(calculateIntensePathway(deficit, avgWorkoutMinutes, alreadyWorkedOutToday, anotherWorkoutAdvisable));
+            pathways.push(calculateModeratePathway(deficit, avgWorkoutMinutes, alreadyWorkedOutToday));
+            pathways.push(calculateGentlePathway(deficit, avgWorkoutMinutes, alreadyWorkedOutToday));
             
-            displayRecoveryPathways(pathways, consecutiveRestDays, deficit);
+            displayRecoveryPathways(pathways, consecutiveRestDays, deficit, alreadyWorkedOutToday, todayMinutes, anotherWorkoutReason);
         }
         
         function calculateQuickCatchUpPathway(deficit, avgMinutes, restDays) {
@@ -1815,15 +1943,23 @@
             // Simulates when the rolling 7-day window will reach 360 minutes
             const targetTotal = 360;
             
+            // Debug logging
+            console.log('SimulateRollingWindow called with:', {
+                startingMinutes,
+                dailyPlan: dailyPlan.slice(0, 7),
+                avgMinutes,
+                pastWorkouts
+            });
+            
             // Build a complete workout history (past + future)
             const workoutHistory = [];
             
-            // Add past 6 days of workouts (index -6 to -1)
-            for (let i = 6; i >= 1; i--) {
-                workoutHistory.push(pastWorkouts && pastWorkouts[i-1] ? pastWorkouts[i-1] : 0);
+            // Add past 6 days of workouts (these are days -6 through -1)
+            for (let i = 0; i < 6; i++) {
+                workoutHistory.push(pastWorkouts && pastWorkouts[i] !== undefined ? pastWorkouts[i] : 0);
             }
             
-            // Add planned workouts starting from today (index 0+)
+            // Add planned workouts starting from today
             for (let i = 0; i < dailyPlan.length; i++) {
                 workoutHistory.push(dailyPlan[i]);
             }
@@ -1833,107 +1969,136 @@
                 workoutHistory.push(avgMinutes);
             }
             
-            // Now simulate rolling windows
-            for (let day = 0; day < 60; day++) {
-                // Calculate rolling 7-day total ending on this day
+            // Debug the workout history
+            console.log('Workout history (first 14 days):', workoutHistory.slice(0, 14));
+            
+            // Now simulate rolling windows starting from today (day 0)
+            for (let futureDay = 0; futureDay < 60; futureDay++) {
+                // Calculate rolling 7-day total that ENDS on futureDay
+                // We need to look at the 7 days ending on (6 + futureDay) in our workoutHistory array
                 let rollingTotal = 0;
-                for (let i = 0; i < 7; i++) {
-                    const idx = day + 6 - i; // Work backwards from current day
-                    if (idx >= 0 && idx < workoutHistory.length) {
-                        rollingTotal += workoutHistory[idx];
+                const endIdx = 6 + futureDay; // Today is at index 6 in workoutHistory
+                const startIdx = endIdx - 6; // 7 days back from endIdx
+                
+                for (let i = startIdx; i <= endIdx; i++) {
+                    if (i >= 0 && i < workoutHistory.length) {
+                        rollingTotal += workoutHistory[i];
                     }
                 }
                 
                 // Debug first few days
-                if (day < 5) {
-                    console.log(`Day ${day}: Rolling total = ${rollingTotal}`);
+                if (futureDay < 5) {
+                    console.log(`Future day ${futureDay}: Rolling 7-day total = ${rollingTotal} (indices ${startIdx}-${endIdx})`);
                 }
                 
                 if (rollingTotal >= targetTotal) {
-                    return day + 1; // Days until back on track
+                    return futureDay + 1; // Days until back on track
                 }
             }
             
             return 60; // Max days if not reached
         }
         
-        function calculateGentlePathway(deficit, avgMinutes, restDays, currentMinutes, pastWorkouts) {
-            const rampUp = restDays >= 2;
+        function calculateIntensePathway(deficit, avgMinutes, alreadyWorkedOut, advisable) {
+            const pathway = {
+                type: 'intense',
+                name: '1-Day Catch-up',
+                icon: '🚀',
+                recommended: advisable && deficit <= 90,
+                days: []
+            };
+            
+            if (alreadyWorkedOut) {
+                if (advisable) {
+                    pathway.days.push({ day: 'Today (2nd workout)', minutes: Math.round(deficit) });
+                } else {
+                    pathway.days.push({ day: 'Tomorrow', minutes: Math.round(deficit) });
+                    pathway.backOnTrack = 2;
+                    return pathway;
+                }
+            } else {
+                pathway.days.push({ day: 'Today', minutes: Math.round(deficit) });
+            }
+            
+            pathway.backOnTrack = 1;
+            pathway.reasoning = deficit <= 60 ? 'Small deficit - can be made up in one solid workout.' : 'Large single session, ensure proper warm-up and fueling.';
+            
+            return pathway;
+        }
+        
+        function calculateModeratePathway(deficit, avgMinutes, alreadyWorkedOut) {
+            const pathway = {
+                type: 'moderate',
+                name: '3-Day Plan',
+                icon: '⚖️',
+                recommended: true,
+                days: []
+            };
+            
+            // Spread deficit over 3 days
+            const dailyTarget = Math.ceil(deficit / 3);
+            let remainingDeficit = deficit;
+            
+            // If already worked out today, start tomorrow
+            const startDay = alreadyWorkedOut ? 1 : 0;
+            
+            for (let i = 0; i < 3; i++) {
+                const dayIndex = startDay + i;
+                const dayLabel = dayIndex === 0 ? 'Today' : dayIndex === 1 ? 'Tomorrow' : `Day ${dayIndex + 1}`;
+                const dayMinutes = Math.min(dailyTarget, remainingDeficit);
+                
+                pathway.days.push({
+                    day: dayLabel,
+                    minutes: Math.round(Math.max(0, dayMinutes))
+                });
+                
+                remainingDeficit -= dayMinutes;
+            }
+            
+            pathway.backOnTrack = startDay + 3;
+            pathway.reasoning = 'Balanced approach spreading the deficit over 3 days.';
+            
+            return pathway;
+        }
+        
+        function calculateGentlePathway(deficit, avgMinutes, alreadyWorkedOut) {
             const pathway = {
                 type: 'gentle',
-                name: 'Gentle Recovery',
+                name: '7-Day Recovery',
                 icon: '🌱',
                 recommended: false,
                 days: []
             };
             
-            // Gentle ramp up
-            const startMinutes = rampUp ? 30 : Math.min(avgMinutes * 0.7, 45);
-            const dailyIncrease = 10;
-            const maxMinutes = Math.min(avgMinutes, 60); // Cap at 60 for gentle
+            // Spread deficit over 7 days
+            const dailyTarget = Math.ceil(deficit / 7);
+            let remainingDeficit = deficit;
             
-            // Build daily plan
-            const dailyPlan = [];
-            let tempMinutes = startMinutes;
+            // If already worked out today, start tomorrow
+            const startDay = alreadyWorkedOut ? 1 : 0;
             
-            for (let day = 0; day < 14; day++) { // Plan for 2 weeks
-                dailyPlan.push(tempMinutes);
+            for (let i = 0; i < 7; i++) {
+                const dayIndex = startDay + i;
+                let dayLabel;
+                if (dayIndex === 0) dayLabel = 'Today';
+                else if (dayIndex === 1) dayLabel = 'Tomorrow';
+                else dayLabel = `Day ${dayIndex + 1}`;
                 
-                // Store first 7 days for display
-                if (day < 7) {
+                const dayMinutes = Math.min(dailyTarget, remainingDeficit);
+                
+                // Only show first 3 days plus ellipsis
+                if (i < 3) {
                     pathway.days.push({
-                        day: day === 0 ? 'Today' : day === 1 ? 'Tomorrow' : `Day ${day + 1}`,
-                        minutes: Math.round(tempMinutes)
+                        day: dayLabel,
+                        minutes: Math.round(Math.max(0, dayMinutes))
                     });
                 }
                 
-                // Gradually increase
-                tempMinutes = Math.min(tempMinutes + dailyIncrease, maxMinutes);
+                remainingDeficit -= dayMinutes;
             }
             
-            // Simulate when we'll be back on track
-            pathway.backOnTrack = simulateRollingWindow(currentMinutes, dailyPlan, avgMinutes, pastWorkouts);
-            return pathway;
-        }
-        
-        function calculateModeratePathway(deficit, avgMinutes, restDays, currentMinutes, pastWorkouts) {
-            const pathway = {
-                type: 'moderate',
-                name: 'Moderate Build',
-                icon: '⚖️',
-                recommended: false,
-                days: []
-            };
-            
-            // Balanced approach between gentle and aggressive
-            const todayMinutes = restDays >= 2 ? avgMinutes : Math.min(avgMinutes * 1.1, 75);
-            const dailyTarget = Math.min(avgMinutes * 1.1, 75);
-            
-            pathway.days.push({ day: 'Today', minutes: Math.round(todayMinutes) });
-            
-            let remainingDeficit = deficit - todayMinutes;
-            const daysNeeded = Math.ceil(remainingDeficit / dailyTarget);
-            
-            for (let day = 1; day <= Math.min(6, daysNeeded); day++) {
-                pathway.days.push({
-                    day: day === 1 ? 'Tomorrow' : `Day ${day + 1}`,
-                    minutes: Math.round(Math.min(dailyTarget, remainingDeficit))
-                });
-                remainingDeficit -= dailyTarget;
-            }
-            
-            // Build full plan
-            const fullPlan = [];
-            for (let i = 0; i < pathway.days.length; i++) {
-                fullPlan.push(pathway.days[i].minutes);
-            }
-            // Continue with daily target
-            while (fullPlan.length < 14) {
-                fullPlan.push(dailyTarget);
-            }
-            
-            pathway.backOnTrack = simulateRollingWindow(currentMinutes, fullPlan, avgMinutes, pastWorkouts);
-            pathway.reasoning = 'Balanced approach with consistent daily volume';
+            pathway.backOnTrack = startDay + 7;
+            pathway.reasoning = 'Gentle approach with minimal daily volume over a full week.';
             
             return pathway;
         }
@@ -1957,13 +2122,32 @@
             let remainingDeficit = deficit - todayMinutes - tomorrowMinutes;
             
             // Spread remaining over next 5 days
+            console.log('Steady pathway initial:', {
+                deficit,
+                todayMinutes,
+                tomorrowMinutes,
+                remainingDeficit,
+                avgMinutes
+            });
+            
             for (let day = 2; day < 7; day++) {
-                const dayMinutes = Math.min(avgMinutes, remainingDeficit / (7 - day));
-                pathway.days.push({
-                    day: `Day ${day + 1}`,
-                    minutes: Math.round(Math.max(dayMinutes, 0))
-                });
-                remainingDeficit -= dayMinutes;
+                if (remainingDeficit <= 0) {
+                    // If deficit is already covered, just maintain moderate volume
+                    pathway.days.push({
+                        day: `Day ${day + 1}`,
+                        minutes: Math.round(avgMinutes * 0.8)
+                    });
+                } else {
+                    const daysLeft = 7 - day;
+                    const dayMinutes = Math.min(avgMinutes, remainingDeficit / daysLeft);
+                    const finalMinutes = Math.max(30, dayMinutes); // Minimum 30 minutes
+                    console.log(`Day ${day + 1}: remainingDeficit=${remainingDeficit}, daysLeft=${daysLeft}, dayMinutes=${dayMinutes}, finalMinutes=${finalMinutes}`);
+                    pathway.days.push({
+                        day: `Day ${day + 1}`,
+                        minutes: Math.round(finalMinutes)
+                    });
+                    remainingDeficit -= dayMinutes;
+                }
             }
             
             // Build full plan
@@ -1971,11 +2155,18 @@
             for (let i = 0; i < pathway.days.length; i++) {
                 fullPlan.push(pathway.days[i].minutes);
             }
-            // Continue with average
-            while (fullPlan.length < 14) {
-                fullPlan.push(avgMinutes);
+            // Continue with steady volume (slightly above average for steady approach)
+            const sustainedVolume = Math.min(avgMinutes * 1.1, 90);
+            while (fullPlan.length < 30) {
+                fullPlan.push(sustainedVolume);
             }
             
+            console.log('Steady pathway plan:', {
+                days: pathway.days,
+                fullPlan: fullPlan.slice(0, 14),
+                sustainedVolume,
+                avgMinutes
+            });
             pathway.backOnTrack = simulateRollingWindow(currentMinutes, fullPlan, avgMinutes, pastWorkouts);
             
             return pathway;
@@ -1996,14 +2187,16 @@
             const dailyPlan = [];
             
             // First 3 days: push hard
-            const aggressiveDaily = Math.min(maxDaily, deficit / 2);
+            // Ensure minimum workout duration of 30 minutes
+            const aggressiveDaily = Math.max(30, Math.min(maxDaily, deficit / 2));
             dailyPlan.push(aggressiveDaily);
             dailyPlan.push(aggressiveDaily);
             dailyPlan.push(avgMinutes); // Recovery day
             
-            // Then maintain at average
-            for (let day = 3; day < 14; day++) {
-                dailyPlan.push(avgMinutes);
+            // Then maintain at above average for aggressive approach
+            const sustainedVolume = Math.min(avgMinutes * 1.2, 100);
+            for (let day = 3; day < 30; day++) {
+                dailyPlan.push(sustainedVolume);
             }
             
             // Display first few days
@@ -2025,14 +2218,29 @@
             return pathway;
         }
         
-        function displayRecoveryPathways(pathways, consecutiveRestDays, deficit) {
+        function displayRecoveryPathways(pathways, consecutiveRestDays, deficit, alreadyWorkedOut, todayMinutes, anotherWorkoutReason) {
             const pathwaysDiv = document.getElementById('recovery-pathways');
+            
+            if (deficit <= 0) {
+                pathwaysDiv.innerHTML = `
+                    <h3 style="margin-top: 20px; margin-bottom: 10px;">✅ You're On Track!</h3>
+                    <div style="background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px;">
+                        <strong>Great job!</strong> You're at or above your weekly target of 360 minutes.
+                    </div>
+                `;
+                return;
+            }
+            
             pathwaysDiv.innerHTML = '<h3 style="margin-top: 20px; margin-bottom: 10px;">🎯 Choose Your Recovery Path</h3>';
             
-            if (consecutiveRestDays >= 2) {
+            if (alreadyWorkedOut && anotherWorkoutReason) {
+                const bgColor = anotherWorkoutReason.includes('fine') ? '#e8f5e8' : '#fff3e0';
+                const borderColor = anotherWorkoutReason.includes('fine') ? '#4caf50' : '#ffb74d';
+                const textColor = anotherWorkoutReason.includes('fine') ? '#2e7d32' : '#f57c00';
+                
                 pathwaysDiv.innerHTML += `
-                    <div style="background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-                        <strong>Welcome back!</strong> You've had ${consecutiveRestDays} rest days. The recommendations below account for a gradual return to training.
+                    <div style="background-color: ${bgColor}; border: 1px solid ${borderColor}; color: ${textColor}; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+                        <strong>You already worked out today (${todayMinutes} min).</strong> ${anotherWorkoutReason}
                     </div>
                 `;
             }
@@ -2067,11 +2275,12 @@
                     ${pathway.warning ? `<div class="pathway-warning">⚠️ ${pathway.warning}</div>` : ''}
                     
                     <div id="ai-rec-${pathway.type}" style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; min-height: 60px;">
-                        <div style="color: #6c757d; text-align: center;">
-                            <div class="spinner-border spinner-border-sm" role="status" style="width: 1rem; height: 1rem;">
-                                <span class="sr-only">Loading...</span>
+                        <div style="color: #6c757d; text-align: center; display: flex; align-items: center; justify-content: center;">
+                            <div style="display: inline-block;">
+                                <div class="spinner-border spinner-border-sm" role="status" style="width: 1rem; height: 1rem;">
+                                </div>
                             </div>
-                            <span style="margin-left: 8px;">Loading AI recommendation...</span>
+                            <span style="margin-left: 8px; display: inline-block;">Loading AI recommendation...</span>
                         </div>
                     </div>
                 `;
@@ -2158,6 +2367,23 @@
                     // Show error state
                 } else {
                     // Still generating, poll again
+                    // Update loading message to show we're connecting
+                    const pathways = ['conservative', 'steady', 'aggressive'];
+                    pathways.forEach(type => {
+                        const recDiv = document.getElementById(`ai-rec-${type}`);
+                        if (recDiv && recDiv.querySelector('.spinner-border')) {
+                            // Only update if still showing spinner
+                            recDiv.innerHTML = `
+                                <div style="color: #6c757d; text-align: center; display: flex; align-items: center; justify-content: center;">
+                                    <div style="display: inline-block;">
+                                        <div class="spinner-border spinner-border-sm" role="status" style="width: 1rem; height: 1rem;">
+                                        </div>
+                                    </div>
+                                    <span style="margin-left: 8px; display: inline-block;">Connecting to Claude...</span>
+                                </div>
+                            `;
+                        }
+                    });
                     setTimeout(pollPathwayAIStatus, 2000);
                 }
             } catch (error) {
@@ -2316,6 +2542,10 @@
         
         // Load data when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            // Initially hide the charts
+            document.getElementById('combined-chart').style.display = 'none';
+            document.getElementById('volume-tracking').style.display = 'none';
+            
             // Check if Chart.js loaded properly
             if (typeof Chart === 'undefined') {
                 console.error('Chart.js failed to load. Charts will not be displayed.');

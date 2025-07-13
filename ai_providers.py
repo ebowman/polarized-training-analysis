@@ -84,20 +84,25 @@ class OpenAIProvider(AIProvider):
                 raise
     
     def _call_model(self, model: str, prompt: str, temperature: float) -> str:
-        response = self.client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "You are an expert fitness coach specializing in polarized training for endurance athletes."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=temperature,
-            response_format={"type": "json_object"}
-        )
-        
-        if not response.choices or not response.choices[0].message:
-            raise ValueError("OpenAI returned no message content")
-        
-        return response.choices[0].message.content
+        try:
+            print(f"🔍 Calling OpenAI model: {model}")
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "You are an expert fitness coach specializing in polarized training for endurance athletes."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=temperature,
+                response_format={"type": "json_object"}
+            )
+            
+            if not response.choices or not response.choices[0].message:
+                raise ValueError("OpenAI returned no message content")
+            
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"❌ OpenAI API error: {type(e).__name__}: {str(e)}")
+            raise
 
 
 class ClaudeProvider(AIProvider):
@@ -133,18 +138,23 @@ class ClaudeProvider(AIProvider):
         # Claude requires explicit JSON instruction in the prompt
         json_prompt = prompt + "\n\nIMPORTANT: Return your response as a valid JSON object only, with no additional text or markdown formatting."
         
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=4000,
-            temperature=temperature,
-            system="You are an expert fitness coach specializing in polarized training for endurance athletes. Always respond with valid JSON.",
-            messages=[
-                {"role": "user", "content": json_prompt}
-            ]
-        )
-        
-        if not response.content:
-            raise ValueError("Claude returned no content")
+        try:
+            print(f"🔍 Calling Claude model: {self.model}")
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=4000,
+                temperature=temperature,
+                system="You are an expert fitness coach specializing in polarized training for endurance athletes. Always respond with valid JSON.",
+                messages=[
+                    {"role": "user", "content": json_prompt}
+                ]
+            )
+            
+            if not response.content:
+                raise ValueError("Claude returned no content")
+        except Exception as e:
+            print(f"❌ Claude API error: {type(e).__name__}: {str(e)}")
+            raise
         
         # Extract text from Claude's response
         content = response.content[0].text if isinstance(response.content, list) else response.content

@@ -489,3 +489,16 @@ class DownloadManager:
             self.download_thread.start()
             
             return True
+    
+    def reset_state(self):
+        """Reset download manager to idle state"""
+        with self._lock:
+            self.status = DownloadStatus.IDLE
+            self.progress = 0
+            self.processed_activities = 0
+            self.total_activities = 0
+            self.current_activity_name = ""
+            self.message = ""
+            self.new_activities = []
+            self.error = None
+            self.rate_limit_retry_after = None

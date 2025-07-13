@@ -381,8 +381,12 @@ class TrainingAnalyzer:
             elif sport_type in ['Run', 'VirtualRun', 'Rowing', 'Walk', 'Hike']:
                 analysis = self.analyze_activity_hr(activity)
             elif sport_type in ['WeightTraining', 'Workout']:
-                # Skip strength training activities
-                continue
+                # For strength training, use HR analysis if available
+                if activity.get('has_heartrate'):
+                    analysis = self.analyze_activity_hr(activity)
+                else:
+                    # Skip if no heart rate data
+                    continue
             else:
                 # For other activities, try HR first
                 analysis = self.analyze_activity_hr(activity)

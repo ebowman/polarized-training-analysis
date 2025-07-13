@@ -262,6 +262,20 @@
             }
         }
         
+        async function resetDownloadState() {
+            try {
+                await fetch('/api/reset-download', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin'
+                });
+            } catch (error) {
+                console.error('Error resetting download state:', error);
+            }
+        }
+        
         async function startDownload(force = false) {
             if (isDownloading) return;
             
@@ -374,12 +388,21 @@
                             const lastChecked = document.getElementById('lastCheckedInfo');
                             lastChecked.textContent = 'All activities are up to date. Click Force Refresh to check again.';
                         }, 2000);
+                    } else {
+                        // Reset button after successful download with new activities
+                        setTimeout(() => {
+                            downloadBtn.innerHTML = '📥 Download Latest Workouts';
+                            downloadBtn.disabled = false;
+                            downloadBtn.onclick = () => startDownload();
+                            resetDownloadState();
+                        }, 3000);
                     }
                     break;
                 case 'error':
                     statusMessage.classList.add('status-error');
                     downloadBtn.innerHTML = '❌ Failed - Try Again';
                     downloadBtn.disabled = false;
+                    resetDownloadState();
                     break;
                 case 'rate_limited':
                     statusMessage.classList.add('status-rate-limited');

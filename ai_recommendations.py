@@ -589,6 +589,12 @@ IMPORTANT: Since the athlete is currently at 18% Polarized Zone 2 (target 10%), 
 Generate {num_recommendations} specific, actionable workout recommendations appropriate for TODAY and the next few days. 
 Consider the current day of the week and whether they've already trained today.
 
+🚫 EQUIPMENT RESTRICTION: You MUST ONLY recommend workouts using the following equipment:
+- **Peloton bike** (for cycling workouts)
+- **Concept2 RowERG** (for rowing workouts)
+- **Dumbbells/Bodyweight** (for strength training)
+- **NO RUNNING** - Do not recommend any running, jogging, or treadmill workouts
+
 ⚠️ CRITICAL ZONE 2 CHECK: Current Zone 2 = {analysis.zone2_percent:.1f}% (Target: 10%)
 - IF Zone 2 > 10%: AVOID THRESHOLD WORKOUTS (no Power Zone 3-4, no tempo work)
 - CURRENT STATUS: {'ZONE 2 IS ABOVE TARGET - AVOID POWER ZONE 3-4' if analysis.zone2_percent > 10 else 'Zone 2 at/below target'}
@@ -606,12 +612,16 @@ Consider the current day of the week and whether they've already trained today.
 - REST DAY recommendation format: {{"workout_type": "Rest Day", "duration_minutes": 0, "description": "Complete rest to allow adaptation", "structure": "No training - focus on recovery, hydration, and sleep", "reasoning": "[explain why based on current metrics]", "equipment": "None", "intensity_zones": [], "priority": "high"}}
 
 Each recommendation should be formatted as valid JSON with these fields:
-- workout_type: (e.g., "Power Zone Endurance Ride", "HR Zone Steady State Row", "Functional Strength")
+- workout_type: MUST be one of these types ONLY:
+  - Cycling: "Power Zone Endurance Ride", "Power Zone Intervals", "Power Zone Max Ride", "Recovery Ride"
+  - Rowing: "Steady State Row", "Rowing Intervals", "Technical Row", "Recovery Row"
+  - Strength: "Functional Strength", "Core Workout", "Upper Body Strength", "Lower Body Strength"
+  - Rest: "Rest Day", "Active Recovery"
 - duration_minutes: (integer)
 - description: (brief, engaging description using correct zone terminology)
 - structure: (detailed workout structure with specific power zones for cycling, HR zones for rowing)
 - reasoning: (why this workout fits their current needs and goals)
-- equipment: (e.g., "Peloton", "Concept2 RowERG", "Dumbbells", "Bodyweight")
+- equipment: MUST be EXACTLY one of: "Peloton", "Concept2 RowERG", "Dumbbells", "Bodyweight", "None"
 - intensity_zones: (array of polarized zones used for analysis, e.g., [1], [2], [3], [1,3])
 - priority: ("high", "medium", or "low")
 
@@ -673,12 +683,12 @@ Each recommendation must have these fields:
 Example format:
 [
   {{
-    "workout_type": "Recovery Run",
+    "workout_type": "Power Zone Endurance Ride",
     "duration_minutes": 45,
-    "description": "Easy recovery run",
-    "structure": "45 minutes at conversational pace",
+    "description": "Easy endurance ride in Power Zone 2",
+    "structure": "5 min warm-up, 35 min in Power Zone 2 (56-75% FTP), 5 min cool-down",
     "reasoning": "Promotes recovery while maintaining aerobic base",
-    "equipment": "Running shoes",
+    "equipment": "Peloton",
     "intensity_zones": [1],
     "priority": "high"
   }}
@@ -832,7 +842,7 @@ class AIRecommendationEngine:
 Current Training Status:
 - Zone distribution: Zone 1: {analysis.zone1_percent:.1f}%, Zone 2: {analysis.zone2_percent:.1f}%, Zone 3: {analysis.zone3_percent:.1f}%
 - Rolling 7-day volume: {analysis.total_minutes} minutes
-- Equipment available: Peloton bike, running shoes, rowing machine
+- Equipment available: Peloton bike, Concept2 RowERG, dumbbells/bodyweight
 
 Generate specific workout recommendations for EACH of these recovery pathways:
 
