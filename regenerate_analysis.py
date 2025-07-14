@@ -77,7 +77,7 @@ def main():
     analyzer = TrainingAnalyzer()
     
     # Analyze activities
-    analyses = analyzer.analyze_activities(activities)
+    analyses, ancillary_work = analyzer.analyze_activities(activities)
     
     if not analyses:
         print("❌ No analyzable activities found.")
@@ -85,6 +85,7 @@ def main():
         return
     
     print(f"Successfully analyzed {len(analyses)} activities")
+    print(f"Found {ancillary_work['strength_training_count']} strength training sessions ({ancillary_work['strength_training_minutes']} minutes)")
     
     # Calculate training distribution
     distribution = analyzer.calculate_training_distribution(analyses)
@@ -130,6 +131,7 @@ def main():
             'adherence_score': distribution.adherence_score,
             'recommendations': distribution.recommendations
         },
+        'ancillary_work': ancillary_work,
         'workout_recommendations': [
             {
                 'workout_type': rec.workout_type.value,

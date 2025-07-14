@@ -361,7 +361,7 @@ class DownloadManager:
             
             # Run analysis using same pattern as web_server.py
             analyzer = TrainingAnalyzer()
-            analyses = analyzer.analyze_activities(all_detailed_activities)
+            analyses, ancillary_work = analyzer.analyze_activities(all_detailed_activities)
             
             if not analyses:
                 raise ValueError("No analyzable activities found")
@@ -410,6 +410,7 @@ class DownloadManager:
                     'adherence_score': distribution.adherence_score,
                     'recommendations': distribution.recommendations
                 },
+                'ancillary_work': ancillary_work,
                 'workout_recommendations': [
                     {
                         'workout_type': rec.workout_type.value,
@@ -435,7 +436,8 @@ class DownloadManager:
                         'average_power': a.average_power
                     }
                     for a in analyses
-                ]
+                ],
+                'all_activities': all_detailed_activities  # Include all activities with strength training
             }
             
             # Save to file using CacheManager

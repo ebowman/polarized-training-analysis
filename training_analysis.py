@@ -371,15 +371,31 @@ class TrainingAnalyzer:
             detailed_zones=detailed_zones
         )
     
-    def analyze_activities(self, activities: List[Dict]) -> List[ActivityAnalysis]:
-        """Analyze multiple activities using sport-specific zone calculations"""
+    def analyze_activities(self, activities: List[Dict]) -> Tuple[List[ActivityAnalysis], Dict[str, int]]:
+        """Analyze multiple activities using sport-specific zone calculations
+        
+        Returns:
+            Tuple of (analyses, ancillary_work)
+            - analyses: List of polarized training analyses (excludes strength training)
+            - ancillary_work: Dict with strength_training_minutes and other ancillary work
+        """
         analyses = []
+        ancillary_work = {
+            'strength_training_minutes': 0,
+            'strength_training_count': 0
+        }
         
         for activity in activities:
             sport_type = activity.get('sport_type', activity.get('type', 'Unknown'))
             
+            # Strength training is tracked as ancillary work, not polarized training
+            if sport_type in ['WeightTraining', 'Workout']:
+                duration = activity.get('elapsed_time', 0) / 60  # Convert to minutes
+                ancillary_work['strength_training_minutes'] += int(duration)
+                ancillary_work['strength_training_count'] += 1
+                continue
+            
             # Use power zones for cycling, HR zones for running/rowing
-            # Skip strength training as it doesn't use HR zones
             if sport_type in ['Ride', 'VirtualRide', 'EBikeRide']:
                 analysis = self.analyze_activity_power(activity)
                 # If no power data, fall back to HR
@@ -387,13 +403,6 @@ class TrainingAnalyzer:
                     analysis = self.analyze_activity_hr(activity)
             elif sport_type in ['Run', 'VirtualRun', 'Rowing', 'Walk', 'Hike']:
                 analysis = self.analyze_activity_hr(activity)
-            elif sport_type in ['WeightTraining', 'Workout']:
-                # For strength training, use HR analysis if available
-                if activity.get('has_heartrate'):
-                    analysis = self.analyze_activity_hr(activity)
-                else:
-                    # Skip if no heart rate data
-                    continue
             else:
                 # For other activities, try HR first
                 analysis = self.analyze_activity_hr(activity)
@@ -401,7 +410,7 @@ class TrainingAnalyzer:
             if analysis:
                 analyses.append(analysis)
         
-        return analyses
+        return analyses, ancillary_work
     
     def calculate_training_distribution(self, analyses: List[ActivityAnalysis]) -> TrainingDistribution:
         """Calculate overall training intensity distribution"""
@@ -575,6 +584,36 @@ class TrainingAnalyzer:
                 continue
         
         return filtered
+    
+    def filter_ancillary_work(self, activities: List[Dict], days: int = 7) -> Dict[str, int]:
+        """Filter ancillary work (strength training) to recent period"""
+        cutoff_date = datetime.now() - timedelta(days=days)
+        ancillary_work = {
+            'strength_training_minutes': 0,
+            'strength_training_count': 0
+        }
+        
+        for activity in activities:
+            sport_type = activity.get('sport_type', activity.get('type', 'Unknown'))
+            
+            # Only count strength training
+            if sport_type in ['WeightTraining', 'Workout']:
+                try:
+                    # Handle both ISO format with and without timezone
+                    activity_date_str = activity.get('start_date', '')
+                    if activity_date_str:
+                        activity_date_str = activity_date_str.replace('Z', '+00:00') if activity_date_str.endswith('Z') else activity_date_str
+                        activity_date = datetime.fromisoformat(activity_date_str).replace(tzinfo=None)
+                        
+                        if activity_date >= cutoff_date:
+                            duration = activity.get('elapsed_time', 0) / 60  # Convert to minutes
+                            ancillary_work['strength_training_minutes'] += int(duration)
+                            ancillary_work['strength_training_count'] += 1
+                except (ValueError, AttributeError):
+                    # Skip activities with invalid dates
+                    continue
+        
+        return ancillary_work
     
     def get_workout_recommendations(self, all_analyses: List[ActivityAnalysis],
                                   target_weekly_hours: float = 8.0) -> List[WorkoutRecommendation]:

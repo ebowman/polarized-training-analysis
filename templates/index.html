@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Polarized Training Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script>
+        // Force cache refresh by adding version
+        window.appVersion = '{{ cache_buster }}';
+    </script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -663,6 +667,58 @@
             margin-left: 5px;
         }
         
+        .info-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background-color: #3498db;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 16px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 5px;
+            font-weight: bold;
+        }
+        
+        .info-popup {
+            display: none;
+            position: absolute;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            max-width: 300px;
+            font-size: 0.9em;
+            color: #2c3e50;
+        }
+        
+        .info-popup.show {
+            display: block;
+        }
+        
+        .info-popup h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        
+        .info-popup p {
+            margin: 5px 0;
+            line-height: 1.5;
+        }
+        
+        .info-popup .formula {
+            background-color: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85em;
+            margin: 10px 0;
+        }
+        
         @media (max-width: 768px) {
             .container {
                 padding: 15px;
@@ -709,7 +765,13 @@
         </div>
         
         <div class="controls">
-            <div style="display: flex; gap: 10px;">
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <select id="timeRange" class="time-range-select" onchange="saveTimeRangeAndLoad()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                    <option value="7">Last 7 days</option>
+                    <option value="14">Last 14 days</option>
+                    <option value="21">Last 21 days</option>
+                    <option value="28">Last 28 days</option>
+                </select>
                 <a href="/download-workouts" class="refresh-button" style="text-decoration: none; display: inline-block;">📥 Download Latest</a>
                 <button id="main-refresh-btn" class="refresh-button" onclick="loadData()">🔄 Refresh Data</button>
             </div>
@@ -721,16 +783,56 @@
                 <div class="value" id="total-workouts">-</div>
                 <div class="label">analyzed</div>
             </div>
-            <div class="summary-card">
-                <h3>Total Volume</h3>
-                <div class="value" id="total-time">-</div>
-                <div class="label" id="total-time-label">minutes</div>
+            <div class="summary-card" id="volume-progress-card">
+                <h3 id="progress-title">Progress</h3>
+                <div style="position: relative; width: 120px; height: 120px; margin: 10px auto;">
+                    <canvas id="progressChart" width="120" height="120"></canvas>
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                        <div class="value" id="progress-percent" style="font-size: 1.8em; margin: 0;">-</div>
+                        <div class="label" id="progress-sublabel" style="font-size: 0.8em; margin: 0;">of target</div>
+                    </div>
+                </div>
+                <div class="label" id="progress-label" style="font-size: 0.9em;">- / 360 min</div>
                 <div class="volume-guidance" id="volume-guidance" style="font-size: 0.8em; margin-top: 5px; color: #bbb; font-weight: normal;"></div>
             </div>
-            <div class="summary-card">
-                <h3>Adherence Score</h3>
+            <div class="summary-card" style="position: relative;">
+                <h3>Adherence Score <span class="info-icon" onclick="toggleAdherenceInfo(event)">i</span></h3>
                 <div class="value" id="adherence-score">-</div>
                 <div class="label">out of 100</div>
+                <div id="adherence-info-popup" class="info-popup">
+                    <h4>How Adherence Score is Calculated</h4>
+                    <p>The adherence score measures how closely your training matches the ideal 80/10/10 polarized distribution.</p>
+                    
+                    <p><strong>Target Distribution:</strong></p>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li>Zone 1: 80% (low intensity)</li>
+                        <li>Zone 2: 10% (threshold)</li>
+                        <li>Zone 3: 10% (high intensity)</li>
+                    </ul>
+                    
+                    <p><strong>Calculation:</strong></p>
+                    <div class="formula">
+                        Deviation = |Actual% - Target%|<br>
+                        <br>
+                        Total Deviation = <br>
+                        &nbsp;&nbsp;(Zone1 Dev × 0.5) +<br>
+                        &nbsp;&nbsp;(Zone2 Dev × 0.25) +<br>
+                        &nbsp;&nbsp;(Zone3 Dev × 0.25)<br>
+                        <br>
+                        Score = 100 - Total Deviation
+                    </div>
+                    
+                    <p><strong>Your Current Distribution:</strong></p>
+                    <div id="adherence-current-dist" style="font-family: monospace; font-size: 0.9em;">
+                        Zone 1: --% (target: 80%)<br>
+                        Zone 2: --% (target: 10%)<br>
+                        Zone 3: --% (target: 10%)
+                    </div>
+                    
+                    <p style="margin-top: 10px; font-size: 0.85em; color: #7f8c8d;">
+                        Zone 1 deviations are weighted most heavily (50%) because maintaining high volume of low-intensity work is crucial for polarized training.
+                    </p>
+                </div>
             </div>
             <div class="summary-card">
                 <h3>Zone Distribution</h3>
@@ -744,7 +846,7 @@
         <div id="error" class="error" style="display: none;"></div>
         
         <div id="combined-chart" class="combined-chart">
-            <h2>Last 7 Days Training Distribution</h2>
+            <h2 id="combined-chart-title">Training Distribution</h2>
             <div class="combined-chart-container">
                 <canvas id="combinedChart"></canvas>
             </div>
@@ -776,19 +878,19 @@
         <div id="volume-tracking" class="volume-tracking">
             <h2>📊 Weekly Training Volume Tracking</h2>
             <div class="volume-info">
-                <p>Target: 360 minutes/week (6 hours) for optimal polarized training</p>
-                <p style="font-size: 0.9em; color: #95a5a6;">Rolling 7-day window (today + previous 6 days)</p>
+                <p id="volume-target-info">Target: 360 minutes/week (6 hours) of polarized training (not including ancillary work)</p>
+                <p id="volume-window-info" style="font-size: 0.9em; color: #95a5a6;">Rolling window</p>
             </div>
             <div class="volume-chart-container">
                 <canvas id="volumeChart"></canvas>
             </div>
             <div class="volume-stats">
                 <div class="volume-stat">
-                    <div class="volume-label">Last 7 Days</div>
+                    <div class="volume-label" id="past-volume-label">Time Period</div>
                     <div class="volume-value" id="past-volume">-</div>
                 </div>
                 <div class="volume-stat">
-                    <div class="volume-label">Avg/Day Needed (next 7d)</div>
+                    <div class="volume-label" id="daily-needed-label">Avg/Day Needed (next 7d)</div>
                     <div class="volume-value" id="daily-needed">-</div>
                 </div>
                 <div class="volume-stat">
@@ -830,11 +932,64 @@
     <script>
         let workoutData = null;
         let filteredActivities = [];
-        let combinedChart = null;
+        window.combinedChart = null;  // Declare on window to avoid scope issues
         let volumeChart = null;
         let aiSessionId = '{{ ai_session_id }}';
         let aiPollingInterval = null;
+        
+        // Cookie functions
+        function setCookie(name, value, days) {
+            const expires = new Date();
+            expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+            document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+        }
+        
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for(let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
+        
+        // Toggle adherence info popup
+        function toggleAdherenceInfo(event) {
+            event.stopPropagation();
+            const popup = document.getElementById('adherence-info-popup');
+            popup.classList.toggle('show');
+            
+            // Close popup when clicking outside
+            if (popup.classList.contains('show')) {
+                setTimeout(() => {
+                    document.addEventListener('click', closeAdherenceInfo);
+                }, 100);
+            }
+        }
+        
+        function closeAdherenceInfo() {
+            const popup = document.getElementById('adherence-info-popup');
+            popup.classList.remove('show');
+            document.removeEventListener('click', closeAdherenceInfo);
+        }
         let selectedRecoveryPathway = null;
+        
+        // Save time range preference and reload data
+        function saveTimeRangeAndLoad() {
+            const timeRange = document.getElementById('timeRange').value;
+            setCookie('timeRange', timeRange, 365); // Save for 1 year
+            loadData();
+        }
+        
+        // Load saved time range preference
+        function loadTimeRangePreference() {
+            const savedRange = getCookie('timeRange');
+            if (savedRange) {
+                document.getElementById('timeRange').value = savedRange;
+            }
+        }
         
         async function loadData() {
             const loadingDiv = document.getElementById('loading');
@@ -886,6 +1041,7 @@
                 }
                 
                 workoutData = await response.json();
+                window.workoutData = workoutData;  // Also set on window for global access
                 
                 // Check if data is still downloading
                 if (workoutData.downloading) {
@@ -906,14 +1062,48 @@
                 }
                 
                 loadingDiv.style.display = 'none';
-                // Display all activities (no filtering) and show 7-day analysis
+                // Display all activities (no filtering) and show analysis for selected time range
                 displaySummary(workoutData.activities);
-                displayCombinedChart(workoutData.activities);
+                displayCombinedChart(workoutData.activities, workoutData);
                 // Only load AI recommendations if we have training data
                 if (workoutData && workoutData.activities && workoutData.activities.length > 0) {
                     loadAIRecommendations();
                 }
-                displayWorkouts(workoutData.activities);
+                // Display all activities including strength training
+                // We need to merge analyzed activities with strength training from all_activities
+                const analyzedActivities = workoutData.activities || [];
+                const allRawActivities = workoutData.all_activities || [];
+                
+                // Create a map of analyzed activities by ID for quick lookup
+                const analyzedMap = new Map();
+                analyzedActivities.forEach(a => {
+                    analyzedMap.set(a.activity_id || a.id, a);
+                });
+                
+                // Build display list: use analyzed data when available, raw data for strength training
+                const displayActivities = [];
+                allRawActivities.forEach(rawActivity => {
+                    const activityId = rawActivity.id;
+                    const sportType = rawActivity.sport_type || rawActivity.type || 'Unknown';
+                    const isStrengthTraining = ['WeightTraining', 'Workout'].includes(sportType);
+                    
+                    if (isStrengthTraining) {
+                        // Use raw activity data for strength training
+                        displayActivities.push(rawActivity);
+                    } else if (analyzedMap.has(activityId)) {
+                        // Use analyzed data for other activities
+                        displayActivities.push(analyzedMap.get(activityId));
+                    }
+                });
+                
+                // Sort by date (newest first)
+                displayActivities.sort((a, b) => {
+                    const dateA = new Date(a.date || a.start_date);
+                    const dateB = new Date(b.date || b.start_date);
+                    return dateB - dateA;
+                });
+                
+                displayWorkouts(displayActivities);
                 
             } catch (error) {
                 console.error('Error loading data:', error);
@@ -931,26 +1121,29 @@
             console.log('displaySummary called with', activities.length, 'activities');
             const summaryDiv = document.getElementById('summary');
             
-            // Filter to last 7 days for summary stats (matching the 7-day analysis)
-            const now = new Date();
-            const last7Days = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+            // Get selected time range
+            const timeRange = parseInt(document.getElementById('timeRange').value) || 7;
             
-            const last7DaysActivities = activities.filter(activity => {
+            // Filter to selected time range for summary stats
+            const now = new Date();
+            const rangeStart = new Date(now.getTime() - (timeRange * 24 * 60 * 60 * 1000));
+            
+            const filteredActivities = activities.filter(activity => {
                 const activityDate = new Date(activity.date);
-                return activityDate >= last7Days;
+                return activityDate >= rangeStart;
             });
             
-            // Calculate summary stats for last 7 days
-            const totalActivities = last7DaysActivities.length;
-            const totalMinutes = last7DaysActivities.reduce((sum, a) => sum + a.duration_minutes, 0);
+            // Calculate summary stats for selected time range
+            const totalActivities = filteredActivities.length;
+            const totalMinutes = filteredActivities.reduce((sum, a) => sum + a.duration_minutes, 0);
             const totalHours = totalMinutes / 60;
             
-            // Calculate weighted zone percentages for last 7 days
+            // Calculate weighted zone percentages for selected time range
             let totalZone1Minutes = 0;
             let totalZone2Minutes = 0;
             let totalZone3Minutes = 0;
             
-            last7DaysActivities.forEach(activity => {
+            filteredActivities.forEach(activity => {
                 const activityMinutes = activity.duration_minutes;
                 totalZone1Minutes += activityMinutes * (activity.zone1_percent / 100);
                 totalZone2Minutes += activityMinutes * (activity.zone2_percent / 100);
@@ -975,29 +1168,76 @@
             
             document.getElementById('total-workouts').textContent = totalActivities;
             
-            // Display volume in hours and add guidance
-            if (totalHours >= 1) {
-                document.getElementById('total-time').textContent = totalHours.toFixed(1);
-                document.getElementById('total-time-label').textContent = 'hours';
-            } else {
-                document.getElementById('total-time').textContent = totalMinutes;
-                document.getElementById('total-time-label').textContent = 'minutes';
+            // Create progress chart
+            const progressCanvas = document.getElementById('progressChart');
+            const ctx = progressCanvas.getContext('2d');
+            // Calculate target based on time range (360 minutes per week)
+            const weeklyTarget = 360;
+            const dailyTarget = weeklyTarget / 7;
+            const targetMinutes = Math.round(dailyTarget * timeRange);
+            const progressPercent = Math.min(100, (totalMinutes / targetMinutes) * 100);
+            
+            // Update text displays
+            document.getElementById('progress-percent').textContent = Math.round(progressPercent) + '%';
+            document.getElementById('progress-label').textContent = `${Math.round(totalMinutes)} / ${targetMinutes} min`;
+            document.getElementById('progress-title').textContent = `${timeRange}-Day Achievement`;
+            
+            // Draw donut chart
+            if (window.progressChart && typeof window.progressChart.destroy === 'function') {
+                window.progressChart.destroy();
             }
             
-            // Add volume-based training guidance for 7-day period
+            window.progressChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [totalMinutes, Math.max(0, targetMinutes - totalMinutes)],
+                        backgroundColor: [
+                            progressPercent >= 100 ? '#27ae60' : progressPercent >= 75 ? '#f39c12' : '#e74c3c',
+                            '#ecf0f1'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            enabled: false
+                        }
+                    }
+                }
+            });
+            
+            // Removed old volume display code
+            
+            // Add volume-based training guidance for selected period
             let volumeGuidance = '';
-            if (totalHours < 4) {
-                volumeGuidance = `${totalHours.toFixed(1)}h last 7 days: Low volume - mixed approach`;
-            } else if (totalHours < 6) {
-                volumeGuidance = `${totalHours.toFixed(1)}h last 7 days: Pyramidal (70/20/10)`;
+            const remainingMinutes = Math.max(0, targetMinutes - totalMinutes);
+            if (progressPercent >= 100) {
+                volumeGuidance = `✅ Target met!`;
             } else {
-                volumeGuidance = `${totalHours.toFixed(1)}h last 7 days: Polarized (80/10/10)`;
+                const shortfall = targetMinutes - totalMinutes;
+                const shortfallHours = (shortfall / 60).toFixed(1);
+                volumeGuidance = `❌ Missed by ${shortfall} min (${shortfallHours}h)`;
             }
             document.getElementById('volume-guidance').textContent = volumeGuidance;
             
             document.getElementById('adherence-score').textContent = Math.round(adherenceScore);
             document.getElementById('zone-distribution').textContent = 
                 `${Math.round(zone1Percent)}% / ${Math.round(zone2Percent)}% / ${Math.round(zone3Percent)}%`;
+            
+            // Update the adherence popup with current distribution
+            document.getElementById('adherence-current-dist').innerHTML = `
+                Zone 1: ${Math.round(zone1Percent)}% (target: 80%)<br>
+                Zone 2: ${Math.round(zone2Percent)}% (target: 10%)<br>
+                Zone 3: ${Math.round(zone3Percent)}% (target: 10%)
+            `;
             
             console.log('Summary calculations:', {
                 totalActivities,
@@ -1027,8 +1267,12 @@
             return daysMap[timeRange] || 14;
         }
         
-        function displayCombinedChart(activities) {
-            console.log('displayCombinedChart called with', activities?.length, 'activities');
+        function displayCombinedChart(activities, fullData) {
+            console.log('=== displayCombinedChart START ===');
+            console.log('Cache buster:', '{{ cache_buster }}');
+            console.log('Activities:', activities?.length);
+            console.log('FullData keys:', fullData ? Object.keys(fullData) : 'null');
+            
             const combinedChartDiv = document.getElementById('combined-chart');
             console.log('Combined chart div:', combinedChartDiv);
             
@@ -1037,35 +1281,46 @@
                 return;
             }
             
-            // ALWAYS use last 7 days for combined chart
+            // Ensure we have access to activities data
+            if (!activities || activities.length === 0) {
+                console.log('No activities provided to displayCombinedChart');
+                return;
+            }
+            
+            // Get selected time range
+            const timeRange = parseInt(document.getElementById('timeRange').value) || 7;
+            
+            // Update chart title
+            document.getElementById('combined-chart-title').textContent = `Last ${timeRange} Days Training Distribution`;
+            
             const today = new Date();
             today.setHours(23, 59, 59, 999); // End of today
-            const sevenDaysAgo = new Date(today);
-            sevenDaysAgo.setDate(today.getDate() - 6);
-            sevenDaysAgo.setHours(0, 0, 0, 0); // Start of 7 days ago
+            const rangeStartDate = new Date(today);
+            rangeStartDate.setDate(today.getDate() - (timeRange - 1));
+            rangeStartDate.setHours(0, 0, 0, 0); // Start of range
             
-            // Filter to last 7 days from ALL activities - always use the full dataset
+            // Filter to selected range from ALL activities - always use the full dataset
             const allActivities = window.workoutData?.activities || activities || [];
             console.log('All activities:', allActivities.length);
-            const last7DaysActivities = allActivities.filter(activity => {
+            const filteredActivities = allActivities.filter(activity => {
                 const activityDate = new Date(activity.date);
-                return activityDate >= sevenDaysAgo && activityDate <= today;
+                return activityDate >= rangeStartDate && activityDate <= today;
             });
-            console.log('Last 7 days activities:', last7DaysActivities.length);
+            console.log(`Last ${timeRange} days activities:`, filteredActivities.length);
             
-            if (last7DaysActivities.length === 0) {
-                console.log('No activities in last 7 days, hiding chart');
+            if (filteredActivities.length === 0) {
+                console.log(`No activities in last ${timeRange} days, hiding chart`);
                 combinedChartDiv.style.display = 'none';
                 return;
             }
             
-            // Calculate combined zone percentages for last 7 days
-            const totalMinutes = last7DaysActivities.reduce((sum, a) => sum + a.duration_minutes, 0);
+            // Calculate combined zone percentages for selected time range
+            const totalMinutes = filteredActivities.reduce((sum, a) => sum + a.duration_minutes, 0);
             let totalZone1Minutes = 0;
             let totalZone2Minutes = 0;
             let totalZone3Minutes = 0;
             
-            last7DaysActivities.forEach(activity => {
+            filteredActivities.forEach(activity => {
                 const activityMinutes = activity.duration_minutes;
                 totalZone1Minutes += activityMinutes * (activity.zone1_percent / 100);
                 totalZone2Minutes += activityMinutes * (activity.zone2_percent / 100);
@@ -1084,8 +1339,8 @@
                 zone1Percent,
                 zone2Percent,
                 zone3Percent,
-                activities: last7DaysActivities.length,
-                sevenDaysAgo: sevenDaysAgo.toISOString(),
+                activities: filteredActivities.length,
+                rangeStartDate: rangeStartDate.toISOString(),
                 today: today.toISOString()
             });
             
@@ -1093,11 +1348,16 @@
             console.log('Combined chart div element:', combinedChartDiv);
             console.log('Current display style:', combinedChartDiv.style.display);
             
-            // Weekly total is just the total from last 7 days
+            // Calculate target based on time range (360 minutes per week)
+            const weeklyTarget = 360;
+            const dailyTarget = weeklyTarget / 7;
+            const targetMinutes = Math.round(dailyTarget * timeRange);
+            
+            // Weekly total is just the total from selected range
             const totalWeeklyMinutes = totalMinutes;
-            const polarizedMinimumMinutes = 360; // 6 hours/week minimum for effective polarized training
-            const generalHealthMinutes = 150; // NIH general health recommendation
-            const maxHealthyWeeklyMinutes = 600; // 10 hours/week overtraining threshold
+            const polarizedMinimumMinutes = targetMinutes; // Scaled target for effective polarized training
+            const generalHealthMinutes = Math.round(150 * timeRange / 7); // NIH general health recommendation scaled
+            const maxHealthyWeeklyMinutes = Math.round(600 * timeRange / 7); // 10 hours/week overtraining threshold scaled
             
             // Calculate zone deficits based on polarized training targets (80/10/10)
             const targetZone1Minutes = totalMinutes * 0.80;
@@ -1140,6 +1400,10 @@
             zone2DeficitEl.style.color = zone2Deficit > 0 ? '#e74c3c' : zone2Excess > 0 ? '#f39c12' : '#27ae60';
             zone3DeficitEl.style.color = zone3Deficit > 0 ? '#e74c3c' : zone3Excess > 0 ? '#f39c12' : '#27ae60';
             
+            // Get strength training data early so we can use it in the title
+            const ancillaryWork = fullData?.ancillary_work_7days || fullData?.ancillary_work || { strength_training_minutes: 0, strength_training_count: 0 };
+            const strengthMinutes = ancillaryWork.strength_training_minutes || 0;
+            
             // Add time validation warning
             const timeWarningElement = document.getElementById('time-warning') || (() => {
                 const warning = document.createElement('div');
@@ -1149,10 +1413,14 @@
                 return warning;
             })();
             
-            // Update the chart title to show total minutes
+            // Update the chart title to show total minutes and strength training
             const chartTitle = document.querySelector('#combined-chart h2');
             if (chartTitle) {
-                chartTitle.textContent = `Last 7 Days Training Distribution (${Math.round(totalMinutes)} minutes)`;
+                let titleText = `Last ${timeRange} Days Training Distribution (${Math.round(totalMinutes)} minutes)`;
+                if (strengthMinutes > 0) {
+                    titleText += ` + ${strengthMinutes} min ancillary training`;
+                }
+                chartTitle.textContent = titleText;
             }
             
             const weeklyHours = (totalWeeklyMinutes / 60).toFixed(1);
@@ -1177,49 +1445,65 @@
                 console.error('Could not find combinedChart canvas element!');
                 return;
             }
-            if (combinedChart) {
-                combinedChart.destroy();
+            
+            // Check if Chart.js is loaded
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js is not loaded!');
+                return;
             }
             
-            combinedChart = new Chart(ctx, {
+            if (window.combinedChart) {
+                window.combinedChart.destroy();
+            }
+            
+            // Strength training data already defined earlier for use in title
+            
+            window.combinedChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Zone 1\n(Low Intensity)', 'Zone 2\n(Threshold)', 'Zone 3\n(High Intensity)', 'Weekly Time\n(Minutes)'],
+                    labels: ['Zone 1\n(Low Intensity)', 'Zone 2\n(Threshold)', 'Zone 3\n(High Intensity)', 'Ancillary\n(Strength)', 'Weekly Time\n(Minutes)'],
                     datasets: [{
                         label: 'Combined Time Distribution',
-                        data: [zone1Percent, zone2Percent, zone3Percent, null],
-                        backgroundColor: ['#4CAF50', '#FF9800', '#F44336', 'transparent'],
-                        borderColor: ['#388E3C', '#F57C00', '#D32F2F', 'transparent'],
+                        data: [zone1Percent, zone2Percent, zone3Percent, null, null],
+                        backgroundColor: ['#4CAF50', '#FF9800', '#F44336', 'transparent', 'transparent'],
+                        borderColor: ['#388E3C', '#F57C00', '#D32F2F', 'transparent', 'transparent'],
                         borderWidth: 2,
                         yAxisID: 'y'
                     }, {
                         label: 'Target Distribution',
-                        data: [80, 10, 10, null],
-                        backgroundColor: ['rgba(76, 175, 80, 0.3)', 'rgba(255, 152, 0, 0.3)', 'rgba(244, 67, 54, 0.3)', 'transparent'],
-                        borderColor: ['#388E3C', '#F57C00', '#D32F2F', 'transparent'],
+                        data: [80, 10, 10, null, null],
+                        backgroundColor: ['rgba(76, 175, 80, 0.3)', 'rgba(255, 152, 0, 0.3)', 'rgba(244, 67, 54, 0.3)', 'transparent', 'transparent'],
+                        borderColor: ['#388E3C', '#F57C00', '#D32F2F', 'transparent', 'transparent'],
                         borderWidth: 2,
                         borderDash: [5, 5],
                         yAxisID: 'y'
                     }, {
+                        label: 'Ancillary Training',
+                        data: [null, null, null, strengthMinutes, null],
+                        backgroundColor: [null, null, null, '#9C27B0', null],
+                        borderColor: [null, null, null, '#6A1B9A', null],
+                        borderWidth: 2,
+                        yAxisID: 'y1'
+                    }, {
                         label: 'Actual Weekly Time',
-                        data: [null, null, null, Math.round(totalWeeklyMinutes)],
-                        backgroundColor: [null, null, null, totalWeeklyMinutes < generalHealthMinutes ? '#F44336' : totalWeeklyMinutes < polarizedMinimumMinutes ? '#FF9800' : totalWeeklyMinutes > maxHealthyWeeklyMinutes ? '#FF9800' : '#4CAF50'],
-                        borderColor: [null, null, null, totalWeeklyMinutes < generalHealthMinutes ? '#D32F2F' : totalWeeklyMinutes < polarizedMinimumMinutes ? '#F57C00' : totalWeeklyMinutes > maxHealthyWeeklyMinutes ? '#F57C00' : '#388E3C'],
+                        data: [null, null, null, null, Math.round(totalWeeklyMinutes)],
+                        backgroundColor: [null, null, null, null, totalWeeklyMinutes < generalHealthMinutes ? '#F44336' : totalWeeklyMinutes < polarizedMinimumMinutes ? '#FF9800' : totalWeeklyMinutes > maxHealthyWeeklyMinutes ? '#FF9800' : '#4CAF50'],
+                        borderColor: [null, null, null, null, totalWeeklyMinutes < generalHealthMinutes ? '#D32F2F' : totalWeeklyMinutes < polarizedMinimumMinutes ? '#F57C00' : totalWeeklyMinutes > maxHealthyWeeklyMinutes ? '#F57C00' : '#388E3C'],
                         borderWidth: 2,
                         yAxisID: 'y1'
                     }, {
                         label: 'Health Min (150min)',
-                        data: [null, null, null, generalHealthMinutes],
-                        backgroundColor: [null, null, null, 'rgba(244, 67, 54, 0.3)'],
-                        borderColor: [null, null, null, '#D32F2F'],
+                        data: [null, null, null, null, generalHealthMinutes],
+                        backgroundColor: [null, null, null, null, 'rgba(244, 67, 54, 0.3)'],
+                        borderColor: [null, null, null, null, '#D32F2F'],
                         borderWidth: 1,
                         borderDash: [3, 3],
                         yAxisID: 'y1'
                     }, {
-                        label: 'Polarized Min (360min)',
-                        data: [null, null, null, polarizedMinimumMinutes],
-                        backgroundColor: [null, null, null, 'rgba(76, 175, 80, 0.3)'],
-                        borderColor: [null, null, null, '#388E3C'],
+                        label: `Polarized Min (${polarizedMinimumMinutes}min)`,
+                        data: [null, null, null, null, polarizedMinimumMinutes],
+                        backgroundColor: [null, null, null, null, 'rgba(76, 175, 80, 0.3)'],
+                        borderColor: [null, null, null, null, '#388E3C'],
                         borderWidth: 2,
                         borderDash: [5, 5],
                         yAxisID: 'y1'
@@ -1345,11 +1629,11 @@
             // Check if the chart was created successfully
             setTimeout(() => {
                 console.log('After timeout - Combined chart div visible?', combinedChartDiv.style.display);
-                console.log('Combined chart instance:', combinedChart);
-                if (combinedChart) {
-                    console.log('Chart canvas:', combinedChart.canvas);
-                    console.log('Chart width:', combinedChart.width);
-                    console.log('Chart height:', combinedChart.height);
+                console.log('Combined chart instance:', window.combinedChart);
+                if (window.combinedChart) {
+                    console.log('Chart canvas:', window.combinedChart.canvas);
+                    console.log('Chart width:', window.combinedChart.width);
+                    console.log('Chart height:', window.combinedChart.height);
                 }
             }, 100);
             
@@ -1380,51 +1664,73 @@
             const card = document.createElement('div');
             card.className = 'workout-card';
             
-            const date = new Date(activity.date).toLocaleDateString();
-            const duration = activity.duration_minutes;
+            const date = new Date(activity.date || activity.start_date).toLocaleDateString();
+            const duration = activity.duration_minutes || Math.round(activity.elapsed_time / 60);
+            const sportType = activity.sport_type || activity.type || 'Unknown';
             
-            // Calculate zone minutes based on duration and percentages
-            const zone1Minutes = Math.round(duration * (activity.zone1_percent / 100));
-            const zone2Minutes = Math.round(duration * (activity.zone2_percent / 100));
-            const zone3Minutes = Math.round(duration * (activity.zone3_percent / 100));
+            // Check if this is a strength training activity
+            const isStrengthTraining = ['WeightTraining', 'Workout'].includes(sportType);
             
-            card.innerHTML = `
-                <div class="workout-header">
-                    <h3 class="workout-title">${activity.name}</h3>
-                    <div class="workout-date">${date}</div>
-                </div>
-                <div class="workout-stats">
-                    <span>Duration: ${duration} min (${(duration/60).toFixed(1)}h)</span>
-                    <span>Zone 1: ${zone1Minutes} min</span>
-                    <span>Zone 2: ${zone2Minutes} min</span>
-                    <span>Zone 3: ${zone3Minutes} min</span>
-                </div>
-                <div class="chart-container">
-                    <canvas id="chart-${index}"></canvas>
-                </div>
-                <div class="zone-breakdown">
-                    <div class="zone-stat">
-                        <div class="zone-color zone1"></div>
-                        <div class="zone-percentage">${Math.round(activity.zone1_percent)}%</div>
-                        <div>Zone 1</div>
-                    </div>
-                    <div class="zone-stat">
-                        <div class="zone-color zone2"></div>
-                        <div class="zone-percentage">${Math.round(activity.zone2_percent)}%</div>
-                        <div>Zone 2</div>
-                    </div>
-                    <div class="zone-stat">
-                        <div class="zone-color zone3"></div>
-                        <div class="zone-percentage">${Math.round(activity.zone3_percent)}%</div>
-                        <div>Zone 3</div>
-                    </div>
-                </div>
-            `;
+            // Calculate zone minutes based on duration and percentages (0 for strength training)
+            const zone1Minutes = isStrengthTraining ? 0 : Math.round(duration * ((activity.zone1_percent || 0) / 100));
+            const zone2Minutes = isStrengthTraining ? 0 : Math.round(duration * ((activity.zone2_percent || 0) / 100));
+            const zone3Minutes = isStrengthTraining ? 0 : Math.round(duration * ((activity.zone3_percent || 0) / 100));
             
-            // Create chart after the card is added to DOM
-            setTimeout(() => {
-                createChart(activity, index);
-            }, 100);
+            if (isStrengthTraining) {
+                card.innerHTML = `
+                    <div class="workout-header">
+                        <h3 class="workout-title">💪 ${activity.name}</h3>
+                        <div class="workout-date">${date}</div>
+                    </div>
+                    <div class="workout-stats">
+                        <span>Type: Ancillary Training</span>
+                        <span>Duration: ${duration} min</span>
+                        <span style="color: #9C27B0; font-weight: bold;">Ancillary Work</span>
+                    </div>
+                    <div style="padding: 20px; text-align: center; color: #666;">
+                        <div style="font-size: 2em; color: #9C27B0;">💪</div>
+                        <div>Ancillary training does not count toward polarized zones</div>
+                    </div>
+                `;
+            } else {
+                card.innerHTML = `
+                    <div class="workout-header">
+                        <h3 class="workout-title">${activity.name}</h3>
+                        <div class="workout-date">${date}</div>
+                    </div>
+                    <div class="workout-stats">
+                        <span>Duration: ${duration} min (${(duration/60).toFixed(1)}h)</span>
+                        <span>Zone 1: ${zone1Minutes} min</span>
+                        <span>Zone 2: ${zone2Minutes} min</span>
+                        <span>Zone 3: ${zone3Minutes} min</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chart-${index}"></canvas>
+                    </div>
+                    <div class="zone-breakdown">
+                        <div class="zone-stat">
+                            <div class="zone-color zone1"></div>
+                            <div class="zone-percentage">${Math.round(activity.zone1_percent || 0)}%</div>
+                            <div>Zone 1</div>
+                        </div>
+                        <div class="zone-stat">
+                            <div class="zone-color zone2"></div>
+                            <div class="zone-percentage">${Math.round(activity.zone2_percent || 0)}%</div>
+                            <div>Zone 2</div>
+                        </div>
+                        <div class="zone-stat">
+                            <div class="zone-color zone3"></div>
+                            <div class="zone-percentage">${Math.round(activity.zone3_percent || 0)}%</div>
+                            <div>Zone 3</div>
+                        </div>
+                    </div>
+                `;
+                
+                // Create chart after the card is added to DOM (only for non-strength activities)
+                setTimeout(() => {
+                    createChart(activity, index);
+                }, 100);
+            }
             
             return card;
         }
@@ -1671,13 +1977,25 @@
                 return;
             }
             
-            // Calculate volume data for past 7 days (rolling week)
+            // Get selected time range
+            const timeRange = parseInt(document.getElementById('timeRange').value) || 7;
+            
+            // Calculate volume data for selected time range
             const today = new Date();
-            const daysToShow = 7;
-            const targetWeeklyMinutes = 360; // 6 hours
+            const daysToShow = timeRange;
+            const weeklyTarget = 360; // 6 hours per week
+            const dailyTarget = weeklyTarget / 7;
+            const targetMinutes = Math.round(dailyTarget * timeRange);
             const dailyData = [];
             
-            // Initialize daily data
+            // Update window info and labels
+            document.getElementById('volume-target-info').textContent = 
+                `Target: ${targetMinutes} minutes/${timeRange} days (${(targetMinutes/60).toFixed(1)} hours) of polarized training`;
+            document.getElementById('volume-window-info').textContent = 
+                `Rolling ${timeRange}-day window (today + previous ${timeRange - 1} days)`;
+            document.getElementById('past-volume-label').textContent = `Last ${timeRange} Days`;
+            
+            // Initialize daily data with zone breakdown
             for (let i = daysToShow - 1; i >= 0; i--) {
                 const date = new Date(today);
                 date.setDate(date.getDate() - i);
@@ -1685,14 +2003,36 @@
                     date: date,
                     dateStr: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
                     minutes: 0,
+                    zone1Minutes: 0,
+                    zone2Minutes: 0,
+                    zone3Minutes: 0,
+                    strengthMinutes: 0,
                     isPast: i > 0,
                     isToday: i === 0
                 });
             }
             
-            // Populate with actual activity data - use ALL activities, not just filtered
-            workoutData.activities.forEach(activity => {
-                const activityDate = new Date(activity.date);
+            // Populate with actual activity data - merge analyzed with strength training
+            const analyzedActivities = workoutData.activities || [];
+            const allRawActivities = workoutData.all_activities || [];
+            
+            // Create a map of analyzed activities by ID
+            const analyzedMap = new Map();
+            analyzedActivities.forEach(a => {
+                analyzedMap.set(a.activity_id || a.id, a);
+            });
+            
+            // Process all activities
+            allRawActivities.forEach(rawActivity => {
+                const activityId = rawActivity.id;
+                const sportType = rawActivity.sport_type || rawActivity.type || 'Unknown';
+                const isStrengthTraining = ['WeightTraining', 'Workout'].includes(sportType);
+                
+                // Use analyzed data if available, otherwise use raw data
+                const activity = isStrengthTraining ? rawActivity : (analyzedMap.get(activityId) || rawActivity);
+                
+                const activityDate = new Date(activity.date || activity.start_date);
+                const duration = activity.duration_minutes || Math.round((activity.elapsed_time || 0) / 60);
                 
                 // Compare dates in local timezone by using date strings
                 const activityDateStr = activityDate.toLocaleDateString('en-US');
@@ -1701,32 +2041,48 @@
                 for (let i = 0; i < dailyData.length; i++) {
                     const dayDateStr = dailyData[i].date.toLocaleDateString('en-US');
                     if (activityDateStr === dayDateStr && (dailyData[i].isPast || dailyData[i].isToday)) {
-                        dailyData[i].minutes += activity.duration_minutes;
+                        dailyData[i].minutes += duration;
+                        
+                        if (isStrengthTraining) {
+                            dailyData[i].strengthMinutes += duration;
+                        } else {
+                            // Calculate zone minutes
+                            dailyData[i].zone1Minutes += duration * ((activity.zone1_percent || 0) / 100);
+                            dailyData[i].zone2Minutes += duration * ((activity.zone2_percent || 0) / 100);
+                            dailyData[i].zone3Minutes += duration * ((activity.zone3_percent || 0) / 100);
+                        }
                         break;
                     }
                 }
             });
             
-            // Calculate past 7 days volume
+            // Calculate past volume for selected range
             // Find today's index in the dailyData array
             const todayIndex = dailyData.findIndex(day => day.isToday);
             
-            // Calculate rolling 7-day total (including today)
+            // Calculate rolling total for selected period (including today)
             let rollingWeekMinutes = 0;
-            if (todayIndex >= 6) {
-                // Sum today and the 6 days before (7 days total)
-                for (let i = todayIndex - 6; i <= todayIndex; i++) {
+            let rollingPolarizedMinutes = 0;
+            let rollingAncillaryMinutes = 0;
+            
+            if (todayIndex >= timeRange - 1) {
+                // Sum today and the previous days for the time range
+                for (let i = todayIndex - (timeRange - 1); i <= todayIndex; i++) {
                     rollingWeekMinutes += dailyData[i].minutes;
+                    rollingPolarizedMinutes += (dailyData[i].zone1Minutes + dailyData[i].zone2Minutes + dailyData[i].zone3Minutes);
+                    rollingAncillaryMinutes += dailyData[i].strengthMinutes;
                 }
             } else {
-                // If we have less than 7 days of history, sum what we have
+                // If we have less than the full range of history, sum what we have
                 for (let i = 0; i <= todayIndex; i++) {
                     rollingWeekMinutes += dailyData[i].minutes;
+                    rollingPolarizedMinutes += (dailyData[i].zone1Minutes + dailyData[i].zone2Minutes + dailyData[i].zone3Minutes);
+                    rollingAncillaryMinutes += dailyData[i].strengthMinutes;
                 }
             }
             
-            // Calculate what's needed
-            const minutesNeeded = Math.max(0, targetWeeklyMinutes - rollingWeekMinutes);
+            // Calculate what's needed based on polarized minutes only
+            const minutesNeeded = Math.max(0, targetMinutes - rollingPolarizedMinutes);
             
             // Calculate projection for today if not yet completed
             const todayData = dailyData[todayIndex];
@@ -1771,10 +2127,10 @@
                 }
                 
                 // Calculate what's needed per day on average
-                // We need: baseMinutes + (avgPerDay * futureDaysCount) = 360
-                // So: avgPerDay = (360 - baseMinutes) / futureDaysCount
+                // We need: baseMinutes + (avgPerDay * futureDaysCount) = targetMinutes
+                // So: avgPerDay = (targetMinutes - baseMinutes) / futureDaysCount
                 const avgNeededPerDay = futureDaysCount > 0 ? 
-                    Math.max(0, (targetWeeklyMinutes - baseMinutes) / futureDaysCount) : 0;
+                    Math.max(0, (targetMinutes - baseMinutes) / futureDaysCount) : 0;
                 
                 dailyData.push({
                     date: futureDate,
@@ -1789,14 +2145,23 @@
                 });
             }
             
-            // Update stats
-            document.getElementById('past-volume').textContent = `${Math.round(rollingWeekMinutes)} min`;
-            // Calculate simple daily average for display
-            // For small deficits, show the actual deficit instead of dividing by 7
-            const simpleDailyAvg = minutesNeeded < 60 ? minutesNeeded : minutesNeeded / 7;
-            const avgText = minutesNeeded < 60 ? `${Math.round(simpleDailyAvg)} min total` : `${Math.round(simpleDailyAvg)} min`;
+            // Update stats - show both polarized and total time
+            const polarizedText = `${Math.round(rollingPolarizedMinutes)} min`;
+            const totalText = rollingAncillaryMinutes > 0 ? 
+                `${Math.round(rollingWeekMinutes)} min (${Math.round(rollingPolarizedMinutes)} polarized + ${Math.round(rollingAncillaryMinutes)} ancillary)` :
+                `${Math.round(rollingWeekMinutes)} min`;
+            document.getElementById('past-volume').textContent = totalText;
+            // Calculate what's needed per day over next 7 days
+            // This is complex because we need to account for what will drop out of the rolling window
+            // For now, use a simple calculation: if you need X minutes to reach target, divide by 7
+            const dailyNeededNext7Days = minutesNeeded > 0 ? Math.ceil(minutesNeeded / 7) : 0;
+            const avgText = dailyNeededNext7Days === 0 ? 'On target!' : 
+                           minutesNeeded < 60 ? `${Math.round(minutesNeeded)} min total` : 
+                           `${dailyNeededNext7Days} min/day`;
             document.getElementById('daily-needed').textContent = avgText;
-            const deficit = targetWeeklyMinutes - rollingWeekMinutes;
+            
+            // Update deficit based on polarized minutes
+            const deficit = targetMinutes - rollingPolarizedMinutes;
             const deficitElement = document.getElementById('weekly-deficit');
             deficitElement.textContent = deficit > 0 ? `-${Math.round(deficit)} min` : `+${Math.round(Math.abs(deficit))} min`;
             deficitElement.style.color = deficit > 0 ? '#e74c3c' : '#27ae60';
@@ -1816,15 +2181,33 @@
                 data: {
                     labels: dailyData.map(d => d.dateStr),
                     datasets: [{
-                        label: 'Actual Minutes',
-                        data: dailyData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.minutes : 0),
-                        backgroundColor: dailyData.map(d => 
-                            d.isToday && d.minutes > 0 ? '#3498db' : 
-                            d.isPast ? '#27ae60' : 
-                            'transparent'
-                        ),
-                        borderColor: '#27ae60',
-                        borderWidth: 1
+                        label: 'Zone 1',
+                        data: dailyData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.zone1Minutes : 0),
+                        backgroundColor: '#4CAF50',
+                        borderColor: '#388E3C',
+                        borderWidth: 1,
+                        stack: 'actual'
+                    }, {
+                        label: 'Zone 2',
+                        data: dailyData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.zone2Minutes : 0),
+                        backgroundColor: '#FF9800',
+                        borderColor: '#F57C00',
+                        borderWidth: 1,
+                        stack: 'actual'
+                    }, {
+                        label: 'Zone 3',
+                        data: dailyData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.zone3Minutes : 0),
+                        backgroundColor: '#F44336',
+                        borderColor: '#D32F2F',
+                        borderWidth: 1,
+                        stack: 'actual'
+                    }, {
+                        label: 'Ancillary Training',
+                        data: dailyData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.strengthMinutes : 0),
+                        backgroundColor: '#9C27B0',
+                        borderColor: '#6A1B9A',
+                        borderWidth: 1,
+                        stack: 'actual'
                     }, {
                         label: 'Minutes Needed (per day avg)',
                         data: dailyData.map(d => {
@@ -1836,14 +2219,19 @@
                         backgroundColor: 'rgba(52, 152, 219, 0.3)',
                         borderColor: '#3498db',
                         borderWidth: 2,
-                        borderDash: [5, 5]
+                        borderDash: [5, 5],
+                        stack: 'projected'
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
+                        x: {
+                            stacked: true
+                        },
                         y: {
+                            stacked: true,
                             beginAtZero: true,
                             title: {
                                 display: true,
@@ -1858,7 +2246,7 @@
                         },
                         title: {
                             display: true,
-                            text: `Daily Target: ${Math.round(targetWeeklyMinutes / 7)} minutes`,
+                            text: `Daily Target: ${Math.round(dailyTarget)} minutes`,
                             position: 'bottom',
                             color: '#e74c3c'
                         },
@@ -1867,15 +2255,17 @@
                                 afterLabel: function(context) {
                                     const dataPoint = dailyData[context.dataIndex];
                                     if (dataPoint.isFuture && dataPoint.daysToAverage >= 0) {
-                                        const totalNeeded = Math.round(dataPoint.projectedMinutes * dataPoint.futureDaysInWindow);
-                                        const rollingTotal = Math.round(dataPoint.baseMinutes + totalNeeded);
+                                        const totalNeeded = Math.round((targetMinutes - dataPoint.baseMinutes));
+                                        const daysToWork = dataPoint.futureDaysInWindow;
+                                        const perDayNeeded = Math.round(dataPoint.projectedMinutes);
+                                        
                                         if (dataPoint.daysToAverage === 0) {
-                                            return `\nTo hit 360min rolling target tomorrow:\nNeed ${Math.round(dataPoint.projectedMinutes)}min tomorrow\n(Would give ${rollingTotal}min rolling total)`;
+                                            return `\nTo hit ${targetMinutes}min rolling target tomorrow:\nNeed ${perDayNeeded}min tomorrow\n(${dataPoint.baseMinutes} existing + ${perDayNeeded} new = ${targetMinutes}min total)`;
                                         } else {
-                                            return `\nTo hit 360min rolling target on ${dataPoint.dateStr}:\n${Math.round(dataPoint.projectedMinutes)}min/day for next ${dataPoint.daysToAverage + 1} days\n(${totalNeeded}min total needed)`;
+                                            return `\nTo hit ${targetMinutes}min rolling target on ${dataPoint.dateStr}:\n${perDayNeeded}min/day for next ${daysToWork} days\n(${totalNeeded}min total still needed)`;
                                         }
                                     } else if (dataPoint.isToday && dataPoint.projectedMinutes && dataPoint.minutes === 0) {
-                                        return `\nNeeded today to hit\n360min rolling target`;
+                                        return `\nNeeded today to hit\n${targetMinutes}min rolling target`;
                                     }
                                     return '';
                                 }
@@ -1888,15 +2278,15 @@
             volumeDiv.style.display = 'block';
             console.log('Volume div display set to block');
             
-            // Calculate zone percentages for pathway decision
-            const last7DaysActivities = workoutData.activities.filter(activity => {
+            // Calculate zone percentages for pathway decision (always use 7 days for AI recommendations)
+            const aiFilteredActivities = workoutData.activities.filter(activity => {
                 const activityDate = new Date(activity.date);
                 const last7Days = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
                 return activityDate >= last7Days;
             });
             
             let totalZone1Minutes = 0, totalZone2Minutes = 0, totalZone3Minutes = 0;
-            const totalMinutes = last7DaysActivities.reduce((sum, activity) => {
+            const totalMinutes = aiFilteredActivities.reduce((sum, activity) => {
                 const activityMinutes = activity.duration_minutes;
                 totalZone1Minutes += activityMinutes * (activity.zone1_percent / 100);
                 totalZone2Minutes += activityMinutes * (activity.zone2_percent / 100);
@@ -1913,14 +2303,14 @@
             const hasZoneImbalance = Math.abs(zone1Percent - 80) > 5 || Math.abs(zone2Percent - 10) > 5 || Math.abs(zone3Percent - 10) > 5;
             
             if (deficit > 0 || hasZoneImbalance) {
-                generateAIRecoveryPathways(rollingWeekMinutes, targetWeeklyMinutes, Math.max(deficit, 0), dailyData, todayIndex);
+                generateAIRecoveryPathways(rollingWeekMinutes, targetMinutes, Math.max(deficit, 0), dailyData, todayIndex);
             } else {
                 // Show simple message when everything is on target
                 const pathwaysDiv = document.getElementById('recovery-pathways');
                 pathwaysDiv.innerHTML = `
                     <h3 style="margin-top: 20px; margin-bottom: 10px;">🎯 Training Status</h3>
                     <div style="background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px;">
-                        <strong>✅ Excellent work!</strong> You're on track with your training volume (${Math.round(rollingWeekMinutes)}/${targetWeeklyMinutes} min) and zone distribution looks good. 
+                        <strong>✅ Excellent work!</strong> You're on track with your training volume (${Math.round(rollingWeekMinutes)}/${targetMinutes} min) and zone distribution looks good. 
                         Consider a maintenance workout or active recovery.
                     </div>
                 `;
@@ -1944,7 +2334,7 @@
                 const pathwayContext = {
                     deficit: deficit,
                     currentWeeklyMinutes: currentMinutes,
-                    targetWeeklyMinutes: targetMinutes,
+                    targetWeeklyMinutes: targetTotal,
                     todayMinutes: todayMinutes,
                     alreadyWorkedOutToday: alreadyWorkedOutToday,
                     dayOfWeek: today.toLocaleDateString('en-US', { weekday: 'long' }),
@@ -2010,7 +2400,10 @@
                 pathwaysDiv.innerHTML = '<p style="color: #e74c3c; text-align: center;">AI recommendations unavailable. Using fallback logic...</p>';
                 setTimeout(() => {
                     // Use the original function but need to reconstruct the parameters
-                    const targetMinutes = 360; // Default target
+                    const timeRange = parseInt(document.getElementById('timeRange').value) || 7;
+                    const weeklyTarget = 360;
+                    const dailyTarget = weeklyTarget / 7;
+                    const targetMinutes = Math.round(dailyTarget * timeRange);
                     const currentMinutes = targetMinutes - deficit;
                     // Create a simple dailyData structure for fallback
                     const simpleDailyData = [
@@ -2182,9 +2575,8 @@
             };
         }
         
-        function simulateRollingWindow(startingMinutes, dailyPlan, avgMinutes, pastWorkouts) {
-            // Simulates when the rolling 7-day window will reach 360 minutes
-            const targetTotal = 360;
+        function simulateRollingWindow(startingMinutes, dailyPlan, avgMinutes, pastWorkouts, targetTotal = 360) {
+            // Simulates when the rolling window will reach the target minutes
             
             // Debug logging
             console.log('SimulateRollingWindow called with:', {
@@ -2500,7 +2892,7 @@
                 pathwaysDiv.innerHTML = `
                     <h3 style="margin-top: 20px; margin-bottom: 10px;">✅ You're On Track!</h3>
                     <div style="background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px;">
-                        <strong>Great job!</strong> You're at or above your weekly target of 360 minutes.
+                        <strong>Great job!</strong> You're at or above your target of ${targetMinutes} minutes.
                     </div>
                 `;
                 return;
@@ -2935,6 +3327,9 @@
         
         // Load data when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            // Load saved time range preference
+            loadTimeRangePreference();
+            
             // Initially hide the charts
             document.getElementById('combined-chart').style.display = 'none';
             document.getElementById('volume-tracking').style.display = 'none';

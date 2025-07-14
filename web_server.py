@@ -18,7 +18,7 @@ import uuid
 import threading
 import time
 from datetime import datetime
-from flask import Flask, render_template, jsonify, request, redirect, session, url_for, Response
+from flask import Flask, render_template, jsonify, request, redirect, session, url_for, Response, make_response
 from training_analysis import TrainingAnalyzer
 from strava_client import StravaClient
 from download_manager import DownloadManager
@@ -275,6 +275,17 @@ def get_training_data(force_refresh=False):
         if existing_report:
             # Verify it has the expected structure
             if 'distribution' in existing_report and 'activities' in existing_report:
+                # Add last 7 days ancillary work if not present
+                if 'ancillary_work_7days' not in existing_report:
+                    # Load all cached activities to calculate 7-day ancillary work
+                    all_activities = cache_manager.load_all_cached_activities()
+                    analyzer = TrainingAnalyzer()
+                    existing_report['ancillary_work_7days'] = analyzer.filter_ancillary_work(all_activities, days=7)
+                
+                # Add all_activities if not present (for showing strength training in the list)
+                if 'all_activities' not in existing_report:
+                    existing_report['all_activities'] = cache_manager.load_all_cached_activities()
+                
                 cached_data = existing_report
                 cache_timestamp = current_time
                 return existing_report
@@ -587,7 +598,16 @@ def index():
             print(f"Error starting AI generation: {e}")
             ai_session_id = None
     
-    return render_template('index.html', ai_session_id=ai_session_id)
+    # Add cache buster
+    import time
+    cache_buster = int(time.time())
+    
+    response = make_response(render_template('index.html', ai_session_id=ai_session_id, cache_buster=cache_buster))
+    # Add no-cache headers to prevent browser caching issues
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/zone_mapping_guide')
 def zone_mapping_guide():

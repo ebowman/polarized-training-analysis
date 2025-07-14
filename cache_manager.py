@@ -121,9 +121,10 @@ class CacheManager:
         
         # Analyze all activities
         analyzer = TrainingAnalyzer()
-        analyzed_activities = analyzer.analyze_activities(all_activities)
+        analyzed_activities, ancillary_work = analyzer.analyze_activities(all_activities)
         
         print(f"Analyzed {len(analyzed_activities)} activities")
+        print(f"Found {ancillary_work['strength_training_count']} strength training sessions ({ancillary_work['strength_training_minutes']} minutes)")
         
         # Calculate training distribution
         if analyzed_activities:
@@ -173,6 +174,7 @@ class CacheManager:
                     'adherence_score': distribution.adherence_score,
                     'recommendations': distribution.recommendations
                 },
+                'ancillary_work': ancillary_work,
                 'workout_recommendations': [
                     {
                         'type': rec.workout_type.value if hasattr(rec.workout_type, 'value') else str(rec.workout_type),
@@ -199,7 +201,8 @@ class CacheManager:
                         'average_power': a.average_power
                     }
                     for a in analyzed_activities
-                ]
+                ],
+                'all_activities': all_activities  # Include all activities with strength training
             }
             
             # Save the updated report

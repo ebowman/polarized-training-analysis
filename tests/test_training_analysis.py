@@ -128,10 +128,11 @@ class TestTrainingAnalyzer:
     
     def test_analyze_activities(self, analyzer, sample_strava_activities):
         """Test analyzing multiple activities"""
-        results = analyzer.analyze_activities(sample_strava_activities)
+        results, ancillary_work = analyzer.analyze_activities(sample_strava_activities)
         
-        # Should return list of ActivityAnalysis objects
+        # Should return tuple of (list of ActivityAnalysis objects, ancillary work dict)
         assert isinstance(results, list)
+        assert isinstance(ancillary_work, dict)
         assert len(results) > 0
         
         # Check first activity
@@ -152,10 +153,11 @@ class TestTrainingAnalyzer:
             'has_heartrate': False
         }
         
-        results = analyzer.analyze_activities([activity])
+        results, ancillary_work = analyzer.analyze_activities([activity])
         
         # Should return empty list for activities without HR/power
         assert results == []
+        assert isinstance(ancillary_work, dict)
     
     def test_calculate_training_distribution(self, analyzer):
         """Test training distribution calculation"""
@@ -208,8 +210,9 @@ class TestTrainingAnalyzer:
     
     def test_empty_activities_handling(self, analyzer):
         """Test handling of empty activity list"""
-        results = analyzer.analyze_activities([])
+        results, ancillary_work = analyzer.analyze_activities([])
         assert results == []
+        assert isinstance(ancillary_work, dict)
         
         # Test distribution with no activities
         distribution = analyzer.calculate_training_distribution([])

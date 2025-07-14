@@ -58,14 +58,16 @@ def main():
     )
     
     # Analyze activities
-    analyses = analyzer.analyze_activities(recent_activities, use_power=args.use_power)
+    analyses, ancillary_work = analyzer.analyze_activities(recent_activities)
     
     if not analyses:
         print("❌ No analyzable activities found.")
-        print("Activities need heart rate data (or power data if --use-power is specified)")
+        print("Activities need heart rate data")
         return
     
     print(f"Successfully analyzed {len(analyses)} activities")
+    if ancillary_work['strength_training_count'] > 0:
+        print(f"Found {ancillary_work['strength_training_count']} strength training sessions ({ancillary_work['strength_training_minutes']} minutes)")
     
     # Calculate training distribution
     distribution = analyzer.calculate_training_distribution(analyses)
@@ -115,8 +117,7 @@ def main():
         'config': {
             'max_hr': analyzer.max_hr,
             'ftp': analyzer.ftp,
-            'days_analyzed': args.days,
-            'use_power': args.use_power
+            'days_analyzed': args.days
         },
         'distribution': {
             'total_activities': distribution.total_activities,
