@@ -575,6 +575,63 @@
             margin-top: 8px;
         }
         
+        .day-workout-section {
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        
+        .day-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .workout-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+        
+        .workout-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 6px;
+        }
+        
+        .workout-structure {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 8px;
+            margin: 6px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            color: #495057;
+        }
+        
+        .workout-reasoning {
+            font-style: italic;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+        
+        .overall-reasoning {
+            background: rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #495057;
+        }
+        
         .ai-history {
             border-top: 2px solid #e9ecef;
             padding-top: 20px;
@@ -2656,27 +2713,64 @@
             const card = document.createElement('div');
             card.className = `recommendation-card ${recommendation.priority}-priority`;
             
-            const durationHours = Math.floor(recommendation.duration_minutes / 60);
-            const remainingMinutes = recommendation.duration_minutes % 60;
-            const durationText = durationHours > 0 ? 
-                `${durationHours}h ${remainingMinutes}m` : 
-                `${recommendation.duration_minutes}m`;
+            // Helper function to format workout details
+            function formatWorkoutDetails(workout) {
+                const durationHours = Math.floor(workout.duration_minutes / 60);
+                const remainingMinutes = workout.duration_minutes % 60;
+                const durationText = durationHours > 0 ? 
+                    `${durationHours}h ${remainingMinutes}m` : 
+                    `${workout.duration_minutes}m`;
+                
+                const zoneIcons = workout.intensity_zones.map(zone => getZoneIcon(zone)).join(' ');
+                
+                return {
+                    durationText,
+                    zoneIcons
+                };
+            }
             
-            const zoneIcons = recommendation.intensity_zones.map(zone => getZoneIcon(zone)).join(' ');
+            const todayDetails = formatWorkoutDetails(recommendation.today);
+            const tomorrowDetails = formatWorkoutDetails(recommendation.tomorrow);
             
             card.innerHTML = `
                 <div class="recommendation-header">
                     <div class="recommendation-title">
-                        ${zoneIcons} ${recommendation.description}
-                        <span class="recommendation-duration">${durationText}</span>
-                        <span class="ai-recommendation-equipment">${recommendation.equipment}</span>
+                        ${recommendation.pathway_name}
                     </div>
                     <span class="recommendation-priority priority-${recommendation.priority}">
                         ${getPriorityLabel(recommendation.priority)}
                     </span>
                 </div>
-                <div class="recommendation-structure">${recommendation.structure}</div>
-                <div class="recommendation-reasoning">${recommendation.reasoning}</div>
+                
+                <div class="day-workout-section">
+                    <div class="day-header">
+                        <strong>🗓️ TODAY</strong>
+                        <span class="workout-meta">
+                            ${todayDetails.zoneIcons} ${todayDetails.durationText}
+                            <span class="ai-recommendation-equipment">${recommendation.today.equipment}</span>
+                        </span>
+                    </div>
+                    <div class="workout-title">${recommendation.today.description}</div>
+                    <div class="workout-structure">${recommendation.today.structure}</div>
+                    <div class="workout-reasoning">${recommendation.today.reasoning}</div>
+                </div>
+                
+                <div class="day-workout-section">
+                    <div class="day-header">
+                        <strong>🗓️ TOMORROW</strong>
+                        <span class="workout-meta">
+                            ${tomorrowDetails.zoneIcons} ${tomorrowDetails.durationText}
+                            <span class="ai-recommendation-equipment">${recommendation.tomorrow.equipment}</span>
+                        </span>
+                    </div>
+                    <div class="workout-title">${recommendation.tomorrow.description}</div>
+                    <div class="workout-structure">${recommendation.tomorrow.structure}</div>
+                    <div class="workout-reasoning">${recommendation.tomorrow.reasoning}</div>
+                </div>
+                
+                <div class="overall-reasoning">
+                    <strong>📋 Why This Pathway:</strong> ${recommendation.overall_reasoning}
+                </div>
             `;
             
             return card;
@@ -2703,16 +2797,36 @@
                     const miniCard = document.createElement('div');
                     miniCard.style.cssText = 'margin-bottom: 10px; padding: 8px; border-left: 3px solid #6c757d; background: white;';
                     
-                    const durationHours = Math.floor(rec.duration_minutes / 60);
-                    const remainingMinutes = rec.duration_minutes % 60;
-                    const durationText = durationHours > 0 ? 
-                        `${durationHours}h ${remainingMinutes}m` : 
-                        `${rec.duration_minutes}m`;
-                    
-                    miniCard.innerHTML = `
-                        <strong>${rec.workout_type}</strong> (${durationText}) - ${rec.equipment}
-                        <br><small style="color: #6c757d;">${rec.description}</small>
-                    `;
+                    // Handle both old and new formats
+                    if (rec.today && rec.tomorrow) {
+                        // New format with today/tomorrow
+                        const todayDuration = Math.floor(rec.today.duration_minutes / 60) > 0 ? 
+                            `${Math.floor(rec.today.duration_minutes / 60)}h ${rec.today.duration_minutes % 60}m` : 
+                            `${rec.today.duration_minutes}m`;
+                        const tomorrowDuration = Math.floor(rec.tomorrow.duration_minutes / 60) > 0 ? 
+                            `${Math.floor(rec.tomorrow.duration_minutes / 60)}h ${rec.tomorrow.duration_minutes % 60}m` : 
+                            `${rec.tomorrow.duration_minutes}m`;
+                        
+                        miniCard.innerHTML = `
+                            <strong>${rec.pathway_name}</strong>
+                            <br><small style="color: #6c757d;">
+                                Today: ${rec.today.workout_type} (${todayDuration}) - ${rec.today.equipment}
+                                <br>Tomorrow: ${rec.tomorrow.workout_type} (${tomorrowDuration}) - ${rec.tomorrow.equipment}
+                            </small>
+                        `;
+                    } else {
+                        // Old format - single workout
+                        const durationHours = Math.floor(rec.duration_minutes / 60);
+                        const remainingMinutes = rec.duration_minutes % 60;
+                        const durationText = durationHours > 0 ? 
+                            `${durationHours}h ${remainingMinutes}m` : 
+                            `${rec.duration_minutes}m`;
+                        
+                        miniCard.innerHTML = `
+                            <strong>${rec.workout_type}</strong> (${durationText}) - ${rec.equipment}
+                            <br><small style="color: #6c757d;">${rec.description}</small>
+                        `;
+                    }
                     
                     entryDiv.appendChild(miniCard);
                 });

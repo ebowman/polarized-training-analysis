@@ -701,8 +701,9 @@ IMPORTANT: Recommend zones based on current Polarized Zone distribution and defi
 {self._get_hr_zone_definitions(training_data)}
 
 **For Strength Training:**
-- Use RPE (Rate of Perceived Exertion) 1-10 scale
+- Use HR Zone 1-2 for recovery-focused strength (keep HR below aerobic threshold)
 - Focus on functional strength for endurance athletes
+- Monitor heart rate during strength work to ensure it stays aerobic
 
 ## Athlete's Training Preferences & Goals
 {user_preferences}
@@ -711,7 +712,10 @@ IMPORTANT: Recommend zones based on current Polarized Zone distribution and defi
 {training_context}
 
 ## Task
-Generate {num_recommendations} specific, actionable workout recommendations appropriate for TODAY and the next few days. 
+Generate {num_recommendations} specific workout recommendation pathways. Each pathway should include:
+1. **TODAY**: What's the right workout for today (or if already trained today, what's the next best option including rest)
+2. **TOMORROW**: What's the ideal follow-up workout for tomorrow
+
 Consider the current day of the week and whether they've already trained today.
 
 🚫 EQUIPMENT RESTRICTION: You MUST ONLY recommend workouts using the following equipment:
@@ -765,7 +769,7 @@ Each recommendation should be formatted as valid JSON with these fields:
 - **Rowing for Polarized Zone 1**: "HR Zone 1-2 steady state (below 140 bpm)"
 - **Rowing for Polarized Zone 2**: "HR Zone 3-4 tempo (140-160 bpm)"
 - **Rowing for Polarized Zone 3**: "HR Zone 5+ intervals (above 160 bpm)"
-- **Strength**: "Functional strength circuit at RPE 6-7"
+- **Strength**: "Functional strength circuit (HR Zone 1-2, below 140 bpm)"
 
 **❌ WRONG**: "Zone 2 workout", "20min Zone 1"
 **✅ CORRECT**: "Power Zone 2 endurance", "20min HR Zone 1 (below 140 bpm)"
@@ -814,27 +818,46 @@ When discussing training distribution imbalances in your reasoning, ALWAYS speci
 ❌ WRONG: "This addresses your Zone 2 deficit"
 ✅ CORRECT: "This addresses your Polarized Zone 2 deficit while using Power Zone 3-4 intervals"
 
-Return your response as a JSON array with exactly {num_recommendations} workout recommendations.
-Each recommendation must have these fields:
-- workout_type: string (e.g., "Recovery Ride", "Power Zone Intervals")
-- duration_minutes: number
+Return your response as a JSON array with exactly {num_recommendations} workout recommendation pathways.
+Each pathway must have these fields:
+- pathway_name: string (e.g., "Recovery Focus", "Intensity Builder", "Volume Catch-up")
+- today: object with workout details for today
+- tomorrow: object with workout details for tomorrow
+- overall_reasoning: string (why this pathway fits their current training state - MUST use "Polarized Zone X" when discussing distribution)
+- priority: string ("high", "medium", or "low")
+
+Each today/tomorrow workout object must have:
+- workout_type: string (e.g., "Recovery Ride", "Power Zone Intervals", "Rest Day")
+- duration_minutes: number (0 for rest days)
 - description: string
 - structure: string (detailed workout structure)
-- reasoning: string (why this workout is recommended - MUST use "Polarized Zone X" when discussing distribution)
 - equipment: string
 - intensity_zones: array of numbers (e.g., [1, 2])
-- priority: string ("high", "medium", or "low")
+- reasoning: string (why this specific workout for this day)
 
 Example format:
 [
   {{
-    "workout_type": "Power Zone Endurance Ride",
-    "duration_minutes": 45,
-    "description": "Easy endurance ride in Power Zone 2",
-    "structure": "5 min warm-up, 35 min in Power Zone 2 (56-75% FTP), 5 min cool-down",
-    "reasoning": "Promotes recovery while maintaining aerobic base",
-    "equipment": "Peloton",
-    "intensity_zones": [1],
+    "pathway_name": "Recovery Focus",
+    "today": {{
+      "workout_type": "Recovery Ride",
+      "duration_minutes": 30,
+      "description": "Easy recovery ride in Power Zone 1",
+      "structure": "5 min warm-up, 20 min in Power Zone 1 (0-55% FTP), 5 min cool-down",
+      "equipment": "Peloton",
+      "intensity_zones": [1],
+      "reasoning": "Light recovery work to promote adaptation after recent intensity"
+    }},
+    "tomorrow": {{
+      "workout_type": "Power Zone Intervals",
+      "duration_minutes": 50,
+      "description": "Power Zone 3-4 tempo intervals",
+      "structure": "10 min warm-up, 4x6 min at Power Zone 3-4 (76-105% FTP), 2 min recovery, 10 min cool-down",
+      "equipment": "Peloton",
+      "intensity_zones": [1, 2],
+      "reasoning": "Addresses Polarized Zone 2 deficit with structured threshold work"
+    }},
+    "overall_reasoning": "This pathway addresses your current Polarized Zone 2 deficit while providing immediate recovery today",
     "priority": "high"
   }}
 ]
