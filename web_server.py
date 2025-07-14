@@ -140,8 +140,8 @@ def start_ai_generation(session_id: str, training_data: dict):
     
     return session_id
 
-def start_pathway_ai_generation(session_id: str, training_data: dict, pathways: list):
-    """Start AI recommendation generation for multiple recovery pathways"""
+def start_pathway_ai_generation(session_id: str, training_data: dict, pathway_context: dict):
+    """Start AI recommendation generation for recovery pathways with context"""
     def generate():
         try:
             with ai_sessions_lock:
@@ -150,8 +150,8 @@ def start_pathway_ai_generation(session_id: str, training_data: dict, pathways: 
                     "timestamp": time.time()
                 }
             
-            # Generate AI recommendations for each pathway
-            pathway_recommendations = ai_engine.generate_pathway_recommendations(training_data, pathways)
+            # Generate AI recommendations with context
+            pathway_recommendations = ai_engine.generate_pathway_recommendations(training_data, pathway_context)
             
             # Convert to dict format
             recommendations_dict = {}
@@ -676,14 +676,17 @@ def api_ai_recommendations_pathways():
         if not pathways:
             return jsonify({'error': 'No pathways provided'}), 400
             
+        # Extract pathway context from the first pathway (they all share the same context)
+        pathway_context = pathways[0].get('context', {}) if pathways else {}
+        
         # Get training data
         training_data = get_training_data()
         
         # Generate new session ID
         session_id = str(uuid.uuid4())
         
-        # Start AI generation for pathways in background
-        start_pathway_ai_generation(session_id, training_data, pathways)
+        # Start AI generation for pathways in background with context
+        start_pathway_ai_generation(session_id, training_data, pathway_context)
         
         return jsonify({
             'status': 'generating',

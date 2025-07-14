@@ -141,6 +141,13 @@ class TrainingDistribution:
     zone3_percent: float
     adherence_score: float
     recommendations: List[str]
+    # Zone-specific deficit calculations
+    zone1_deficit_minutes: int = 0
+    zone2_deficit_minutes: int = 0
+    zone3_deficit_minutes: int = 0
+    zone1_excess_minutes: int = 0
+    zone2_excess_minutes: int = 0
+    zone3_excess_minutes: int = 0
 
 class TrainingAnalyzer:
     """Analyzes training data for adherence to polarized training approach"""
@@ -433,6 +440,19 @@ class TrainingAnalyzer:
         total_deviation = (zone1_deviation * 0.5) + (zone2_deviation * 0.25) + (zone3_deviation * 0.25)
         adherence_score = max(0, 100 - total_deviation)
         
+        # Calculate zone-specific deficits and excesses in minutes
+        target_zone1_minutes = total_minutes * (self.target_zone1_percent / 100)
+        target_zone2_minutes = total_minutes * (self.target_zone2_percent / 100)
+        target_zone3_minutes = total_minutes * (self.target_zone3_percent / 100)
+        
+        zone1_deficit_minutes = max(0, int(target_zone1_minutes - total_zone1_minutes))
+        zone2_deficit_minutes = max(0, int(target_zone2_minutes - total_zone2_minutes))
+        zone3_deficit_minutes = max(0, int(target_zone3_minutes - total_zone3_minutes))
+        
+        zone1_excess_minutes = max(0, int(total_zone1_minutes - target_zone1_minutes))
+        zone2_excess_minutes = max(0, int(total_zone2_minutes - target_zone2_minutes))
+        zone3_excess_minutes = max(0, int(total_zone3_minutes - target_zone3_minutes))
+        
         # Generate recommendations
         recommendations = []
         if zone1_percent < 75:
@@ -461,7 +481,13 @@ class TrainingAnalyzer:
             zone2_percent=zone2_percent,
             zone3_percent=zone3_percent,
             adherence_score=adherence_score,
-            recommendations=recommendations
+            recommendations=recommendations,
+            zone1_deficit_minutes=zone1_deficit_minutes,
+            zone2_deficit_minutes=zone2_deficit_minutes,
+            zone3_deficit_minutes=zone3_deficit_minutes,
+            zone1_excess_minutes=zone1_excess_minutes,
+            zone2_excess_minutes=zone2_excess_minutes,
+            zone3_excess_minutes=zone3_excess_minutes
         )
     
     def generate_report(self, distribution: TrainingDistribution, analyses: List[ActivityAnalysis]) -> str:

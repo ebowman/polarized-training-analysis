@@ -475,17 +475,37 @@ class PromptBuilder:
         else:
             context.append(f"📊 VOLUME GUIDANCE: {analysis.weekly_hours:.1f} hours/week - Sufficient volume for polarized training (80% Z1, 10% Z2, 10% Z3)")
         
-        # Training guidance based on current state
+        # Training guidance based on current state - improved logic
+        zone3_deficit = 10 - analysis.zone3_percent
+        zone2_deficit = 10 - analysis.zone2_percent
+        zone1_excess = analysis.zone1_percent - 80
+        
+        # Zone 3 guidance
         if analysis.zone3_percent >= 10:
             context.append(f"⚠️ CRITICAL: Zone 3 is ALREADY at {analysis.zone3_percent:.1f}% (target is 10%). ABSOLUTELY NO high-intensity workouts!")
             context.append(f"🚫 ZONE 3 PROHIBITION: Current Z3 = {analysis.zone3_percent:.1f}% ≥ 10% target. Focus ONLY on Zone 1 aerobic base.")
         elif analysis.zone3_percent >= 8:
             context.append(f"⚠️ CAUTION: Zone 3 is at {analysis.zone3_percent:.1f}% (close to 10% target). Avoid high-intensity unless absolutely necessary.")
+        elif zone3_deficit > 5:
+            context.append(f"🎯 ZONE 3 DEFICIT: Need {zone3_deficit:.1f}% more Zone 3 work. Consider high-intensity intervals (Power Zone 5-7).")
         
-        if analysis.zone1_percent < 80 and analysis.training_approach == "polarized":
-            context.append(f"🎯 PRIORITY: Increase Zone 1 from {analysis.zone1_percent:.1f}% to 80%. Focus on aerobic base building.")
-        elif analysis.zone1_percent < 70 and analysis.training_approach == "pyramidal":
-            context.append(f"🎯 PRIORITY: Increase Zone 1 from {analysis.zone1_percent:.1f}% to 70% (pyramidal approach for your volume).")
+        # Zone 2 guidance
+        if analysis.zone2_percent > 15:
+            context.append(f"⚠️ ZONE 2 EXCESS: {analysis.zone2_percent:.1f}% > 10% target. Avoid threshold work (Power Zone 3-4).")
+        elif zone2_deficit > 5:
+            context.append(f"🎯 ZONE 2 DEFICIT: Need {zone2_deficit:.1f}% more Zone 2 work. Consider threshold sessions (Power Zone 3-4).")
+        
+        # Zone 1 guidance
+        if analysis.zone1_percent > 85:
+            context.append(f"⚠️ ZONE 1 EXCESS: {analysis.zone1_percent:.1f}% > 80% target. Need more intensity work.")
+        elif analysis.zone1_percent < 75:
+            context.append(f"🎯 ZONE 1 DEFICIT: Need {80 - analysis.zone1_percent:.1f}% more Zone 1 work. Focus on aerobic base building.")
+        
+        # Overall approach guidance
+        if analysis.training_approach == "polarized":
+            context.append(f"📊 POLARIZED APPROACH: Target 80% Z1, 10% Z2, 10% Z3. Current: {analysis.zone1_percent:.1f}% Z1, {analysis.zone2_percent:.1f}% Z2, {analysis.zone3_percent:.1f}% Z3.")
+        elif analysis.training_approach == "pyramidal":
+            context.append(f"📊 PYRAMIDAL APPROACH: Target 70% Z1, 20% Z2, 10% Z3. Current: {analysis.zone1_percent:.1f}% Z1, {analysis.zone2_percent:.1f}% Z2, {analysis.zone3_percent:.1f}% Z3.")
         
         # Add recovery metrics if available
         if recovery_metrics:
@@ -538,6 +558,88 @@ class PromptBuilder:
         
         return "\\n".join(context)
     
+    def build_recovery_pathway_prompt(self, training_data: Dict, pathway_context: Dict) -> str:
+        """Build AI prompt specifically for recovery pathway recommendations"""
+        # Analyze training data
+        analysis = self.analyzer.analyze_training_data(training_data)
+        scheduling = self.scheduling_provider.get_current_context(analysis.recent_activities)
+        
+        # Calculate recovery metrics
+        recovery_metrics = self.analyzer.calculate_recovery_metrics(training_data.get('activities', []))
+        
+        # Load context components
+        user_preferences = self.load_user_preferences()
+        training_context = self.create_training_context(analysis, scheduling, training_data, recovery_metrics)
+        
+        deficit = pathway_context.get('deficit', 0)
+        current_minutes = pathway_context.get('currentWeeklyMinutes', 0)
+        target_minutes = pathway_context.get('targetWeeklyMinutes', 360)
+        today_minutes = pathway_context.get('todayMinutes', 0)
+        already_worked_out = pathway_context.get('alreadyWorkedOutToday', False)
+        day_of_week = pathway_context.get('dayOfWeek', 'Unknown')
+        
+        # Build recovery-specific prompt
+        prompt = f"""
+You are an expert endurance coach specializing in recovery and volume management. 
+Generate 3 specific recovery pathway recommendations for an athlete who is {deficit} minutes behind their weekly training target.
+
+## Current Training Context
+{training_context}
+
+## Recovery Situation
+- **Current Rolling 7-Day Volume**: {current_minutes} minutes
+- **Target Weekly Volume**: {target_minutes} minutes
+- **Deficit**: {deficit} minutes ({deficit/60:.1f} hours)
+- **Today**: {day_of_week} 
+- **Already worked out today**: {"Yes" if already_worked_out else "No"}
+- **Today's training volume**: {today_minutes} minutes
+
+## Zone Balance Context (CRITICAL FOR RECOMMENDATIONS)
+- **Zone 1**: {analysis.zone1_percent:.1f}% (Target: 80%) - {'EXCESS - needs less' if analysis.zone1_percent > 85 else 'DEFICIT - needs more' if analysis.zone1_percent < 75 else 'OK'}
+- **Zone 2**: {analysis.zone2_percent:.1f}% (Target: 10%) - {'EXCESS - avoid threshold' if analysis.zone2_percent > 15 else 'DEFICIT - add threshold' if analysis.zone2_percent < 5 else 'OK'}
+- **Zone 3**: {analysis.zone3_percent:.1f}% (Target: 10%) - {'EXCESS - avoid high intensity' if analysis.zone3_percent > 10 else 'DEFICIT - add intervals' if analysis.zone3_percent < 5 else 'OK'}
+
+⚠️ **ZONE-SPECIFIC GUIDANCE**:
+- If Zone 1 > 85%: RECOMMEND more intensity work (Zone 2/3) to rebalance
+- If Zone 2 < 5%: RECOMMEND threshold sessions (Power Zone 3-4)
+- If Zone 3 < 5%: RECOMMEND high-intensity intervals (Power Zone 5-7)
+- If Zone 2 > 15%: AVOID threshold work
+- If Zone 3 > 10%: AVOID high-intensity work
+
+## Equipment Available
+- **Peloton bike** (for cycling workouts)
+- **Concept2 RowERG** (for rowing workouts)
+- **Dumbbells/Bodyweight** (for strength training)
+- **NO RUNNING** - Do not recommend any running workouts
+
+## Task
+Generate exactly 3 recovery pathway recommendations:
+
+1. **Quick Catch-up** (1-2 days): Fast but sustainable approach
+2. **Moderate Plan** (3-4 days): Balanced distribution  
+3. **Gentle Recovery** (5-7 days): Conservative, sustainable approach
+
+For each pathway, provide:
+- **workout_type**: Specific workout name/type
+- **duration_minutes**: Exact duration in minutes
+- **description**: Brief workout description (1 sentence)
+- **structure**: Detailed workout structure with specific zones/efforts
+- **reasoning**: Why this pathway fits the athlete's current situation and zone balance
+- **equipment**: Primary equipment used
+- **intensity_zones**: List of zones/efforts involved
+- **priority**: "high", "medium", or "low" based on current training state
+
+🎯 **CRITICAL**: Consider the athlete's current zone imbalance when recommending intensities. Don't just focus on volume deficit - focus on QUALITY of training distribution.
+
+Return as JSON:
+{{
+  "catch-up": {{workout_recommendation}},
+  "moderate": {{workout_recommendation}},
+  "gentle": {{workout_recommendation}}
+}}
+"""
+        return prompt
+
     def build_prompt(self, training_data: Dict, num_recommendations: int = 3) -> str:
         """Build complete AI prompt from components"""
         # Analyze training data
@@ -595,13 +697,21 @@ Consider the current day of the week and whether they've already trained today.
 - **Dumbbells/Bodyweight** (for strength training)
 - **NO RUNNING** - Do not recommend any running, jogging, or treadmill workouts
 
-⚠️ CRITICAL ZONE 2 CHECK: Current Zone 2 = {analysis.zone2_percent:.1f}% (Target: 10%)
-- IF Zone 2 > 10%: AVOID THRESHOLD WORKOUTS (no Power Zone 3-4, no tempo work)
-- CURRENT STATUS: {'ZONE 2 IS ABOVE TARGET - AVOID POWER ZONE 3-4' if analysis.zone2_percent > 10 else 'Zone 2 at/below target'}
+⚠️ CRITICAL ZONE BALANCE CHECK:
+- Zone 1: {analysis.zone1_percent:.1f}% (Target: 80%) - {'EXCESS' if analysis.zone1_percent > 85 else 'DEFICIT' if analysis.zone1_percent < 75 else 'OK'}
+- Zone 2: {analysis.zone2_percent:.1f}% (Target: 10%) - {'EXCESS' if analysis.zone2_percent > 15 else 'DEFICIT' if analysis.zone2_percent < 5 else 'OK'}
+- Zone 3: {analysis.zone3_percent:.1f}% (Target: 10%) - {'EXCESS' if analysis.zone3_percent > 10 else 'DEFICIT' if analysis.zone3_percent < 5 else 'OK'}
 
-🚫 CRITICAL ZONE 3 CHECK: Current Zone 3 = {analysis.zone3_percent:.1f}% (Target: 10%)
-- IF Zone 3 ≥ 10.0%: ABSOLUTELY NO HIGH-INTENSITY WORKOUTS (no Power Zone 5-7, no VO2-max, no intervals above threshold)
-- CURRENT STATUS: {'ZONE 3 IS AT/ABOVE TARGET - NO HIGH INTENSITY ALLOWED' if analysis.zone3_percent >= 10 else 'Zone 3 below target - high intensity appropriate if needed'}
+ZONE-SPECIFIC RECOMMENDATIONS:
+- If Zone 1 > 85%: Recommend MORE intensity work (Zone 2 and Zone 3)
+- If Zone 2 < 5%: Recommend threshold work (Power Zone 3-4)
+- If Zone 3 < 5%: Recommend high-intensity intervals (Power Zone 5-7)
+- If Zone 2 > 15%: AVOID threshold work
+- If Zone 3 > 10%: AVOID high-intensity work
+
+🚫 CRITICAL INTENSITY RESTRICTIONS:
+- Zone 2 Status: {'ABOVE TARGET - AVOID POWER ZONE 3-4' if analysis.zone2_percent > 15 else 'BELOW TARGET - CONSIDER POWER ZONE 3-4' if analysis.zone2_percent < 5 else 'AT TARGET'}
+- Zone 3 Status: {'ABOVE TARGET - AVOID POWER ZONE 5-7' if analysis.zone3_percent > 10 else 'BELOW TARGET - CONSIDER POWER ZONE 5-7' if analysis.zone3_percent < 5 else 'AT TARGET'}
 
 🛑 REST DAY PRIORITY CHECK:
 - Current rolling 7-day volume: {recovery_metrics.get('this_week_volume', 'unknown') if recovery_metrics else 'unknown'} minutes
@@ -714,6 +824,49 @@ class AIRecommendationEngine:
         # Default retry configuration
         self.max_retries = 3
     
+    def generate_pathway_recommendations(self, training_data: Dict, 
+                                       pathway_context: Dict) -> Dict[str, AIWorkoutRecommendation]:
+        """Generate AI-powered recovery pathway recommendations"""
+        
+        # Build recovery pathway specific prompt
+        prompt = self.prompt_builder.build_recovery_pathway_prompt(training_data, pathway_context)
+        
+        # Use AI provider to generate response
+        try:
+            response = self.provider.generate_completion(prompt)
+            print(f"🤖 AI Recovery Pathway Response: {response}")
+            
+            # Parse JSON response
+            import json
+            try:
+                pathway_data = json.loads(response)
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON parse error: {e}")
+                print(f"Raw response: {response}")
+                raise ValueError(f"Invalid JSON response from AI: {e}")
+            
+            # Convert to AIWorkoutRecommendation objects
+            pathway_recommendations = {}
+            for pathway_type, rec_data in pathway_data.items():
+                if rec_data and isinstance(rec_data, dict):
+                    pathway_recommendations[pathway_type] = AIWorkoutRecommendation(
+                        workout_type=rec_data.get('workout_type', 'Unknown'),
+                        duration_minutes=rec_data.get('duration_minutes', 0),
+                        description=rec_data.get('description', ''),
+                        structure=rec_data.get('structure', ''),
+                        reasoning=rec_data.get('reasoning', ''),
+                        equipment=rec_data.get('equipment', 'Unknown'),
+                        intensity_zones=rec_data.get('intensity_zones', []),
+                        priority=rec_data.get('priority', 'medium'),
+                        generated_at=datetime.now().isoformat()
+                    )
+            
+            return pathway_recommendations
+            
+        except Exception as e:
+            print(f"❌ Error generating AI pathway recommendations: {e}")
+            raise
+
     def generate_ai_recommendations(self, training_data: Dict, 
                                   num_recommendations: int = 3) -> List[AIWorkoutRecommendation]:
         """Generate AI-powered workout recommendations using the new architecture"""
@@ -771,7 +924,7 @@ class AIRecommendationEngine:
         # If we get here, all retries failed
         return self._create_fallback_recommendations(f"All {self.max_retries} attempts failed")
     
-    def generate_pathway_recommendations(self, training_data: Dict, pathways: List[Dict]) -> Dict[str, AIWorkoutRecommendation]:
+    def generate_pathway_recommendations_old(self, training_data: Dict, pathways: List[Dict]) -> Dict[str, AIWorkoutRecommendation]:
         """Generate AI recommendations for multiple recovery pathways in a single call"""
         
         # Build special prompt for pathway recommendations
