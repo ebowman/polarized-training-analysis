@@ -594,17 +594,20 @@ Generate 3 specific recovery pathway recommendations for an athlete who is {defi
 - **Already worked out today**: {"Yes" if already_worked_out else "No"}
 - **Today's training volume**: {today_minutes} minutes
 
-## Zone Balance Context (CRITICAL FOR RECOMMENDATIONS)
-- **Zone 1**: {analysis.zone1_percent:.1f}% (Target: 80%) - {'EXCESS - needs less' if analysis.zone1_percent > 85 else 'DEFICIT - needs more' if analysis.zone1_percent < 75 else 'OK'}
-- **Zone 2**: {analysis.zone2_percent:.1f}% (Target: 10%) - {'EXCESS - avoid threshold' if analysis.zone2_percent > 15 else 'DEFICIT - add threshold' if analysis.zone2_percent < 5 else 'OK'}
-- **Zone 3**: {analysis.zone3_percent:.1f}% (Target: 10%) - {'EXCESS - avoid high intensity' if analysis.zone3_percent > 10 else 'DEFICIT - add intervals' if analysis.zone3_percent < 5 else 'OK'}
+## Polarized Zone Balance Context (CRITICAL FOR RECOMMENDATIONS)
+**IMPORTANT: When referring to training distribution, use "Polarized Zone" terminology explicitly**
+- **Polarized Zone 1 (Aerobic)**: {analysis.zone1_percent:.1f}% (Target: 80%) - {'EXCESS - needs less aerobic work' if analysis.zone1_percent > 85 else 'DEFICIT - needs more aerobic base' if analysis.zone1_percent < 75 else 'OK'}
+- **Polarized Zone 2 (Threshold)**: {analysis.zone2_percent:.1f}% (Target: 10%) - {'EXCESS - avoid threshold work' if analysis.zone2_percent > 15 else 'DEFICIT - add threshold work' if analysis.zone2_percent < 5 else 'OK'}
+- **Polarized Zone 3 (High Intensity)**: {analysis.zone3_percent:.1f}% (Target: 10%) - {'EXCESS - avoid high intensity' if analysis.zone3_percent > 10 else 'DEFICIT - add intervals' if analysis.zone3_percent < 5 else 'OK'}
 
-⚠️ **ZONE-SPECIFIC GUIDANCE**:
-- If Zone 1 > 85%: RECOMMEND more intensity work (Zone 2/3) to rebalance
-- If Zone 2 < 5%: RECOMMEND threshold sessions (Power Zone 3-4)
-- If Zone 3 < 5%: RECOMMEND high-intensity intervals (Power Zone 5-7)
-- If Zone 2 > 15%: AVOID threshold work
-- If Zone 3 > 10%: AVOID high-intensity work
+⚠️ **POLARIZED ZONE-SPECIFIC GUIDANCE**:
+- If Polarized Zone 1 > 85%: RECOMMEND more intensity work (Polarized Zone 2/3) to rebalance
+- If Polarized Zone 2 < 5%: RECOMMEND threshold sessions (use Power Zone 3-4 for cycling, HR Zone 3-4 for rowing)
+- If Polarized Zone 3 < 5%: RECOMMEND high-intensity intervals (use Power Zone 5-7 for cycling, HR Zone 5+ for rowing)
+- If Polarized Zone 2 > 15%: AVOID threshold work
+- If Polarized Zone 3 > 10%: AVOID high-intensity work
+
+**CRITICAL TERMINOLOGY RULE**: When discussing training distribution imbalances in your reasoning, ALWAYS say "Polarized Zone X deficit/excess" not just "Zone X deficit". This prevents confusion with equipment-specific zones.
 
 ## Equipment Available & Zone Terminology
 **CRITICAL: Use correct zone terminology for each equipment type:**
@@ -717,21 +720,21 @@ Consider the current day of the week and whether they've already trained today.
 - **Dumbbells/Bodyweight** (for strength training)
 - **NO RUNNING** - Do not recommend any running, jogging, or treadmill workouts
 
-⚠️ CRITICAL ZONE BALANCE CHECK:
-- Zone 1: {analysis.zone1_percent:.1f}% (Target: 80%) - {'EXCESS' if analysis.zone1_percent > 85 else 'DEFICIT' if analysis.zone1_percent < 75 else 'OK'}
-- Zone 2: {analysis.zone2_percent:.1f}% (Target: 10%) - {'EXCESS' if analysis.zone2_percent > 15 else 'DEFICIT' if analysis.zone2_percent < 5 else 'OK'}
-- Zone 3: {analysis.zone3_percent:.1f}% (Target: 10%) - {'EXCESS' if analysis.zone3_percent > 10 else 'DEFICIT' if analysis.zone3_percent < 5 else 'OK'}
+⚠️ CRITICAL POLARIZED ZONE BALANCE CHECK:
+- Polarized Zone 1: {analysis.zone1_percent:.1f}% (Target: 80%) - {'EXCESS' if analysis.zone1_percent > 85 else 'DEFICIT' if analysis.zone1_percent < 75 else 'OK'}
+- Polarized Zone 2: {analysis.zone2_percent:.1f}% (Target: 10%) - {'EXCESS' if analysis.zone2_percent > 15 else 'DEFICIT' if analysis.zone2_percent < 5 else 'OK'}
+- Polarized Zone 3: {analysis.zone3_percent:.1f}% (Target: 10%) - {'EXCESS' if analysis.zone3_percent > 10 else 'DEFICIT' if analysis.zone3_percent < 5 else 'OK'}
 
-ZONE-SPECIFIC RECOMMENDATIONS:
-- If Zone 1 > 85%: Recommend MORE intensity work (Zone 2 and Zone 3)
-- If Zone 2 < 5%: Recommend threshold work (Power Zone 3-4)
-- If Zone 3 < 5%: Recommend high-intensity intervals (Power Zone 5-7)
-- If Zone 2 > 15%: AVOID threshold work
-- If Zone 3 > 10%: AVOID high-intensity work
+POLARIZED ZONE-SPECIFIC RECOMMENDATIONS:
+- If Polarized Zone 1 > 85%: Recommend MORE intensity work (Polarized Zone 2 and Zone 3)
+- If Polarized Zone 2 < 5%: Recommend threshold work (Power Zone 3-4)
+- If Polarized Zone 3 < 5%: Recommend high-intensity intervals (Power Zone 5-7)
+- If Polarized Zone 2 > 15%: AVOID threshold work
+- If Polarized Zone 3 > 10%: AVOID high-intensity work
 
 🚫 CRITICAL INTENSITY RESTRICTIONS:
-- Zone 2 Status: {'ABOVE TARGET - AVOID POWER ZONE 3-4' if analysis.zone2_percent > 15 else 'BELOW TARGET - CONSIDER POWER ZONE 3-4' if analysis.zone2_percent < 5 else 'AT TARGET'}
-- Zone 3 Status: {'ABOVE TARGET - AVOID POWER ZONE 5-7' if analysis.zone3_percent > 10 else 'BELOW TARGET - CONSIDER POWER ZONE 5-7' if analysis.zone3_percent < 5 else 'AT TARGET'}
+- Polarized Zone 2 Status: {'ABOVE TARGET - AVOID POWER ZONE 3-4' if analysis.zone2_percent > 15 else 'BELOW TARGET - CONSIDER POWER ZONE 3-4' if analysis.zone2_percent < 5 else 'AT TARGET'}
+- Polarized Zone 3 Status: {'ABOVE TARGET - AVOID POWER ZONE 5-7' if analysis.zone3_percent > 10 else 'BELOW TARGET - CONSIDER POWER ZONE 5-7' if analysis.zone3_percent < 5 else 'AT TARGET'}
 
 🛑 REST DAY PRIORITY CHECK:
 - Current rolling 7-day volume: {recovery_metrics.get('this_week_volume', 'unknown') if recovery_metrics else 'unknown'} minutes
@@ -771,12 +774,12 @@ Consider:
 1. Their specific goals (FTP improvement, multi-modal training)
 2. **VOLUME-BASED TRAINING APPROACH** (most important factor):
    - **<{LOW_VOLUME_THRESHOLD} hours/week**: Mixed approach, focus on general fitness
-   - **{LOW_VOLUME_THRESHOLD}-{PYRAMIDAL_VOLUME_THRESHOLD} hours/week**: PYRAMIDAL approach (70% Z1, 20% Z2, 10% Z3) - More Zone 2 threshold work
-   - **>{PYRAMIDAL_VOLUME_THRESHOLD} hours/week**: POLARIZED approach (80% Z1, 10% Z2, 10% Z3) - Minimal Zone 2
+   - **{LOW_VOLUME_THRESHOLD}-{PYRAMIDAL_VOLUME_THRESHOLD} hours/week**: PYRAMIDAL approach (70% Polarized Z1, 20% Polarized Z2, 10% Polarized Z3) - More Polarized Zone 2 threshold work
+   - **>{PYRAMIDAL_VOLUME_THRESHOLD} hours/week**: POLARIZED approach (80% Polarized Z1, 10% Polarized Z2, 10% Polarized Z3) - Minimal Polarized Zone 2
 3. Current training distribution vs. volume-appropriate targets:
-   - **Polarized (>{PYRAMIDAL_VOLUME_THRESHOLD} hrs/week)**: If Zone 1 < 80% OR Zone 3 > 10%, focus on Zone 1
-   - **Pyramidal ({LOW_VOLUME_THRESHOLD}-{PYRAMIDAL_VOLUME_THRESHOLD} hrs/week)**: If Zone 1 < 70% OR Zone 2 < 20%, adjust accordingly
-   - Only recommend Zone 3 if current Zone 3 is significantly below target
+   - **Polarized (>{PYRAMIDAL_VOLUME_THRESHOLD} hrs/week)**: If Polarized Zone 1 < 80% OR Polarized Zone 3 > 10%, focus on Polarized Zone 1
+   - **Pyramidal ({LOW_VOLUME_THRESHOLD}-{PYRAMIDAL_VOLUME_THRESHOLD} hrs/week)**: If Polarized Zone 1 < 70% OR Polarized Zone 2 < 20%, adjust accordingly
+   - Only recommend Polarized Zone 3 if current Polarized Zone 3 is significantly below target
 4. Equipment preferences (Peloton, RowERG, dumbbells)
 5. Recovery needs based on recent training
 6. Progressive overload principles
@@ -785,13 +788,13 @@ Consider:
 
 CRITICAL RULES - READ CAREFULLY:
 - **Volume determines training approach**: Use pyramidal targets for <{PYRAMIDAL_VOLUME_THRESHOLD} hrs/week, polarized for >{PYRAMIDAL_VOLUME_THRESHOLD} hrs/week
-- **🚫 ZONE 3 PROHIBITION**: If current Zone 3 ≥ 10%, DO NOT recommend ANY high-intensity workouts (Power Zone 5-6, VO2 max, HIIT, intervals above threshold)
-- **ZONE 3 MATH CHECK**: If Zone 3 percentage is 10.0% or higher, the athlete has ENOUGH high-intensity. Focus on Zone 1 only.
-- **Zone 2 threshold work**: More appropriate for pyramidal (limited volume) athletes
-- **When Zone 3 is adequate**: Only recommend Zone 1 (aerobic base) and Zone 2 (threshold) workouts
+- **🚫 POLARIZED ZONE 3 PROHIBITION**: If current Polarized Zone 3 ≥ 10%, DO NOT recommend ANY high-intensity workouts (Power Zone 5-6, VO2 max, HIIT, intervals above threshold)
+- **POLARIZED ZONE 3 MATH CHECK**: If Polarized Zone 3 percentage is 10.0% or higher, the athlete has ENOUGH high-intensity. Focus on Polarized Zone 1 only.
+- **Polarized Zone 2 threshold work**: More appropriate for pyramidal (limited volume) athletes
+- **When Polarized Zone 3 is adequate**: Only recommend Polarized Zone 1 (aerobic base) and Polarized Zone 2 (threshold) workouts
 - **🛑 RECOVERY RULES**:
-  - **5+ consecutive training days**: MUST recommend rest day or very light recovery (max 30 min Zone 1)
-  - **Zone 3 > 15% in last 3 days**: NO high-intensity work, focus on Zone 1 recovery
+  - **5+ consecutive training days**: MUST recommend rest day or very light recovery (max 30 min Polarized Zone 1)
+  - **Polarized Zone 3 > 15% in last 3 days**: NO high-intensity work, focus on Polarized Zone 1 recovery
   - **Weekly volume increase > 30%**: Reduce intensity and volume to prevent overtraining
   - **Tomorrow's volume > 360 min**: If they'll still be above target tomorrow, recommend rest or very light activity
   - **Already trained today**: Be conservative with additional recommendations
@@ -802,15 +805,22 @@ CRITICAL RULES - READ CAREFULLY:
   - **Monday/Tuesday**: Good for high-intensity if needed (fresh start of week)
   - **Wednesday/Thursday**: Mixed approach, consider mid-week recovery
   - **Friday**: Lean toward easier sessions (end of work week)
-  - **Weekend**: Ideal for long Zone 1 aerobic base sessions
+  - **Weekend**: Ideal for long Polarized Zone 1 aerobic base sessions
+
+🚨 **CRITICAL TERMINOLOGY REQUIREMENT FOR REASONING FIELD**:
+When discussing training distribution imbalances in your reasoning, ALWAYS specify "Polarized Zone X deficit/excess" not just "Zone X deficit". This prevents confusion with equipment-specific zones.
+
+**EXAMPLES:**
+❌ WRONG: "This addresses your Zone 2 deficit"
+✅ CORRECT: "This addresses your Polarized Zone 2 deficit while using Power Zone 3-4 intervals"
 
 Return your response as a JSON array with exactly {num_recommendations} workout recommendations.
 Each recommendation must have these fields:
-- workout_type: string (e.g., "Recovery Run", "Tempo Ride")
+- workout_type: string (e.g., "Recovery Ride", "Power Zone Intervals")
 - duration_minutes: number
 - description: string
 - structure: string (detailed workout structure)
-- reasoning: string (why this workout is recommended)
+- reasoning: string (why this workout is recommended - MUST use "Polarized Zone X" when discussing distribution)
 - equipment: string
 - intensity_zones: array of numbers (e.g., [1, 2])
 - priority: string ("high", "medium", or "low")
