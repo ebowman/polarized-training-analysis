@@ -89,13 +89,26 @@ def start_ai_generation(session_id: str, training_data: dict):
             # Convert to dict format for JSON response
             recommendations_dict = [
                 {
-                    'workout_type': rec.workout_type,
-                    'duration_minutes': rec.duration_minutes,
-                    'description': rec.description,
-                    'structure': rec.structure,
-                    'reasoning': rec.reasoning,
-                    'equipment': rec.equipment,
-                    'intensity_zones': rec.intensity_zones,
+                    'pathway_name': rec.pathway_name,
+                    'today': {
+                        'workout_type': rec.today.workout_type,
+                        'duration_minutes': rec.today.duration_minutes,
+                        'description': rec.today.description,
+                        'structure': rec.today.structure,
+                        'reasoning': rec.today.reasoning,
+                        'equipment': rec.today.equipment,
+                        'intensity_zones': rec.today.intensity_zones
+                    },
+                    'tomorrow': {
+                        'workout_type': rec.tomorrow.workout_type,
+                        'duration_minutes': rec.tomorrow.duration_minutes,
+                        'description': rec.tomorrow.description,
+                        'structure': rec.tomorrow.structure,
+                        'reasoning': rec.tomorrow.reasoning,
+                        'equipment': rec.tomorrow.equipment,
+                        'intensity_zones': rec.tomorrow.intensity_zones
+                    },
+                    'overall_reasoning': rec.overall_reasoning,
                     'priority': rec.priority,
                     'generated_at': rec.generated_at
                 }

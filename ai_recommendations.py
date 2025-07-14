@@ -37,6 +37,16 @@ class AIWorkoutRecommendation:
     generated_at: str
 
 @dataclass
+class AIWorkoutPathway:
+    """AI-generated workout pathway with today/tomorrow structure"""
+    pathway_name: str
+    today: 'AIWorkoutRecommendation'
+    tomorrow: 'AIWorkoutRecommendation'  
+    overall_reasoning: str
+    priority: str
+    generated_at: str
+
+@dataclass
 class TrainingAnalysis:
     """Results of training data analysis"""
     total_minutes: float
@@ -926,7 +936,7 @@ class AIRecommendationEngine:
             raise
 
     def generate_ai_recommendations(self, training_data: Dict, 
-                                  num_recommendations: int = 3) -> List[AIWorkoutRecommendation]:
+                                  num_recommendations: int = 3) -> List[AIWorkoutPathway]:
         """Generate AI-powered workout recommendations using the new architecture"""
         
         # Build prompt using the new PromptBuilder
@@ -935,7 +945,7 @@ class AIRecommendationEngine:
         # Call AI provider with retry logic
         return self._call_ai_with_retry(prompt)
     
-    def _call_ai_with_retry(self, prompt: str) -> List[AIWorkoutRecommendation]:
+    def _call_ai_with_retry(self, prompt: str) -> List[AIWorkoutPathway]:
         """Call AI provider with retry logic and error handling"""
         
         for attempt in range(self.max_retries):
@@ -1099,7 +1109,7 @@ Return ONLY the JSON, no other text."""
         
         return prompt
     
-    def _parse_response(self, response_json: str) -> List[AIWorkoutRecommendation]:
+    def _parse_response(self, response_json: str) -> List[AIWorkoutPathway]:
         """Parse and validate AI response"""
         provider_name = self.provider.get_provider_name()
         print(f"✅ {provider_name} response received")
@@ -1150,9 +1160,9 @@ Return ONLY the JSON, no other text."""
             response = response[:-3]
         return response.strip()
     
-    def _convert_to_recommendations(self, recommendations_data: List[dict]) -> List[AIWorkoutRecommendation]:
-        """Convert parsed JSON data to AIWorkoutRecommendation objects"""
-        ai_recommendations = []
+    def _convert_to_recommendations(self, recommendations_data: List[dict]) -> List[AIWorkoutPathway]:
+        """Convert parsed JSON data to AIWorkoutPathway objects"""
+        ai_pathways = []
         
         # Ensure we have a list
         if not isinstance(recommendations_data, list):
@@ -1167,28 +1177,83 @@ Return ONLY the JSON, no other text."""
                 continue
                 
             try:
-                ai_rec = AIWorkoutRecommendation(
-                    workout_type=rec_data.get('workout_type', 'Unknown'),
-                    duration_minutes=rec_data.get('duration_minutes', 60),
-                    description=rec_data.get('description', ''),
-                    structure=rec_data.get('structure', ''),
-                    reasoning=rec_data.get('reasoning', ''),
-                    equipment=rec_data.get('equipment', 'General'),
-                    intensity_zones=rec_data.get('intensity_zones', [1]),
-                    priority=rec_data.get('priority', 'medium'),
-                    generated_at=datetime.now().isoformat()
-                )
-                ai_recommendations.append(ai_rec)
+                # Check if this is the new pathway format
+                if 'today' in rec_data and 'tomorrow' in rec_data:
+                    # New format with today/tomorrow
+                    today_data = rec_data.get('today', {})
+                    tomorrow_data = rec_data.get('tomorrow', {})
+                    
+                    today_workout = AIWorkoutRecommendation(
+                        workout_type=today_data.get('workout_type', 'Unknown'),
+                        duration_minutes=today_data.get('duration_minutes', 60),
+                        description=today_data.get('description', ''),
+                        structure=today_data.get('structure', ''),
+                        reasoning=today_data.get('reasoning', ''),
+                        equipment=today_data.get('equipment', 'General'),
+                        intensity_zones=today_data.get('intensity_zones', [1]),
+                        priority=rec_data.get('priority', 'medium'),
+                        generated_at=datetime.now().isoformat()
+                    )
+                    
+                    tomorrow_workout = AIWorkoutRecommendation(
+                        workout_type=tomorrow_data.get('workout_type', 'Unknown'),
+                        duration_minutes=tomorrow_data.get('duration_minutes', 60),
+                        description=tomorrow_data.get('description', ''),
+                        structure=tomorrow_data.get('structure', ''),
+                        reasoning=tomorrow_data.get('reasoning', ''),
+                        equipment=tomorrow_data.get('equipment', 'General'),
+                        intensity_zones=tomorrow_data.get('intensity_zones', [1]),
+                        priority=rec_data.get('priority', 'medium'),
+                        generated_at=datetime.now().isoformat()
+                    )
+                    
+                    pathway = AIWorkoutPathway(
+                        pathway_name=rec_data.get('pathway_name', f'Pathway {i+1}'),
+                        today=today_workout,
+                        tomorrow=tomorrow_workout,
+                        overall_reasoning=rec_data.get('overall_reasoning', ''),
+                        priority=rec_data.get('priority', 'medium'),
+                        generated_at=datetime.now().isoformat()
+                    )
+                    
+                    ai_pathways.append(pathway)
+                else:
+                    # Legacy format - convert to pathway format
+                    print(f"Converting legacy format for recommendation {i}")
+                    workout = AIWorkoutRecommendation(
+                        workout_type=rec_data.get('workout_type', 'Unknown'),
+                        duration_minutes=rec_data.get('duration_minutes', 60),
+                        description=rec_data.get('description', ''),
+                        structure=rec_data.get('structure', ''),
+                        reasoning=rec_data.get('reasoning', ''),
+                        equipment=rec_data.get('equipment', 'General'),
+                        intensity_zones=rec_data.get('intensity_zones', [1]),
+                        priority=rec_data.get('priority', 'medium'),
+                        generated_at=datetime.now().isoformat()
+                    )
+                    
+                    # Create a pathway with the same workout for both days
+                    pathway = AIWorkoutPathway(
+                        pathway_name=rec_data.get('workout_type', f'Pathway {i+1}'),
+                        today=workout,
+                        tomorrow=workout,
+                        overall_reasoning=rec_data.get('reasoning', ''),
+                        priority=rec_data.get('priority', 'medium'),
+                        generated_at=datetime.now().isoformat()
+                    )
+                    
+                    ai_pathways.append(pathway)
+                    
             except Exception as e:
                 print(f"Error creating recommendation {i}: {e}")
                 print(f"Data: {rec_data}")
                 continue
         
-        return ai_recommendations
+        return ai_pathways
     
-    def _create_fallback_recommendations(self, error_message: str) -> List[AIWorkoutRecommendation]:
+    def _create_fallback_recommendations(self, error_message: str) -> List[AIWorkoutPathway]:
         """Create fallback recommendations when AI fails"""
-        return [AIWorkoutRecommendation(
+        fallback_workout = AIWorkoutRecommendation(
             workout_type="Fallback Workout",
             duration_minutes=60,
             description="Easy aerobic workout",
@@ -1198,9 +1263,18 @@ Return ONLY the JSON, no other text."""
             intensity_zones=[1],
             priority="medium",
             generated_at=datetime.now().isoformat()
+        )
+        
+        return [AIWorkoutPathway(
+            pathway_name="Fallback Pathway",
+            today=fallback_workout,
+            tomorrow=fallback_workout,
+            overall_reasoning=f"AI service unavailable: {error_message}",
+            priority="medium",
+            generated_at=datetime.now().isoformat()
         )]
     
-    def save_recommendation_history(self, recommendations: List[AIWorkoutRecommendation], 
+    def save_recommendation_history(self, recommendations: List[AIWorkoutPathway], 
                                   filename: str = "cache/ai_recommendation_history.json"):
         """Save AI recommendations to history file"""
         history_entry = {
