@@ -606,11 +606,26 @@ Generate 3 specific recovery pathway recommendations for an athlete who is {defi
 - If Zone 2 > 15%: AVOID threshold work
 - If Zone 3 > 10%: AVOID high-intensity work
 
-## Equipment Available
-- **Peloton bike** (for cycling workouts)
-- **Concept2 RowERG** (for rowing workouts)
-- **Dumbbells/Bodyweight** (for strength training)
-- **NO RUNNING** - Do not recommend any running workouts
+## Equipment Available & Zone Terminology
+**CRITICAL: Use correct zone terminology for each equipment type:**
+
+**For Peloton Cycling Workouts:**
+- Use "Power Zone X" terminology ONLY (e.g., "Power Zone 2", "Power Zone 4")
+- Power Zone 1-2 (0-75% FTP) = Polarized Zone 1 (aerobic base)
+- Power Zone 3-4 (76-105% FTP) = Polarized Zone 2 (threshold)  
+- Power Zone 5-7 (106%+ FTP) = Polarized Zone 3 (high intensity)
+- Current FTP: {training_data.get('config', {}).get('ftp', 301)} watts
+
+**For Concept2 RowERG Workouts:**
+- Use "HR Zone X" terminology with BPM ranges
+{self._get_hr_zone_definitions(training_data)}
+
+**For Strength Training:**
+- Use RPE (Rate of Perceived Exertion) 1-10 scale
+- No zone terminology needed
+
+**❌ DO NOT mix zone systems** - never say "Zone 1" or "Zone 2" without specifying "Power Zone" or "HR Zone"
+**❌ NO RUNNING** - Do not recommend any running workouts
 
 ## Task
 Generate exactly 3 recovery pathway recommendations:
@@ -628,6 +643,11 @@ For each pathway, provide:
 - **equipment**: Primary equipment used
 - **intensity_zones**: List of zones/efforts involved
 - **priority**: "high", "medium", or "low" based on current training state
+
+🎯 **CRITICAL ZONE TERMINOLOGY REQUIREMENTS**:
+- **Peloton workouts**: MUST use "Power Zone X" (e.g., "Power Zone 2 endurance", "Power Zone 4 intervals")
+- **Rowing workouts**: MUST use "HR Zone X with BPM" (e.g., "HR Zone 2 (140-150 bpm)")
+- **NEVER** use generic "Zone 1", "Zone 2" without equipment prefix
 
 🎯 **CRITICAL**: Consider the athlete's current zone imbalance when recommending intensities. Don't just focus on volume deficit - focus on QUALITY of training distribution.
 
@@ -671,7 +691,7 @@ Use activity-specific zone terminology:
 - Power Zone 5-7 (VO2 Max/Anaerobic/Neuromuscular, 106%+ FTP) = Polarized Zone 3 (high intensity)
 - Current FTP: {training_data.get('config', {}).get('ftp', 301)} watts
 
-IMPORTANT: Since the athlete is currently at 18% Polarized Zone 2 (target 10%), AVOID recommending Power Zone 3-4 workouts. Focus on Power Zone 1-2 for aerobic base.
+IMPORTANT: Recommend zones based on current Polarized Zone distribution and deficits. Use equipment-specific terminology.
 
 **For Rowing (HR-based):**
 - Use "HR Zone X" terminology with actual BPM ranges
@@ -735,12 +755,17 @@ Each recommendation should be formatted as valid JSON with these fields:
 - intensity_zones: (array of polarized zones used for analysis, e.g., [1], [2], [3], [1,3])
 - priority: ("high", "medium", or "low")
 
-Examples:
-- Cycling for Zone 1: "Power Zone 2 endurance ride (56-75% FTP) for 90 minutes" 
-- Cycling for Zone 2 (only if needed): "Power Zone 3-4 tempo intervals (76-95% FTP)"
-- Cycling for Zone 3 (only if appropriate): "Power Zone 5 VO2 max intervals (106-120% FTP)"
-- Rowing: "HR Zone 2 steady state ({self._get_example_hr_range(training_data)}) for 45 minutes"
-- Strength: "Functional strength circuit at RPE 6-7 for 30 minutes"
+**ZONE TERMINOLOGY EXAMPLES:**
+- **Peloton for Polarized Zone 1**: "Power Zone 2 endurance ride (56-75% FTP)"
+- **Peloton for Polarized Zone 2**: "Power Zone 3-4 tempo intervals (76-105% FTP)" 
+- **Peloton for Polarized Zone 3**: "Power Zone 5-6 VO2 max intervals (106-150% FTP)"
+- **Rowing for Polarized Zone 1**: "HR Zone 1-2 steady state (below 140 bpm)"
+- **Rowing for Polarized Zone 2**: "HR Zone 3-4 tempo (140-160 bpm)"
+- **Rowing for Polarized Zone 3**: "HR Zone 5+ intervals (above 160 bpm)"
+- **Strength**: "Functional strength circuit at RPE 6-7"
+
+**❌ WRONG**: "Zone 2 workout", "20min Zone 1"
+**✅ CORRECT**: "Power Zone 2 endurance", "20min HR Zone 1 (below 140 bpm)"
 
 Consider:
 1. Their specific goals (FTP improvement, multi-modal training)
