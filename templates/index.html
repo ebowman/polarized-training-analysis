@@ -2692,9 +2692,27 @@
             
             cardsDiv.innerHTML = '';
             
-            recommendations.forEach(rec => {
-                const card = createAIRecommendationCard(rec);
-                cardsDiv.appendChild(card);
+            recommendations.forEach((rec, index) => {
+                try {
+                    console.log(`Processing recommendation ${index}:`, rec);
+                    const card = createAIRecommendationCard(rec);
+                    cardsDiv.appendChild(card);
+                } catch (error) {
+                    console.error(`Error creating card for recommendation ${index}:`, error, rec);
+                    // Show a fallback error card
+                    const errorCard = document.createElement('div');
+                    errorCard.className = 'recommendation-card medium-priority';
+                    errorCard.innerHTML = `
+                        <div class="recommendation-header">
+                            <div class="recommendation-title">Error Loading Recommendation</div>
+                            <span class="recommendation-priority priority-medium">ERROR</span>
+                        </div>
+                        <div class="recommendation-reasoning">
+                            Unable to display recommendation. Please try refreshing AI recommendations.
+                        </div>
+                    `;
+                    cardsDiv.appendChild(errorCard);
+                }
             });
             
             aiRecommendationsDiv.style.display = 'block';
@@ -2713,15 +2731,28 @@
             const card = document.createElement('div');
             card.className = `recommendation-card ${recommendation.priority}-priority`;
             
+            // Check if this is the new format with today/tomorrow
+            if (!recommendation.today || !recommendation.tomorrow) {
+                // Fall back to old format
+                return createLegacyAIRecommendationCard(recommendation);
+            }
+            
             // Helper function to format workout details
             function formatWorkoutDetails(workout) {
+                if (!workout || workout.duration_minutes === undefined) {
+                    return {
+                        durationText: '0m',
+                        zoneIcons: ''
+                    };
+                }
+                
                 const durationHours = Math.floor(workout.duration_minutes / 60);
                 const remainingMinutes = workout.duration_minutes % 60;
                 const durationText = durationHours > 0 ? 
                     `${durationHours}h ${remainingMinutes}m` : 
                     `${workout.duration_minutes}m`;
                 
-                const zoneIcons = workout.intensity_zones.map(zone => getZoneIcon(zone)).join(' ');
+                const zoneIcons = (workout.intensity_zones || []).map(zone => getZoneIcon(zone)).join(' ');
                 
                 return {
                     durationText,
@@ -2735,10 +2766,10 @@
             card.innerHTML = `
                 <div class="recommendation-header">
                     <div class="recommendation-title">
-                        ${recommendation.pathway_name}
+                        ${recommendation.pathway_name || 'Workout Pathway'}
                     </div>
-                    <span class="recommendation-priority priority-${recommendation.priority}">
-                        ${getPriorityLabel(recommendation.priority)}
+                    <span class="recommendation-priority priority-${recommendation.priority || 'medium'}">
+                        ${getPriorityLabel(recommendation.priority || 'medium')}
                     </span>
                 </div>
                 
@@ -2747,12 +2778,12 @@
                         <strong>🗓️ TODAY</strong>
                         <span class="workout-meta">
                             ${todayDetails.zoneIcons} ${todayDetails.durationText}
-                            <span class="ai-recommendation-equipment">${recommendation.today.equipment}</span>
+                            <span class="ai-recommendation-equipment">${recommendation.today?.equipment || 'Unknown'}</span>
                         </span>
                     </div>
-                    <div class="workout-title">${recommendation.today.description}</div>
-                    <div class="workout-structure">${recommendation.today.structure}</div>
-                    <div class="workout-reasoning">${recommendation.today.reasoning}</div>
+                    <div class="workout-title">${recommendation.today?.description || recommendation.today?.workout_type || 'Workout'}</div>
+                    <div class="workout-structure">${recommendation.today?.structure || 'Structure not available'}</div>
+                    <div class="workout-reasoning">${recommendation.today?.reasoning || 'No reasoning provided'}</div>
                 </div>
                 
                 <div class="day-workout-section">
@@ -2760,17 +2791,47 @@
                         <strong>🗓️ TOMORROW</strong>
                         <span class="workout-meta">
                             ${tomorrowDetails.zoneIcons} ${tomorrowDetails.durationText}
-                            <span class="ai-recommendation-equipment">${recommendation.tomorrow.equipment}</span>
+                            <span class="ai-recommendation-equipment">${recommendation.tomorrow?.equipment || 'Unknown'}</span>
                         </span>
                     </div>
-                    <div class="workout-title">${recommendation.tomorrow.description}</div>
-                    <div class="workout-structure">${recommendation.tomorrow.structure}</div>
-                    <div class="workout-reasoning">${recommendation.tomorrow.reasoning}</div>
+                    <div class="workout-title">${recommendation.tomorrow?.description || recommendation.tomorrow?.workout_type || 'Workout'}</div>
+                    <div class="workout-structure">${recommendation.tomorrow?.structure || 'Structure not available'}</div>
+                    <div class="workout-reasoning">${recommendation.tomorrow?.reasoning || 'No reasoning provided'}</div>
                 </div>
                 
                 <div class="overall-reasoning">
-                    <strong>📋 Why This Pathway:</strong> ${recommendation.overall_reasoning}
+                    <strong>📋 Why This Pathway:</strong> ${recommendation.overall_reasoning || 'No reasoning provided'}
                 </div>
+            `;
+            
+            return card;
+        }
+        
+        function createLegacyAIRecommendationCard(recommendation) {
+            const card = document.createElement('div');
+            card.className = `recommendation-card ${recommendation.priority}-priority`;
+            
+            const durationHours = Math.floor((recommendation.duration_minutes || 0) / 60);
+            const remainingMinutes = (recommendation.duration_minutes || 0) % 60;
+            const durationText = durationHours > 0 ? 
+                `${durationHours}h ${remainingMinutes}m` : 
+                `${recommendation.duration_minutes || 0}m`;
+            
+            const zoneIcons = (recommendation.intensity_zones || []).map(zone => getZoneIcon(zone)).join(' ');
+            
+            card.innerHTML = `
+                <div class="recommendation-header">
+                    <div class="recommendation-title">
+                        ${zoneIcons} ${recommendation.description || recommendation.workout_type || 'Workout'}
+                        <span class="recommendation-duration">${durationText}</span>
+                        <span class="ai-recommendation-equipment">${recommendation.equipment || 'Unknown'}</span>
+                    </div>
+                    <span class="recommendation-priority priority-${recommendation.priority}">
+                        ${getPriorityLabel(recommendation.priority)}
+                    </span>
+                </div>
+                <div class="recommendation-structure">${recommendation.structure || 'Structure not available'}</div>
+                <div class="recommendation-reasoning">${recommendation.reasoning || 'No reasoning provided'}</div>
             `;
             
             return card;
