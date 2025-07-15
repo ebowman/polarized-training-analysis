@@ -331,8 +331,8 @@
                     eventSource.close();
                     isDownloading = false;
                     
-                    if (data.status === 'completed') {
-                        // Auto redirect after 3 seconds
+                    if (data.status === 'completed' && data.new_activities && data.new_activities.length > 0) {
+                        // Auto redirect after 3 seconds only when new activities were downloaded
                         setTimeout(() => {
                             window.location.href = '/';
                         }, 3000);
