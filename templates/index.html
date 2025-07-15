@@ -2081,6 +2081,20 @@
                 }
             }
             
+            // Calculate zone deficits for daily breakdown
+            const rollingZone1Minutes = dailyData.slice(0, todayIndex + 1).reduce((sum, d) => sum + d.zone1Minutes, 0);
+            const rollingZone2Minutes = dailyData.slice(0, todayIndex + 1).reduce((sum, d) => sum + d.zone2Minutes, 0);
+            const rollingZone3Minutes = dailyData.slice(0, todayIndex + 1).reduce((sum, d) => sum + d.zone3Minutes, 0);
+            
+            // Calculate zone deficits based on polarized training targets (80/10/10)
+            const targetZone1Minutes = targetMinutes * 0.80;
+            const targetZone2Minutes = targetMinutes * 0.10;
+            const targetZone3Minutes = targetMinutes * 0.10;
+            
+            const zone1Deficit = Math.max(0, Math.round(targetZone1Minutes - rollingZone1Minutes));
+            const zone2Deficit = Math.max(0, Math.round(targetZone2Minutes - rollingZone2Minutes));
+            const zone3Deficit = Math.max(0, Math.round(targetZone3Minutes - rollingZone3Minutes));
+            
             // Calculate what's needed based on polarized minutes only
             const minutesNeeded = Math.max(0, targetMinutes - rollingPolarizedMinutes);
             
@@ -2089,6 +2103,10 @@
             if (todayData && todayData.minutes === 0 && minutesNeeded > 0) {
                 // If no activity today yet, show what's needed today to hit target
                 todayData.projectedMinutes = minutesNeeded;
+                // Also set zone-specific projections for today
+                todayData.projectedZone1Minutes = zone1Deficit > 0 ? Math.ceil(zone1Deficit / 7) : 0;
+                todayData.projectedZone2Minutes = zone2Deficit > 0 ? Math.ceil(zone2Deficit / 7) : 0;
+                todayData.projectedZone3Minutes = zone3Deficit > 0 ? Math.ceil(zone3Deficit / 7) : 0;
             }
             
             // Calculate future projections based on your idea:
@@ -2132,6 +2150,44 @@
                 const avgNeededPerDay = futureDaysCount > 0 ? 
                     Math.max(0, (targetMinutes - baseMinutes) / futureDaysCount) : 0;
                 
+                // Calculate zone-specific daily needs for this specific future day
+                // Look back 6 days from this future date to calculate what zones are needed
+                let futureZone1Minutes = 0;
+                let futureZone2Minutes = 0;
+                let futureZone3Minutes = 0;
+                
+                // Sum up zone minutes from the 7-day window ending on this future date
+                for (let j = 0; j < 7; j++) {
+                    const checkDate = new Date(windowStart);
+                    checkDate.setDate(checkDate.getDate() + j);
+                    
+                    // Find if we have actual data for this date
+                    const dayData = dailyData.find(d => 
+                        d.date.toDateString() === checkDate.toDateString()
+                    );
+                    
+                    if (dayData && (dayData.isPast || (dayData.isToday && dayData.minutes > 0))) {
+                        // We have actual data for this day
+                        futureZone1Minutes += dayData.zone1Minutes || 0;
+                        futureZone2Minutes += dayData.zone2Minutes || 0;
+                        futureZone3Minutes += dayData.zone3Minutes || 0;
+                    }
+                }
+                
+                // Calculate zone deficits for this specific future date's 7-day window
+                const futureTargetZone1Minutes = targetMinutes * 0.80;
+                const futureTargetZone2Minutes = targetMinutes * 0.10;
+                const futureTargetZone3Minutes = targetMinutes * 0.10;
+                
+                const futureZone1Deficit = Math.max(0, futureTargetZone1Minutes - futureZone1Minutes);
+                const futureZone2Deficit = Math.max(0, futureTargetZone2Minutes - futureZone2Minutes);
+                const futureZone3Deficit = Math.max(0, futureTargetZone3Minutes - futureZone3Minutes);
+                
+                // Divide deficits by remaining future days in the window
+                const dailyZone1Needed = futureDaysCount > 0 ? Math.ceil(futureZone1Deficit / futureDaysCount) : 0;
+                const dailyZone2Needed = futureDaysCount > 0 ? Math.ceil(futureZone2Deficit / futureDaysCount) : 0;
+                const dailyZone3Needed = futureDaysCount > 0 ? Math.ceil(futureZone3Deficit / futureDaysCount) : 0;
+                
                 dailyData.push({
                     date: futureDate,
                     dateStr: futureDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -2139,6 +2195,9 @@
                     isPast: false,
                     isFuture: true,
                     projectedMinutes: avgNeededPerDay,
+                    projectedZone1Minutes: dailyZone1Needed,
+                    projectedZone2Minutes: dailyZone2Needed,
+                    projectedZone3Minutes: dailyZone3Needed,
                     daysToAverage: i,  // How many days from tomorrow
                     baseMinutes: baseMinutes,
                     futureDaysInWindow: futureDaysCount
@@ -2151,13 +2210,33 @@
                 `${Math.round(rollingWeekMinutes)} min (${Math.round(rollingPolarizedMinutes)} polarized + ${Math.round(rollingAncillaryMinutes)} ancillary)` :
                 `${Math.round(rollingWeekMinutes)} min`;
             document.getElementById('past-volume').textContent = totalText;
-            // Calculate what's needed per day over next 7 days
+            // Calculate what's needed per day over next 7 days, broken down by zone
             // This is complex because we need to account for what will drop out of the rolling window
             // For now, use a simple calculation: if you need X minutes to reach target, divide by 7
             const dailyNeededNext7Days = minutesNeeded > 0 ? Math.ceil(minutesNeeded / 7) : 0;
-            const avgText = dailyNeededNext7Days === 0 ? 'On target!' : 
-                           minutesNeeded < 60 ? `${Math.round(minutesNeeded)} min total` : 
-                           `${dailyNeededNext7Days} min/day`;
+            
+            // Calculate daily zone-specific needs based on deficits
+            const dailyZone1Needed = zone1Deficit > 0 ? Math.ceil(zone1Deficit / 7) : 0;
+            const dailyZone2Needed = zone2Deficit > 0 ? Math.ceil(zone2Deficit / 7) : 0;
+            const dailyZone3Needed = zone3Deficit > 0 ? Math.ceil(zone3Deficit / 7) : 0;
+            
+            // Create zone-specific daily target text
+            let avgText;
+            if (dailyNeededNext7Days === 0) {
+                avgText = 'On target!';
+            } else {
+                const zoneParts = [];
+                if (dailyZone1Needed > 0) zoneParts.push(`Z1: ${dailyZone1Needed}min`);
+                if (dailyZone2Needed > 0) zoneParts.push(`Z2: ${dailyZone2Needed}min`);
+                if (dailyZone3Needed > 0) zoneParts.push(`Z3: ${dailyZone3Needed}min`);
+                
+                if (zoneParts.length > 0) {
+                    avgText = zoneParts.join(', ') + ' per day';
+                } else {
+                    avgText = minutesNeeded < 60 ? `${Math.round(minutesNeeded)} min total` : 
+                             `${dailyNeededNext7Days} min/day`;
+                }
+            }
             document.getElementById('daily-needed').textContent = avgText;
             
             // Update deficit based on polarized minutes
@@ -2209,15 +2288,41 @@
                         borderWidth: 1,
                         stack: 'actual'
                     }, {
-                        label: 'Minutes Needed (per day avg)',
+                        label: 'Zone 1 Needed',
                         data: dailyData.map(d => {
-                            if (d.isFuture || (d.isToday && d.projectedMinutes)) {
-                                return d.projectedMinutes || 0;
+                            if (d.isFuture || (d.isToday && d.projectedZone1Minutes)) {
+                                return d.projectedZone1Minutes || 0;
                             }
                             return 0;
                         }),
-                        backgroundColor: 'rgba(52, 152, 219, 0.3)',
-                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(76, 175, 80, 0.3)',
+                        borderColor: '#4CAF50',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        stack: 'projected'
+                    }, {
+                        label: 'Zone 2 Needed',
+                        data: dailyData.map(d => {
+                            if (d.isFuture || (d.isToday && d.projectedZone2Minutes)) {
+                                return d.projectedZone2Minutes || 0;
+                            }
+                            return 0;
+                        }),
+                        backgroundColor: 'rgba(255, 152, 0, 0.3)',
+                        borderColor: '#FF9800',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        stack: 'projected'
+                    }, {
+                        label: 'Zone 3 Needed',
+                        data: dailyData.map(d => {
+                            if (d.isFuture || (d.isToday && d.projectedZone3Minutes)) {
+                                return d.projectedZone3Minutes || 0;
+                            }
+                            return 0;
+                        }),
+                        backgroundColor: 'rgba(244, 67, 54, 0.3)',
+                        borderColor: '#F44336',
                         borderWidth: 2,
                         borderDash: [5, 5],
                         stack: 'projected'
