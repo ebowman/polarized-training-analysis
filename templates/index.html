@@ -1360,9 +1360,9 @@
             const maxHealthyWeeklyMinutes = Math.round(600 * timeRange / 7); // 10 hours/week overtraining threshold scaled
             
             // Calculate zone deficits based on polarized training targets (80/10/10)
-            const targetZone1Minutes = totalMinutes * 0.80;
-            const targetZone2Minutes = totalMinutes * 0.10;
-            const targetZone3Minutes = totalMinutes * 0.10;
+            const targetZone1Minutes = targetMinutes * 0.80;
+            const targetZone2Minutes = targetMinutes * 0.10;
+            const targetZone3Minutes = targetMinutes * 0.10;
             
             const zone1Deficit = Math.max(0, Math.round(targetZone1Minutes - totalZone1Minutes));
             const zone2Deficit = Math.max(0, Math.round(targetZone2Minutes - totalZone2Minutes));
@@ -1372,13 +1372,13 @@
             const zone2Excess = Math.max(0, Math.round(totalZone2Minutes - targetZone2Minutes));
             const zone3Excess = Math.max(0, Math.round(totalZone3Minutes - targetZone3Minutes));
             
-            // Update combined stats display with percentages and absolute time
+            // Update combined stats display with actual/target minutes
             document.getElementById('combined-zone1').textContent = 
-                `${Math.round(zone1Percent)}% (${Math.round(totalZone1Minutes)}min)`;
+                `${Math.round(totalZone1Minutes)}min/${Math.round(targetZone1Minutes)}min`;
             document.getElementById('combined-zone2').textContent = 
-                `${Math.round(zone2Percent)}% (${Math.round(totalZone2Minutes)}min)`;
+                `${Math.round(totalZone2Minutes)}min/${Math.round(targetZone2Minutes)}min`;
             document.getElementById('combined-zone3').textContent = 
-                `${Math.round(zone3Percent)}% (${Math.round(totalZone3Minutes)}min)`;
+                `${Math.round(totalZone3Minutes)}min/${Math.round(targetZone3Minutes)}min`;
             
             // Display zone deficit/excess information
             document.getElementById('zone1-deficit').textContent = 
