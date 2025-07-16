@@ -21,7 +21,7 @@ from datetime import datetime
 from flask import Flask, render_template, jsonify, request, redirect, session, url_for, Response, make_response
 from training_analysis import TrainingAnalyzer
 from strava_client import StravaClient
-from download_manager import DownloadManager
+from download_manager import DownloadManager, DownloadStatus
 from cache_manager import CacheManager
 
 app = Flask(__name__, template_folder='templates')
@@ -428,7 +428,11 @@ def strava_callback():
         print(f"  - refresh_token exists: {bool(session.get('strava_refresh_token'))}")
         print(f"  - expires_at: {session.get('strava_expires_at')}")
         
-        return redirect(url_for('download_progress'))
+        # Check if this was initiated from the simplified download flow
+        if request.args.get('from_download') == 'true':
+            return redirect(url_for('index', start_download='true'))
+        else:
+            return redirect(url_for('download_progress'))
         
     except Exception as e:
         return jsonify({'error': f'Failed to complete OAuth: {str(e)}'}), 500
@@ -448,6 +452,58 @@ def download_progress():
     
     return render_template('download_progress.html', 
                          athlete_name=session.get('athlete_name', 'Athlete'))
+
+@app.route('/api/download-latest', methods=['POST'])
+def api_download_latest():
+    """Simplified API endpoint to download latest workouts from Strava"""
+    try:
+        # Use global strava_client for test compatibility
+        if strava_client is None:
+            return jsonify({'error': 'Strava client not initialized'}), 500
+            
+        # Check if we have valid tokens
+        if not strava_client.access_token:
+            # Need to authenticate
+            redirect_uri = request.url_root.rstrip('/') + '/strava-callback?from_download=true'
+            auth_url = strava_client.get_authorization_url(redirect_uri)
+            return jsonify({
+                'redirect_to_auth': True,
+                'auth_url': auth_url
+            })
+        
+        # Try to refresh token if needed
+        try:
+            strava_client._ensure_valid_token()
+        except Exception as e:
+            # Token refresh failed, need to re-authenticate
+            print(f"Token refresh failed: {e}")
+            strava_client.access_token = None
+            redirect_uri = request.url_root.rstrip('/') + '/strava-callback?from_download=true'
+            auth_url = strava_client.get_authorization_url(redirect_uri)
+            return jsonify({
+                'redirect_to_auth': True,
+                'auth_url': auth_url
+            })
+        
+        # Check if download is already in progress
+        download_manager = DownloadManager()
+        if download_manager.status != DownloadStatus.IDLE:
+            return jsonify({
+                'error': 'Download already in progress',
+                'status': download_manager.status.value
+            })
+        
+        # Start download
+        download_manager.start_download(strava_client)
+        return jsonify({
+            'success': True,
+            'job_id': 'download_job',
+            'message': 'Download started'
+        })
+        
+    except Exception as e:
+        print(f"Download API error: {e}")
+        return jsonify({'error': f'Download failed: {str(e)}'}), 500
 
 @app.route('/api/download-workouts', methods=['POST'])
 def api_download_workouts():

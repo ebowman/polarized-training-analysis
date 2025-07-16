@@ -772,7 +772,7 @@
                     <option value="21">Last 21 days</option>
                     <option value="28">Last 28 days</option>
                 </select>
-                <a href="/download-workouts" class="refresh-button" style="text-decoration: none; display: inline-block;">📥 Download Latest</a>
+                <button id="download-latest-btn" class="refresh-button" onclick="downloadLatest()">📥 Download Latest</button>
                 <button id="main-refresh-btn" class="refresh-button" onclick="loadData()">🔄 Refresh Data</button>
             </div>
         </div>
@@ -991,6 +991,95 @@
             }
         }
         
+        async function downloadLatest() {
+            const downloadBtn = document.getElementById('download-latest-btn');
+            const originalText = downloadBtn.textContent;
+            
+            // Disable button and show loading state
+            downloadBtn.disabled = true;
+            downloadBtn.textContent = '📥 Downloading...';
+            
+            try {
+                // First, try to start the download
+                const response = await fetch('/api/download-latest', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                const result = await response.json();
+                
+                if (result.redirect_to_auth) {
+                    // Need to authenticate with Strava
+                    downloadBtn.textContent = '🔄 Authenticating...';
+                    window.location.href = result.auth_url;
+                    return;
+                }
+                
+                if (result.error) {
+                    alert('Download failed: ' + result.error);
+                    downloadBtn.disabled = false;
+                    downloadBtn.textContent = originalText;
+                    return;
+                }
+                
+                // Download started successfully, show progress
+                downloadBtn.textContent = '📥 Downloading...';
+                
+                // Poll for progress
+                const jobId = result.job_id;
+                pollDownloadProgress(jobId, downloadBtn, originalText);
+                
+            } catch (error) {
+                console.error('Download failed:', error);
+                alert('Download failed: ' + error.message);
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = originalText;
+            }
+        }
+        
+        function pollDownloadProgress(jobId, downloadBtn, originalText) {
+            const eventSource = new EventSource('/api/download-progress');
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.status === 'completed') {
+                        eventSource.close();
+                        downloadBtn.textContent = '✅ Download Complete';
+                        setTimeout(() => {
+                            downloadBtn.disabled = false;
+                            downloadBtn.textContent = originalText;
+                            // Refresh the data to show new workouts
+                            loadData();
+                        }, 2000);
+                    } else if (data.status === 'error') {
+                        eventSource.close();
+                        downloadBtn.disabled = false;
+                        downloadBtn.textContent = originalText;
+                        alert('Download failed: ' + data.message);
+                    } else if (data.status === 'downloading') {
+                        const progress = data.progress || 0;
+                        const processed = data.processed_activities || 0;
+                        const total = data.total_activities || 0;
+                        downloadBtn.textContent = `📥 ${processed}/${total} activities`;
+                    }
+                } catch (error) {
+                    console.error('Error parsing progress data:', error);
+                }
+            };
+            
+            eventSource.onerror = function(error) {
+                console.error('EventSource error:', error);
+                eventSource.close();
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = originalText;
+                alert('Download connection lost. Please try again.');
+            };
+        }
+
         async function loadData() {
             const loadingDiv = document.getElementById('loading');
             const errorDiv = document.getElementById('error');
@@ -2103,10 +2192,53 @@
             if (todayData && todayData.minutes === 0 && minutesNeeded > 0) {
                 // If no activity today yet, show what's needed today to hit target
                 todayData.projectedMinutes = minutesNeeded;
-                // Also set zone-specific projections for today
-                todayData.projectedZone1Minutes = zone1Deficit > 0 ? Math.ceil(zone1Deficit / 7) : 0;
-                todayData.projectedZone2Minutes = zone2Deficit > 0 ? Math.ceil(zone2Deficit / 7) : 0;
-                todayData.projectedZone3Minutes = zone3Deficit > 0 ? Math.ceil(zone3Deficit / 7) : 0;
+                
+                // Calculate what zones are needed for today specifically
+                // This looks at the rolling window ending tomorrow
+                const tomorrowDate = new Date(today);
+                tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+                
+                const tomorrowWindowStart = new Date(tomorrowDate);
+                tomorrowWindowStart.setDate(tomorrowWindowStart.getDate() - 6);
+                
+                let todayWindowZone1Minutes = 0;
+                let todayWindowZone2Minutes = 0;
+                let todayWindowZone3Minutes = 0;
+                let todayFutureDaysCount = 0;
+                
+                // Calculate zone minutes from the 7-day window ending tomorrow
+                for (let j = 0; j < 7; j++) {
+                    const checkDate = new Date(tomorrowWindowStart);
+                    checkDate.setDate(checkDate.getDate() + j);
+                    
+                    const dayData = dailyData.find(d => 
+                        d.date.toDateString() === checkDate.toDateString()
+                    );
+                    
+                    if (dayData && dayData.isPast) {
+                        // Past day with actual data
+                        todayWindowZone1Minutes += dayData.zone1Minutes || 0;
+                        todayWindowZone2Minutes += dayData.zone2Minutes || 0;
+                        todayWindowZone3Minutes += dayData.zone3Minutes || 0;
+                    } else if (checkDate.toDateString() === today.toDateString()) {
+                        // Today - count as future day
+                        todayFutureDaysCount++;
+                    }
+                }
+                
+                // Calculate zone deficits for tomorrow's rolling window
+                const todayTargetZone1Minutes = targetMinutes * 0.80;
+                const todayTargetZone2Minutes = targetMinutes * 0.10;
+                const todayTargetZone3Minutes = targetMinutes * 0.10;
+                
+                const todayZone1Deficit = Math.max(0, todayTargetZone1Minutes - todayWindowZone1Minutes);
+                const todayZone2Deficit = Math.max(0, todayTargetZone2Minutes - todayWindowZone2Minutes);
+                const todayZone3Deficit = Math.max(0, todayTargetZone3Minutes - todayWindowZone3Minutes);
+                
+                // Since today is the only future day, it gets the full deficit
+                todayData.projectedZone1Minutes = Math.ceil(todayZone1Deficit);
+                todayData.projectedZone2Minutes = Math.ceil(todayZone2Deficit);
+                todayData.projectedZone3Minutes = Math.ceil(todayZone3Deficit);
             }
             
             // Calculate future projections based on your idea:
@@ -2359,18 +2491,34 @@
                             callbacks: {
                                 afterLabel: function(context) {
                                     const dataPoint = dailyData[context.dataIndex];
+                                    const datasetLabel = context.dataset.label;
+                                    
                                     if (dataPoint.isFuture && dataPoint.daysToAverage >= 0) {
-                                        const totalNeeded = Math.round((targetMinutes - dataPoint.baseMinutes));
                                         const daysToWork = dataPoint.futureDaysInWindow;
-                                        const perDayNeeded = Math.round(dataPoint.projectedMinutes);
                                         
-                                        if (dataPoint.daysToAverage === 0) {
-                                            return `\nTo hit ${targetMinutes}min rolling target tomorrow:\nNeed ${perDayNeeded}min tomorrow\n(${dataPoint.baseMinutes} existing + ${perDayNeeded} new = ${targetMinutes}min total)`;
-                                        } else {
-                                            return `\nTo hit ${targetMinutes}min rolling target on ${dataPoint.dateStr}:\n${perDayNeeded}min/day for next ${daysToWork} days\n(${totalNeeded}min total still needed)`;
+                                        // Zone-specific messaging
+                                        if (datasetLabel === 'Zone 1 Needed') {
+                                            const perDayNeeded = Math.round(dataPoint.projectedZone1Minutes);
+                                            const targetZone1 = Math.round(targetMinutes * 0.80);
+                                            return `\nZone 1 (Low intensity) needed:\n${perDayNeeded}min/day for next ${daysToWork} days\nTo reach ${targetZone1}min Zone 1 target`;
+                                        } else if (datasetLabel === 'Zone 2 Needed') {
+                                            const perDayNeeded = Math.round(dataPoint.projectedZone2Minutes);
+                                            const targetZone2 = Math.round(targetMinutes * 0.10);
+                                            return `\nZone 2 (Threshold) needed:\n${perDayNeeded}min/day for next ${daysToWork} days\nTo reach ${targetZone2}min Zone 2 target`;
+                                        } else if (datasetLabel === 'Zone 3 Needed') {
+                                            const perDayNeeded = Math.round(dataPoint.projectedZone3Minutes);
+                                            const targetZone3 = Math.round(targetMinutes * 0.10);
+                                            return `\nZone 3 (High intensity) needed:\n${perDayNeeded}min/day for next ${daysToWork} days\nTo reach ${targetZone3}min Zone 3 target`;
                                         }
                                     } else if (dataPoint.isToday && dataPoint.projectedMinutes && dataPoint.minutes === 0) {
-                                        return `\nNeeded today to hit\n${targetMinutes}min rolling target`;
+                                        // Zone-specific messaging for today
+                                        if (datasetLabel === 'Zone 1 Needed') {
+                                            return `\nZone 1 (Low intensity)\nneeded today`;
+                                        } else if (datasetLabel === 'Zone 2 Needed') {
+                                            return `\nZone 2 (Threshold)\nneeded today`;
+                                        } else if (datasetLabel === 'Zone 3 Needed') {
+                                            return `\nZone 3 (High intensity)\nneeded today`;
+                                        }
                                     }
                                     return '';
                                 }
@@ -3448,6 +3596,19 @@
             }
             console.log('Chart.js loaded successfully, version:', Chart.version);
             loadData();
+            
+            // Check if we should auto-start download (after OAuth)
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('start_download') === 'true') {
+                // Remove the parameter from URL
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
+                
+                // Start download after a short delay
+                setTimeout(() => {
+                    downloadLatest();
+                }, 1000);
+            }
         });
     </script>
 </body>
