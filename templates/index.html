@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Polarized Training Analysis</title>
+    <title>PolarFlow: Polarized Training Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <script>
         // Force cache refresh by adding version
@@ -66,10 +66,10 @@
         
         .zone-colors {
             display: flex;
-            justify-content: center;
-            gap: 30px;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
             margin-bottom: 30px;
-            flex-wrap: wrap;
         }
         
         .zone-legend {
@@ -467,7 +467,7 @@
         }
         
         .volume-value {
-            font-size: 1.5em;
+            font-size: 1.2em;
             font-weight: bold;
             color: #2c3e50;
         }
@@ -741,7 +741,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏃‍♂️ Polarized Training Analysis</h1>
+        <h1>🏃‍♂️ PolarFlow: Polarized Training Analysis</h1>
         
         <div class="zone-colors">
             <div class="zone-legend">
@@ -899,7 +899,7 @@
                     <div class="volume-value" id="past-volume">-</div>
                 </div>
                 <div class="volume-stat">
-                    <div class="volume-label" id="daily-needed-label">Avg/Day Needed (next 7d)</div>
+                    <div class="volume-label" id="daily-needed-label">Daily Target for 360min/week</div>
                     <div class="volume-value" id="daily-needed">-</div>
                 </div>
                 <div class="volume-stat">
@@ -1831,11 +1831,12 @@
             // Update the chart title to show total minutes and strength training
             const chartTitle = document.querySelector('#combined-chart h2');
             if (chartTitle) {
-                let titleText = `Last ${timeRange} Days Training Distribution (${Math.round(totalMinutes)} minutes)`;
+                let titleText = `Last ${timeRange} Days Training Distribution`;
+                let subtitleText = `(${Math.round(totalMinutes)} minutes)`;
                 if (strengthMinutes > 0) {
-                    titleText += ` + ${strengthMinutes} min ancillary training`;
+                    subtitleText += ` + ${strengthMinutes} min ancillary training`;
                 }
-                chartTitle.textContent = titleText;
+                chartTitle.innerHTML = `${titleText}<br>${subtitleText}`;
             }
             
             const weeklyHours = (totalWeeklyMinutes / 60).toFixed(1);
@@ -1878,47 +1879,77 @@
                 data: {
                     labels: ['Zone 1\n(Low Intensity)', 'Zone 2\n(Threshold)', 'Zone 3\n(High Intensity)', 'Ancillary\n(Strength)', 'Weekly Time\n(Minutes)'],
                     datasets: [{
-                        label: 'Combined Time Distribution',
-                        data: [zone1Percent, zone2Percent, zone3Percent, null, null],
-                        backgroundColor: ['#4CAF50', '#FF9800', '#F44336', 'transparent', 'transparent'],
-                        borderColor: ['#388E3C', '#F57C00', '#D32F2F', 'transparent', 'transparent'],
+                        label: 'Zone 1 (Actual)',
+                        data: [zone1Percent, null, null, null, null],
+                        backgroundColor: '#4CAF50',
+                        borderColor: '#388E3C',
                         borderWidth: 2,
                         yAxisID: 'y'
                     }, {
-                        label: 'Target Distribution',
-                        data: [80, 10, 10, null, null],
-                        backgroundColor: ['rgba(76, 175, 80, 0.3)', 'rgba(255, 152, 0, 0.3)', 'rgba(244, 67, 54, 0.3)', 'transparent', 'transparent'],
-                        borderColor: ['#388E3C', '#F57C00', '#D32F2F', 'transparent', 'transparent'],
+                        label: 'Zone 2 (Actual)',
+                        data: [null, zone2Percent, null, null, null],
+                        backgroundColor: '#FF9800',
+                        borderColor: '#F57C00',
+                        borderWidth: 2,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Zone 3 (Actual)',
+                        data: [null, null, zone3Percent, null, null],
+                        backgroundColor: '#F44336',
+                        borderColor: '#D32F2F',
+                        borderWidth: 2,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Zone 1 (Target 80%)',
+                        data: [80, null, null, null, null],
+                        backgroundColor: 'rgba(76, 175, 80, 0.3)',
+                        borderColor: '#388E3C',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Zone 2 (Target 10%)',
+                        data: [null, 10, null, null, null],
+                        backgroundColor: 'rgba(255, 152, 0, 0.3)',
+                        borderColor: '#F57C00',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Zone 3 (Target 10%)',
+                        data: [null, null, 10, null, null],
+                        backgroundColor: 'rgba(244, 67, 54, 0.3)',
+                        borderColor: '#D32F2F',
                         borderWidth: 2,
                         borderDash: [5, 5],
                         yAxisID: 'y'
                     }, {
                         label: 'Ancillary Training',
                         data: [null, null, null, strengthMinutes, null],
-                        backgroundColor: [null, null, null, '#9C27B0', null],
-                        borderColor: [null, null, null, '#6A1B9A', null],
+                        backgroundColor: '#9C27B0',
+                        borderColor: '#6A1B9A',
                         borderWidth: 2,
                         yAxisID: 'y1'
                     }, {
                         label: 'Actual Weekly Time',
                         data: [null, null, null, null, Math.round(totalWeeklyMinutes)],
-                        backgroundColor: [null, null, null, null, totalWeeklyMinutes < generalHealthMinutes ? '#F44336' : totalWeeklyMinutes < polarizedMinimumMinutes ? '#FF9800' : totalWeeklyMinutes > maxHealthyWeeklyMinutes ? '#FF9800' : '#4CAF50'],
-                        borderColor: [null, null, null, null, totalWeeklyMinutes < generalHealthMinutes ? '#D32F2F' : totalWeeklyMinutes < polarizedMinimumMinutes ? '#F57C00' : totalWeeklyMinutes > maxHealthyWeeklyMinutes ? '#F57C00' : '#388E3C'],
+                        backgroundColor: totalWeeklyMinutes < generalHealthMinutes ? '#E91E63' : totalWeeklyMinutes < polarizedMinimumMinutes ? '#FF5722' : totalWeeklyMinutes > maxHealthyWeeklyMinutes ? '#FF5722' : '#2196F3',
+                        borderColor: totalWeeklyMinutes < generalHealthMinutes ? '#C2185B' : totalWeeklyMinutes < polarizedMinimumMinutes ? '#E64A19' : totalWeeklyMinutes > maxHealthyWeeklyMinutes ? '#E64A19' : '#1976D2',
                         borderWidth: 2,
                         yAxisID: 'y1'
                     }, {
                         label: 'Health Min (150min)',
                         data: [null, null, null, null, generalHealthMinutes],
-                        backgroundColor: [null, null, null, null, 'rgba(244, 67, 54, 0.3)'],
-                        borderColor: [null, null, null, null, '#D32F2F'],
+                        backgroundColor: 'rgba(96, 125, 139, 0.3)',
+                        borderColor: '#607D8B',
                         borderWidth: 1,
                         borderDash: [3, 3],
                         yAxisID: 'y1'
                     }, {
                         label: `Polarized Min (${polarizedMinimumMinutes}min)`,
                         data: [null, null, null, null, polarizedMinimumMinutes],
-                        backgroundColor: [null, null, null, null, 'rgba(76, 175, 80, 0.3)'],
-                        borderColor: [null, null, null, null, '#388E3C'],
+                        backgroundColor: 'rgba(0, 150, 136, 0.3)',
+                        borderColor: '#009688',
                         borderWidth: 2,
                         borderDash: [5, 5],
                         yAxisID: 'y1'
@@ -1941,7 +1972,15 @@
                     plugins: {
                         legend: {
                             display: true,
-                            position: 'top'
+                            position: 'bottom',
+                            labels: {
+                                boxWidth: 12,
+                                padding: 15,
+                                filter: function(legendItem, chartData) {
+                                    // Group related items and use better labels
+                                    return true;
+                                }
+                            }
                         },
                         tooltip: {
                             callbacks: {
@@ -2497,9 +2536,25 @@
             }
             
             // Calculate zone deficits for daily breakdown
-            const rollingZone1Minutes = dailyData.slice(0, todayIndex + 1).reduce((sum, d) => sum + d.zone1Minutes, 0);
-            const rollingZone2Minutes = dailyData.slice(0, todayIndex + 1).reduce((sum, d) => sum + d.zone2Minutes, 0);
-            const rollingZone3Minutes = dailyData.slice(0, todayIndex + 1).reduce((sum, d) => sum + d.zone3Minutes, 0);
+            let rollingZone1Minutes = 0;
+            let rollingZone2Minutes = 0;
+            let rollingZone3Minutes = 0;
+            
+            if (todayIndex >= timeRange - 1) {
+                // Sum today and the previous days for the time range
+                for (let i = todayIndex - (timeRange - 1); i <= todayIndex; i++) {
+                    rollingZone1Minutes += dailyData[i].zone1Minutes;
+                    rollingZone2Minutes += dailyData[i].zone2Minutes;
+                    rollingZone3Minutes += dailyData[i].zone3Minutes;
+                }
+            } else {
+                // If we have less than the full range of history, sum what we have
+                for (let i = 0; i <= todayIndex; i++) {
+                    rollingZone1Minutes += dailyData[i].zone1Minutes;
+                    rollingZone2Minutes += dailyData[i].zone2Minutes;
+                    rollingZone3Minutes += dailyData[i].zone3Minutes;
+                }
+            }
             
             // Calculate zone deficits based on polarized training targets (80/10/10)
             const targetZone1Minutes = targetMinutes * 0.80;
@@ -2673,29 +2728,35 @@
             // For now, use a simple calculation: if you need X minutes to reach target, divide by 7
             const dailyNeededNext7Days = minutesNeeded > 0 ? Math.ceil(minutesNeeded / 7) : 0;
             
-            // Calculate daily zone-specific needs based on deficits
-            const dailyZone1Needed = zone1Deficit > 0 ? Math.ceil(zone1Deficit / 7) : 0;
-            const dailyZone2Needed = zone2Deficit > 0 ? Math.ceil(zone2Deficit / 7) : 0;
-            const dailyZone3Needed = zone3Deficit > 0 ? Math.ceil(zone3Deficit / 7) : 0;
+            // What you need to do daily to maintain 360 minutes per week consistently
+            // This is the target rate for sustainable polarized training
+            const dailyTargetTotal = Math.round(360 / 7); // 51 minutes per day
+            const dailyTargetZ1 = Math.round(dailyTargetTotal * 0.80); // 41 minutes Z1
+            const dailyTargetZ2 = Math.round(dailyTargetTotal * 0.10); // 5 minutes Z2  
+            const dailyTargetZ3 = Math.round(dailyTargetTotal * 0.10); // 5 minutes Z3
+            
+            const avgDailyZ1Needed = dailyTargetZ1;
+            const avgDailyZ2Needed = dailyTargetZ2;
+            const avgDailyZ3Needed = dailyTargetZ3;
+            const avgDailyTotalNeeded = dailyTargetTotal;
             
             // Create zone-specific daily target text
             let avgText;
-            if (dailyNeededNext7Days === 0) {
-                avgText = 'On target!';
+            if (isNaN(avgDailyTotalNeeded) || avgDailyTotalNeeded === 0) {
+                avgText = isNaN(avgDailyTotalNeeded) ? 'Calculating...' : 'On target!';
             } else {
                 const zoneParts = [];
-                if (dailyZone1Needed > 0) zoneParts.push(`Z1: ${dailyZone1Needed}min`);
-                if (dailyZone2Needed > 0) zoneParts.push(`Z2: ${dailyZone2Needed}min`);
-                if (dailyZone3Needed > 0) zoneParts.push(`Z3: ${dailyZone3Needed}min`);
+                if (avgDailyZ1Needed > 0) zoneParts.push(`Z1: ${avgDailyZ1Needed}min`);
+                if (avgDailyZ2Needed > 0) zoneParts.push(`Z2: ${avgDailyZ2Needed}min`);
+                if (avgDailyZ3Needed > 0) zoneParts.push(`Z3: ${avgDailyZ3Needed}min`);
                 
                 if (zoneParts.length > 0) {
-                    avgText = zoneParts.join(', ') + ' per day';
+                    avgText = zoneParts.join(', ') + ` daily<br>(${avgDailyTotalNeeded} min/day total)`;
                 } else {
-                    avgText = minutesNeeded < 60 ? `${Math.round(minutesNeeded)} min total` : 
-                             `${dailyNeededNext7Days} min/day`;
+                    avgText = `${avgDailyTotalNeeded} min/day total`;
                 }
             }
-            document.getElementById('daily-needed').textContent = avgText;
+            document.getElementById('daily-needed').innerHTML = avgText;
             
             // Update deficit based on polarized minutes
             const deficit = targetMinutes - rollingPolarizedMinutes;
