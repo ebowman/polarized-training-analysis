@@ -263,6 +263,40 @@ Once configured, Claude Flow MCP tools enhance Claude Code's coordination:
 - `mcp__claude-flow__neural_train` - Improve coordination patterns
 - `mcp__claude-flow__neural_patterns` - Analyze thinking approaches
 
+## 🎯 Zone Mapping Guide Integration
+
+### Enhanced User Experience
+The Zone Mapping Guide (`/zone_mapping_guide`) now provides **fully personalized training zone information**:
+
+#### Dynamic Zone Tables
+- **Power Zones**: Real watt ranges from user's FTP (e.g., "168-225W" instead of "55-75% FTP")
+- **Heart Rate Zones**: Actual BPM ranges from Max HR/LTHR (e.g., "119-140 bpm" instead of "70-82% Max HR")
+- **Training Philosophy**: Shows user's chosen approach (Polarized: 80/10/10, Pyramidal: 70/20/10)
+
+#### Personalized Workout Examples
+- **Cycling**: "60-min Power Zone 2 Endurance Ride (168-225W)"
+- **Rowing**: "45-min HR Zone 2 Steady State (119-140 bpm)"
+- **Distribution**: Based on actual zone targets from sport config
+
+#### Technical Implementation
+```python
+# Data flow: sport_config.json → SportConfigService → get_zone_calculations()
+zone_data = {
+    'training_philosophy': 'polarized',
+    'zone_targets': {1: 80.0, 2: 10.0, 3: 10.0},
+    'ftp': 301,
+    'pz2_range': '168-225W',
+    'hr2_range': '119-140',
+    # ... personalized zone ranges
+}
+```
+
+#### Benefits
+- **Actionable**: Precise watt/BPM targets instead of percentages
+- **Equipment-Specific**: Matches Peloton/Concept2 zone conventions
+- **Auto-Updating**: Changes reflect sport config modifications
+- **Training-Aware**: Reflects chosen training philosophy and targets
+
 ### GitHub Integration Tools (NEW!):
 - `mcp__claude-flow__github_swarm` - Create specialized GitHub management swarms
 - `mcp__claude-flow__repo_analyze` - Deep repository analysis with AI
