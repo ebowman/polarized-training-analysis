@@ -19,6 +19,68 @@ from enum import Enum
 import numpy as np
 from dotenv import load_dotenv
 
+# Import constants
+from constants import (
+    # Zone distribution targets
+    POLARIZED_ZONE1_TARGET_PERCENT,
+    POLARIZED_ZONE2_TARGET_PERCENT,
+    POLARIZED_ZONE3_TARGET_PERCENT,
+    # HR zone multipliers
+    HR_ZONE1_MAX_MULTIPLIER,
+    HR_ZONE2_MAX_MULTIPLIER,
+    HR_ZONE3_MAX_MULTIPLIER,
+    HR_ZONE4_MAX_MULTIPLIER,
+    HR_ZONE5A_MAX_MULTIPLIER,
+    HR_ZONE5B_MAX_MULTIPLIER,
+    HR_ZONE5C_MIN_MULTIPLIER,
+    HR_ZONE1_MAX_HR_MULTIPLIER,
+    HR_ZONE2_MAX_HR_MULTIPLIER,
+    LTHR_FROM_MAX_HR_MULTIPLIER,
+    # Power zone multipliers
+    POWER_ZONE1_MAX_MULTIPLIER,
+    POWER_ZONE2_MAX_MULTIPLIER,
+    POWER_ZONE3_MAX_MULTIPLIER,
+    POWER_ZONE4_MAX_MULTIPLIER,
+    POWER_ZONE5_MAX_MULTIPLIER,
+    POWER_ZONE6_MAX_MULTIPLIER,
+    POWER_ZONE7_MIN_MULTIPLIER,
+    FTP_FROM_20MIN_TEST_MULTIPLIER,
+    # Volume and duration constants
+    MIN_WEEKLY_VOLUME_MINUTES,
+    MIN_ZONE3_MINUTES_PER_WEEK,
+    DEFAULT_EASY_WORKOUT_MINUTES,
+    DEFAULT_INTERVAL_WORKOUT_MINUTES,
+    DEFAULT_LONG_WORKOUT_MINUTES,
+    DEFAULT_RECOVERY_WORKOUT_MINUTES,
+    VOLUME_DEFICIT_WORKOUT_FACTOR,
+    WEEKLY_VOLUME_LONG_WORKOUT_FACTOR,
+    WEEKLY_VOLUME_EASY_WORKOUT_FACTOR,
+    # Analysis windows
+    ANALYSIS_WINDOW_DAYS,
+    ZONE3_RECENT_DAYS,
+    INTENSITY_SPACING_DAYS,
+    CONSECUTIVE_TRAINING_WARNING_DAYS,
+    RECENT_DATA_STALENESS_DAYS,
+    # Scoring and thresholds
+    ZONE1_DEVIATION_WEIGHT,
+    ZONE2_DEVIATION_WEIGHT,
+    ZONE3_DEVIATION_WEIGHT,
+    EXCELLENT_ADHERENCE_SCORE,
+    GOOD_ADHERENCE_SCORE,
+    ZONE1_LOW_WARNING_PERCENT,
+    ZONE2_HIGH_WARNING_PERCENT,
+    ZONE3_LOW_WARNING_PERCENT,
+    ZONE3_HIGH_WARNING_PERCENT,
+    ZONE3_SIGNIFICANT_PERCENT,
+    ZONE1_SIGNIFICANT_DEFICIT,
+    ZONE2_EXCESS_THRESHOLD,
+    ZONE3_DEFICIT_THRESHOLD,
+    # Defaults
+    DEFAULT_MAX_HEART_RATE,
+    DEFAULT_FTP_WATTS,
+    DEFAULT_LTHR
+)
+
 # Import sport configuration
 try:
     from sport_config_service import SportConfigService
@@ -47,13 +109,13 @@ class TrainingZones:
     def from_lthr(cls, lthr: int) -> 'TrainingZones':
         """Create zones from LTHR (average HR during FTP test)"""
         return cls(
-            zone1_max=int(lthr * 0.81),    # <81% LTHR
-            zone2_max=int(lthr * 0.89),    # 81-89% LTHR
-            zone3_max=int(lthr * 0.93),    # 90-93% LTHR
-            zone4_max=int(lthr * 0.99),    # 94-99% LTHR
-            zone5a_max=int(lthr * 1.02),   # 100-102% LTHR
-            zone5b_max=int(lthr * 1.06),   # 103-106% LTHR
-            zone5c_min=int(lthr * 1.06),   # >106% LTHR
+            zone1_max=int(lthr * HR_ZONE1_MAX_MULTIPLIER),    # <81% LTHR
+            zone2_max=int(lthr * HR_ZONE2_MAX_MULTIPLIER),    # 81-89% LTHR
+            zone3_max=int(lthr * HR_ZONE3_MAX_MULTIPLIER),    # 90-93% LTHR
+            zone4_max=int(lthr * HR_ZONE4_MAX_MULTIPLIER),    # 94-99% LTHR
+            zone5a_max=int(lthr * HR_ZONE5A_MAX_MULTIPLIER),   # 100-102% LTHR
+            zone5b_max=int(lthr * HR_ZONE5B_MAX_MULTIPLIER),   # 103-106% LTHR
+            zone5c_min=int(lthr * HR_ZONE5C_MIN_MULTIPLIER),   # >106% LTHR
             lthr=lthr
         )
     
@@ -61,15 +123,15 @@ class TrainingZones:
     def from_max_hr(cls, max_hr: int) -> 'TrainingZones':
         """Fallback: Create simplified 3-zone model from max HR if LTHR not available"""
         # Estimate LTHR as ~90% of max HR (rough approximation)
-        estimated_lthr = int(max_hr * 0.90)
+        estimated_lthr = int(max_hr * LTHR_FROM_MAX_HR_MULTIPLIER)
         return cls(
-            zone1_max=int(max_hr * 0.82),  # ~82% max HR
-            zone2_max=int(max_hr * 0.87),  # ~87% max HR
-            zone3_max=int(max_hr * 0.87),  # Same as zone2_max for 3-zone model
-            zone4_max=int(max_hr * 0.87),  # Same as zone2_max for 3-zone model
-            zone5a_max=int(max_hr * 0.87), # Same as zone2_max for 3-zone model
-            zone5b_max=int(max_hr * 0.87), # Same as zone2_max for 3-zone model
-            zone5c_min=int(max_hr * 0.87), # Above 87% for 3-zone model
+            zone1_max=int(max_hr * HR_ZONE1_MAX_HR_MULTIPLIER),  # ~82% max HR
+            zone2_max=int(max_hr * HR_ZONE2_MAX_HR_MULTIPLIER),  # ~87% max HR
+            zone3_max=int(max_hr * HR_ZONE2_MAX_HR_MULTIPLIER),  # Same as zone2_max for 3-zone model
+            zone4_max=int(max_hr * HR_ZONE2_MAX_HR_MULTIPLIER),  # Same as zone2_max for 3-zone model
+            zone5a_max=int(max_hr * HR_ZONE2_MAX_HR_MULTIPLIER), # Same as zone2_max for 3-zone model
+            zone5b_max=int(max_hr * HR_ZONE2_MAX_HR_MULTIPLIER), # Same as zone2_max for 3-zone model
+            zone5c_min=int(max_hr * HR_ZONE2_MAX_HR_MULTIPLIER), # Above 87% for 3-zone model
             lthr=estimated_lthr
         )
 
@@ -89,13 +151,13 @@ class PowerZones:
     def from_ftp(cls, ftp: int) -> 'PowerZones':
         """Create Coggan power zones from FTP"""
         return cls(
-            zone1_max=int(ftp * 0.55),   # Recovery
-            zone2_max=int(ftp * 0.75),   # Endurance
-            zone3_max=int(ftp * 0.90),   # Tempo
-            zone4_max=int(ftp * 1.05),   # Threshold
-            zone5_max=int(ftp * 1.20),   # VO2max
-            zone6_max=int(ftp * 1.50),   # Anaerobic
-            zone7_min=int(ftp * 1.50),   # Neuromuscular
+            zone1_max=int(ftp * POWER_ZONE1_MAX_MULTIPLIER),   # Recovery
+            zone2_max=int(ftp * POWER_ZONE2_MAX_MULTIPLIER),   # Endurance
+            zone3_max=int(ftp * POWER_ZONE3_MAX_MULTIPLIER),   # Tempo
+            zone4_max=int(ftp * POWER_ZONE4_MAX_MULTIPLIER),   # Threshold
+            zone5_max=int(ftp * POWER_ZONE5_MAX_MULTIPLIER),   # VO2max
+            zone6_max=int(ftp * POWER_ZONE6_MAX_MULTIPLIER),   # Anaerobic
+            zone7_min=int(ftp * POWER_ZONE7_MIN_MULTIPLIER),   # Neuromuscular
             ftp=ftp
         )
 
@@ -165,15 +227,15 @@ class TrainingAnalyzer:
     def __init__(self, max_hr: Optional[int] = None, ftp: Optional[int] = None,
                  lthr: Optional[int] = None, ftp_power: Optional[int] = None):
         # Load from environment with new FTP test data
-        self.max_hr = max_hr or int(os.getenv("MAX_HEART_RATE", "180"))
-        self.lthr = lthr or int(os.getenv("AVERAGE_FTP_HR", "0"))
-        self.ftp_power = ftp_power or int(os.getenv("AVERAGE_FTP_POWER", "0"))
+        self.max_hr = max_hr or int(os.getenv("MAX_HEART_RATE", str(DEFAULT_MAX_HEART_RATE)))
+        self.lthr = lthr or int(os.getenv("AVERAGE_FTP_HR", str(DEFAULT_LTHR)))
+        self.ftp_power = ftp_power or int(os.getenv("AVERAGE_FTP_POWER", str(DEFAULT_LTHR)))
         
         # Calculate FTP from 20-minute test power (95% of average)
         if self.ftp_power > 0:
-            self.ftp = int(self.ftp_power * 0.95)
+            self.ftp = int(self.ftp_power * FTP_FROM_20MIN_TEST_MULTIPLIER)
         else:
-            self.ftp = ftp or int(os.getenv("FTP", "250"))
+            self.ftp = ftp or int(os.getenv("FTP", str(DEFAULT_FTP_WATTS)))
         
         # Initialize sport config service if available
         self.sport_config_service = None
@@ -201,17 +263,41 @@ class TrainingAnalyzer:
         # Get target distribution from sport config or use default
         if self.sport_config_service:
             targets = self.sport_config_service.get_zone_distribution_target()
-            self.target_zone1_percent = targets.get(1, 80.0)
-            self.target_zone2_percent = targets.get(2, 10.0)
-            self.target_zone3_percent = targets.get(3, 10.0)
+            self.target_zone1_percent = targets.get(1, POLARIZED_ZONE1_TARGET_PERCENT)
+            self.target_zone2_percent = targets.get(2, POLARIZED_ZONE2_TARGET_PERCENT)
+            self.target_zone3_percent = targets.get(3, POLARIZED_ZONE3_TARGET_PERCENT)
         else:
             # Target distribution based on polarized training (80/10/10 approach)
-            self.target_zone1_percent = 80.0
-            self.target_zone2_percent = 10.0
-            self.target_zone3_percent = 10.0
+            self.target_zone1_percent = POLARIZED_ZONE1_TARGET_PERCENT
+            self.target_zone2_percent = POLARIZED_ZONE2_TARGET_PERCENT
+            self.target_zone3_percent = POLARIZED_ZONE3_TARGET_PERCENT
     
     def _get_hr_zone(self, hr: int, sport_type: Optional[str] = None) -> int:
-        """Get zone number (1-7) for a given heart rate"""
+        """Get zone number (1-7) for a given heart rate.
+        
+        Determines which training zone a heart rate value falls into, using either
+        sport-specific zone calculations from the config service or falling back
+        to LTHR-based zones.
+        
+        Args:
+            hr: Heart rate value in beats per minute
+            sport_type: Optional sport type string (e.g., "Run", "Ride") for
+                sport-specific zone calculations
+                
+        Returns:
+            Zone number from 1-7, where:
+            - 1: Recovery (Z1)
+            - 2: Aerobic (Z2)
+            - 3: Tempo (Z3)
+            - 4: Threshold (Z4)
+            - 5: VO2max (Z5a)
+            - 6: Anaerobic (Z5b)
+            - 7: Neuromuscular (Z5c)
+            
+        Example:
+            >>> analyzer._get_hr_zone(150, "Run")
+            3  # If 150 bpm falls in Zone 3 for running
+        """
         if self.sport_config_service and sport_type:
             sport = self.sport_config_service.get_sport_by_activity_type(sport_type)
             if sport:
@@ -271,7 +357,25 @@ class TrainingAnalyzer:
             return 7
     
     def _map_to_3zone(self, zone_7: int, sport_type: Optional[str] = None) -> int:
-        """Map 7-zone model to simplified 3-zone model for polarized training"""
+        """Map 7-zone model to simplified 3-zone model for polarized training.
+        
+        Converts detailed 7-zone training zones into the 3-zone polarized training
+        model used for analysis. The 3-zone model groups zones into:
+        - Zone 1 (Low): Recovery and aerobic base work
+        - Zone 2 (Threshold): Tempo and threshold work
+        - Zone 3 (High): VO2max and anaerobic work
+        
+        Args:
+            zone_7: Zone number in 7-zone model (1-7)
+            sport_type: Optional sport type for sport-specific mapping
+            
+        Returns:
+            Zone number in 3-zone polarized model (1-3)
+            
+        Example:
+            >>> analyzer._map_to_3zone(5, "Run")
+            3  # Zone 5 (VO2max) maps to Zone 3 (High) in polarized model
+        """
         if self.sport_config_service and sport_type:
             sport = self.sport_config_service.get_sport_by_activity_type(sport_type)
             if sport:
@@ -288,43 +392,91 @@ class TrainingAnalyzer:
             return 3
     
     def analyze_activity_hr(self, activity: Dict) -> Optional[ActivityAnalysis]:
-        """Analyze single activity based on heart rate data"""
-        # For test compatibility: handle simple average_heartrate case
-        if 'average_heartrate' in activity and activity.get('has_heartrate') and not activity.get('streams'):
-            avg_hr = activity['average_heartrate']
-            duration_seconds = activity.get('elapsed_time', 0)
+        """Analyze single activity based on heart rate data.
+        
+        Processes heart rate time series data to calculate time spent in each
+        training zone. Falls back to estimating zones from average heart rate
+        if detailed stream data is not available.
+        
+        Args:
+            activity: Activity dictionary from Strava API containing:
+                - id: Activity ID
+                - name: Activity name
+                - start_date: ISO format timestamp
+                - type/sport_type: Sport type string
+                - streams: Optional dict with heartrate time series data
+                - average_heartrate: Optional average HR if no streams
+                - elapsed_time: Duration in seconds
+                
+        Returns:
+            ActivityAnalysis object with zone distribution data, or None if
+            insufficient data for analysis.
             
-            if avg_hr and duration_seconds > 0:
-                # Estimate zones based on average HR
-                zone1_time = 0
-                zone2_time = 0
-                zone3_time = 0
-                
-                if avg_hr <= self.hr_zones.zone1_max:
-                    zone1_time = duration_seconds
-                elif avg_hr <= self.hr_zones.zone2_max:
-                    zone2_time = duration_seconds
-                else:
-                    zone3_time = duration_seconds
-                
-                return ActivityAnalysis(
-                    activity_id=activity.get('id', 0),
-                    name=activity.get('name', 'Unknown'),
-                    date=activity.get('start_date', ''),
-                    sport_type=activity.get('type', 'Unknown'),
-                    duration_minutes=duration_seconds / 60,
-                    zone1_minutes=zone1_time / 60,
-                    zone2_minutes=zone2_time / 60,
-                    zone3_minutes=zone3_time / 60,
-                    zone1_percent=(zone1_time / duration_seconds * 100) if duration_seconds > 0 else 0,
-                    zone2_percent=(zone2_time / duration_seconds * 100) if duration_seconds > 0 else 0,
-                    zone3_percent=(zone3_time / duration_seconds * 100) if duration_seconds > 0 else 0,
-                    average_hr=avg_hr,
-                    average_power=None,
-                    detailed_zones={}
-                )
+        Example:
+            >>> activity = {
+            ...     'id': 12345,
+            ...     'name': 'Morning Run',
+            ...     'start_date': '2024-01-15T10:00:00Z',
+            ...     'type': 'Run',
+            ...     'streams': {'heartrate': {'data': [120, 125, 130...]}}
+            ... }
+            >>> analysis = analyzer.analyze_activity_hr(activity)
+            >>> print(f"Zone 1: {analysis.zone1_percent:.1f}%")
+            Zone 1: 75.2%
+        """
+        # For test compatibility: handle simple average_heartrate case
+        if self._is_simple_average_hr_case(activity):
+            return self._analyze_by_average_hr(activity)
         
         # Original implementation with streams
+        return self._analyze_by_hr_streams(activity)
+    
+    def _is_simple_average_hr_case(self, activity: Dict) -> bool:
+        """Check if this is a simple average HR case (for tests)"""
+        return ('average_heartrate' in activity and 
+                activity.get('has_heartrate') and 
+                not activity.get('streams'))
+    
+    def _analyze_by_average_hr(self, activity: Dict) -> Optional[ActivityAnalysis]:
+        """Analyze activity using only average heart rate"""
+        avg_hr = activity['average_heartrate']
+        duration_seconds = activity.get('elapsed_time', 0)
+        
+        if not avg_hr or duration_seconds <= 0:
+            return None
+        
+        # Estimate zones based on average HR
+        zone_times = self._estimate_zones_from_avg_hr(avg_hr, duration_seconds)
+        
+        return self._create_activity_analysis(
+            activity=activity,
+            duration_seconds=duration_seconds,
+            zone_times=zone_times,
+            average_hr=avg_hr,
+            detailed_zones={}
+        )
+    
+    def _estimate_zones_from_avg_hr(self, avg_hr: int, duration_seconds: int) -> dict:
+        """Estimate zone times based on average HR"""
+        zone1_time = 0
+        zone2_time = 0
+        zone3_time = 0
+        
+        if avg_hr <= self.hr_zones.zone1_max:
+            zone1_time = duration_seconds
+        elif avg_hr <= self.hr_zones.zone2_max:
+            zone2_time = duration_seconds
+        else:
+            zone3_time = duration_seconds
+        
+        return {
+            'zone1': zone1_time,
+            'zone2': zone2_time,
+            'zone3': zone3_time
+        }
+    
+    def _analyze_by_hr_streams(self, activity: Dict) -> Optional[ActivityAnalysis]:
+        """Analyze activity using detailed HR stream data"""
         streams = activity.get('streams')
         if not streams or 'heartrate' not in streams:
             return None
@@ -336,36 +488,10 @@ class TrainingAnalyzer:
             return None
         
         # Calculate time in each of the 7 zones
-        zone_seconds = {i: 0 for i in range(1, 8)}
+        zone_seconds = self._calculate_zone_seconds(hr_data, time_data, activity)
         
-        for i, hr in enumerate(hr_data):
-            if i < len(time_data) - 1:
-                time_delta = time_data[i + 1] - time_data[i]
-            else:
-                time_delta = 1  # Default 1 second for last point
-            
-            sport_type = activity.get('sport_type', activity.get('type', 'Unknown'))
-            zone = self._get_hr_zone(hr, sport_type)
-            zone_seconds[zone] += time_delta
-        
-        # Map to 3-zone model for polarized training analysis
-        if self.sport_config_service and sport_type:
-            sport = self.sport_config_service.get_sport_by_activity_type(sport_type)
-            if sport:
-                # Dynamic mapping based on polarized zones
-                zone1_seconds = sum(zone_seconds[i] for i in range(1, 8) if i <= len(sport.zones) and sport.zones[i-1].polarized_zone == 1)
-                zone2_seconds = sum(zone_seconds[i] for i in range(1, 8) if i <= len(sport.zones) and sport.zones[i-1].polarized_zone == 2)
-                zone3_seconds = sum(zone_seconds[i] for i in range(1, 8) if i <= len(sport.zones) and sport.zones[i-1].polarized_zone == 3)
-            else:
-                # Legacy mapping
-                zone1_seconds = zone_seconds[1] + zone_seconds[2]  # Z1+Z2
-                zone2_seconds = zone_seconds[3] + zone_seconds[4]  # Z3+Z4
-                zone3_seconds = zone_seconds[5] + zone_seconds[6] + zone_seconds[7]  # Z5+Z6+Z7
-        else:
-            # Legacy mapping
-            zone1_seconds = zone_seconds[1] + zone_seconds[2]  # Z1+Z2
-            zone2_seconds = zone_seconds[3] + zone_seconds[4]  # Z3+Z4
-            zone3_seconds = zone_seconds[5] + zone_seconds[6] + zone_seconds[7]  # Z5+Z6+Z7
+        # Map to 3-zone model for polarized training
+        polarized_zone_seconds = self._map_to_polarized_zones(zone_seconds, activity)
         
         total_seconds = sum(zone_seconds.values())
         if total_seconds == 0:
@@ -374,9 +500,84 @@ class TrainingAnalyzer:
         # Calculate detailed zone percentages
         detailed_zones = {f"zone{i}": (zone_seconds[i] / total_seconds * 100) for i in range(1, 8)}
         
-        zone1_minutes = zone1_seconds / 60
-        zone2_minutes = zone2_seconds / 60
-        zone3_minutes = zone3_seconds / 60
+        return self._create_activity_analysis_from_streams(
+            activity=activity,
+            polarized_zone_seconds=polarized_zone_seconds,
+            total_seconds=total_seconds,
+            detailed_zones=detailed_zones,
+            hr_data=hr_data
+        )
+    
+    def _calculate_zone_seconds(self, hr_data: list, time_data: list, activity: Dict) -> dict:
+        """Calculate seconds spent in each of the 7 zones"""
+        zone_seconds = {i: 0 for i in range(1, 8)}
+        sport_type = activity.get('sport_type', activity.get('type', 'Unknown'))
+        
+        for i, hr in enumerate(hr_data):
+            if i < len(time_data) - 1:
+                time_delta = time_data[i + 1] - time_data[i]
+            else:
+                time_delta = 1  # Default 1 second for last point
+            
+            zone = self._get_hr_zone(hr, sport_type)
+            zone_seconds[zone] += time_delta
+        
+        return zone_seconds
+    
+    def _map_to_polarized_zones(self, zone_seconds: dict, activity: Dict) -> dict:
+        """Map 7-zone seconds to 3-zone polarized model"""
+        sport_type = activity.get('sport_type', activity.get('type', 'Unknown'))
+        
+        if self.sport_config_service and sport_type:
+            sport = self.sport_config_service.get_sport_by_activity_type(sport_type)
+            if sport:
+                # Dynamic mapping based on polarized zones
+                return {
+                    'zone1': sum(zone_seconds[i] for i in range(1, 8) 
+                               if i <= len(sport.zones) and sport.zones[i-1].polarized_zone == 1),
+                    'zone2': sum(zone_seconds[i] for i in range(1, 8) 
+                               if i <= len(sport.zones) and sport.zones[i-1].polarized_zone == 2),
+                    'zone3': sum(zone_seconds[i] for i in range(1, 8) 
+                               if i <= len(sport.zones) and sport.zones[i-1].polarized_zone == 3)
+                }
+        
+        # Legacy mapping
+        return {
+            'zone1': zone_seconds[1] + zone_seconds[2],  # Z1+Z2
+            'zone2': zone_seconds[3] + zone_seconds[4],  # Z3+Z4
+            'zone3': zone_seconds[5] + zone_seconds[6] + zone_seconds[7]  # Z5+Z6+Z7
+        }
+    
+    def _create_activity_analysis(self, activity: Dict, duration_seconds: int, 
+                                zone_times: dict, average_hr: int, 
+                                detailed_zones: dict) -> ActivityAnalysis:
+        """Create ActivityAnalysis from simple HR data"""
+        return ActivityAnalysis(
+            activity_id=activity.get('id', 0),
+            name=activity.get('name', 'Unknown'),
+            date=activity.get('start_date', ''),
+            sport_type=activity.get('type', 'Unknown'),
+            duration_minutes=duration_seconds / 60,
+            zone1_minutes=zone_times['zone1'] / 60,
+            zone2_minutes=zone_times['zone2'] / 60,
+            zone3_minutes=zone_times['zone3'] / 60,
+            zone1_percent=(zone_times['zone1'] / duration_seconds * 100) if duration_seconds > 0 else 0,
+            zone2_percent=(zone_times['zone2'] / duration_seconds * 100) if duration_seconds > 0 else 0,
+            zone3_percent=(zone_times['zone3'] / duration_seconds * 100) if duration_seconds > 0 else 0,
+            average_hr=average_hr,
+            average_power=None,
+            detailed_zones=detailed_zones
+        )
+    
+    def _create_activity_analysis_from_streams(self, activity: Dict, 
+                                             polarized_zone_seconds: dict,
+                                             total_seconds: int, 
+                                             detailed_zones: dict,
+                                             hr_data: list) -> ActivityAnalysis:
+        """Create ActivityAnalysis from HR stream data"""
+        zone1_minutes = polarized_zone_seconds['zone1'] / 60
+        zone2_minutes = polarized_zone_seconds['zone2'] / 60
+        zone3_minutes = polarized_zone_seconds['zone3'] / 60
         total_minutes = total_seconds / 60
         
         return ActivityAnalysis(
@@ -388,9 +589,9 @@ class TrainingAnalyzer:
             zone1_minutes=int(zone1_minutes),
             zone2_minutes=int(zone2_minutes),
             zone3_minutes=int(zone3_minutes),
-            zone1_percent=zone1_seconds / total_seconds * 100,
-            zone2_percent=zone2_seconds / total_seconds * 100,
-            zone3_percent=zone3_seconds / total_seconds * 100,
+            zone1_percent=polarized_zone_seconds['zone1'] / total_seconds * 100,
+            zone2_percent=polarized_zone_seconds['zone2'] / total_seconds * 100,
+            zone3_percent=polarized_zone_seconds['zone3'] / total_seconds * 100,
             average_hr=int(np.mean(hr_data)) if hr_data else None,
             detailed_zones=detailed_zones
         )
@@ -570,7 +771,7 @@ class TrainingAnalyzer:
         zone3_deviation = abs(zone3_percent - self.target_zone3_percent)
         
         # Weighted scoring (Zone 1 is most important)
-        total_deviation = (zone1_deviation * 0.5) + (zone2_deviation * 0.25) + (zone3_deviation * 0.25)
+        total_deviation = (zone1_deviation * ZONE1_DEVIATION_WEIGHT) + (zone2_deviation * ZONE2_DEVIATION_WEIGHT) + (zone3_deviation * ZONE3_DEVIATION_WEIGHT)
         adherence_score = max(0, 100 - total_deviation)
         
         # Calculate zone-specific deficits and excesses in minutes
@@ -588,18 +789,18 @@ class TrainingAnalyzer:
         
         # Generate recommendations
         recommendations = []
-        if zone1_percent < 75:
+        if zone1_percent < ZONE1_LOW_WARNING_PERCENT:
             recommendations.append("Increase low-intensity training volume (Zone 1)")
-        if zone2_percent > 20:
+        if zone2_percent > ZONE2_HIGH_WARNING_PERCENT:
             recommendations.append("Reduce moderate-intensity training (Zone 2)")
-        if zone3_percent < 5:
+        if zone3_percent < ZONE3_LOW_WARNING_PERCENT:
             recommendations.append("Add more high-intensity intervals (Zone 3)")
-        if zone3_percent > 15:
+        if zone3_percent > ZONE3_HIGH_WARNING_PERCENT:
             recommendations.append("Reduce high-intensity training volume (Zone 3)")
         
-        if adherence_score >= 80:
+        if adherence_score >= EXCELLENT_ADHERENCE_SCORE:
             recommendations.append("Excellent adherence to polarized training approach!")
-        elif adherence_score >= 60:
+        elif adherence_score >= GOOD_ADHERENCE_SCORE:
             recommendations.append("Good training distribution with room for improvement")
         else:
             recommendations.append("Consider restructuring training to follow polarized approach")
@@ -626,29 +827,66 @@ class TrainingAnalyzer:
     def generate_report(self, distribution: TrainingDistribution, analyses: List[ActivityAnalysis]) -> str:
         """Generate a detailed training analysis report"""
         report = []
+        
+        # Header
+        self._add_report_header(report)
+        
+        # Configuration section
+        self._add_configuration_section(report)
+        
+        # Training distribution section
+        self._add_distribution_section(report, distribution)
+        
+        # Adherence score section
+        self._add_adherence_section(report, distribution)
+        
+        # Recommendations section
+        self._add_recommendations_section(report, distribution)
+        
+        # Recent activities section
+        self._add_recent_activities_section(report, analyses)
+        
+        return "\n".join(report)
+    
+    def _add_report_header(self, report: list):
+        """Add report header"""
         report.append("=" * 60)
         report.append("POLARIZED TRAINING ANALYSIS REPORT")
         report.append("=" * 60)
-        
-        # Configuration
+    
+    def _add_configuration_section(self, report: list):
+        """Add configuration section to report"""
         report.append(f"\nConfiguration:")
-        if self.lthr > 0:
-            report.append(f"  LTHR (from FTP test): {self.lthr} bpm")
-            report.append(f"  HR Zones (7-zone LTHR model):")
-            report.append(f"    Z1 Recovery: ≤{self.hr_zones.zone1_max} bpm")
-            report.append(f"    Z2 Aerobic: {self.hr_zones.zone1_max+1}-{self.hr_zones.zone2_max} bpm")
-            report.append(f"    Z3 Tempo: {self.hr_zones.zone2_max+1}-{self.hr_zones.zone3_max} bpm")
-            report.append(f"    Z4 Threshold: {self.hr_zones.zone3_max+1}-{self.hr_zones.zone4_max} bpm")
-            report.append(f"    Z5a VO2max: {self.hr_zones.zone4_max+1}-{self.hr_zones.zone5a_max} bpm")
-            report.append(f"    Z5b Anaerobic: {self.hr_zones.zone5a_max+1}-{self.hr_zones.zone5b_max} bpm")
-            report.append(f"    Z5c Neuromuscular: ≥{self.hr_zones.zone5c_min} bpm")
-        else:
-            report.append(f"  Max Heart Rate: {self.max_hr} bpm")
-            report.append(f"  HR Zones (3-zone model):")
-            report.append(f"    Zone 1 (Low): ≤{self.hr_zones.zone1_max} bpm")
-            report.append(f"    Zone 2 (Threshold): {self.hr_zones.zone1_max+1}-{self.hr_zones.zone2_max} bpm")
-            report.append(f"    Zone 3 (High): ≥{self.hr_zones.zone5c_min} bpm")
         
+        if self.lthr > 0:
+            self._add_lthr_configuration(report)
+        else:
+            self._add_max_hr_configuration(report)
+        
+        self._add_power_zones_configuration(report)
+    
+    def _add_lthr_configuration(self, report: list):
+        """Add LTHR-based configuration"""
+        report.append(f"  LTHR (from FTP test): {self.lthr} bpm")
+        report.append(f"  HR Zones (7-zone LTHR model):")
+        report.append(f"    Z1 Recovery: ≤{self.hr_zones.zone1_max} bpm")
+        report.append(f"    Z2 Aerobic: {self.hr_zones.zone1_max+1}-{self.hr_zones.zone2_max} bpm")
+        report.append(f"    Z3 Tempo: {self.hr_zones.zone2_max+1}-{self.hr_zones.zone3_max} bpm")
+        report.append(f"    Z4 Threshold: {self.hr_zones.zone3_max+1}-{self.hr_zones.zone4_max} bpm")
+        report.append(f"    Z5a VO2max: {self.hr_zones.zone4_max+1}-{self.hr_zones.zone5a_max} bpm")
+        report.append(f"    Z5b Anaerobic: {self.hr_zones.zone5a_max+1}-{self.hr_zones.zone5b_max} bpm")
+        report.append(f"    Z5c Neuromuscular: ≥{self.hr_zones.zone5c_min} bpm")
+    
+    def _add_max_hr_configuration(self, report: list):
+        """Add max HR-based configuration"""
+        report.append(f"  Max Heart Rate: {self.max_hr} bpm")
+        report.append(f"  HR Zones (3-zone model):")
+        report.append(f"    Zone 1 (Low): ≤{self.hr_zones.zone1_max} bpm")
+        report.append(f"    Zone 2 (Threshold): {self.hr_zones.zone1_max+1}-{self.hr_zones.zone2_max} bpm")
+        report.append(f"    Zone 3 (High): ≥{self.hr_zones.zone5c_min} bpm")
+    
+    def _add_power_zones_configuration(self, report: list):
+        """Add power zones configuration"""
         report.append(f"\n  FTP: {self.ftp} watts")
         report.append(f"  Power Zones (7-zone Coggan model):")
         report.append(f"    Z1 Recovery: ≤{self.power_zones.zone1_max}W")
@@ -658,33 +896,39 @@ class TrainingAnalyzer:
         report.append(f"    Z5 VO2max: {self.power_zones.zone4_max+1}-{self.power_zones.zone5_max}W")
         report.append(f"    Z6 Anaerobic: {self.power_zones.zone5_max+1}-{self.power_zones.zone6_max}W")
         report.append(f"    Z7 Neuromuscular: ≥{self.power_zones.zone7_min}W")
-        
-        # Overall Distribution
+    
+    def _add_distribution_section(self, report: list, distribution: TrainingDistribution):
+        """Add training distribution section"""
         report.append(f"\nTraining Distribution ({distribution.total_activities} activities, {distribution.total_minutes} minutes):")
         report.append(f"  Zone 1: {distribution.zone1_minutes} min ({distribution.zone1_percent:.1f}%) [Target: {self.target_zone1_percent}%]")
         report.append(f"  Zone 2: {distribution.zone2_minutes} min ({distribution.zone2_percent:.1f}%) [Target: {self.target_zone2_percent}%]")
         report.append(f"  Zone 3: {distribution.zone3_minutes} min ({distribution.zone3_percent:.1f}%) [Target: {self.target_zone3_percent}%]")
-        
-        # Adherence Score
+    
+    def _add_adherence_section(self, report: list, distribution: TrainingDistribution):
+        """Add adherence score section"""
         report.append(f"\nAdherence Score: {distribution.adherence_score:.1f}/100")
-        
-        # Recommendations
+    
+    def _add_recommendations_section(self, report: list, distribution: TrainingDistribution):
+        """Add recommendations section"""
         report.append(f"\nRecommendations:")
         for rec in distribution.recommendations:
             report.append(f"  • {rec}")
-        
-        # Recent Activities
+    
+    def _add_recent_activities_section(self, report: list, analyses: List[ActivityAnalysis]):
+        """Add recent activities section"""
         report.append(f"\nRecent Activities:")
         for analysis in analyses[-10:]:  # Show last 10 activities
-            report.append(f"  {analysis.name} ({analysis.date[:10]}) - {analysis.sport_type}")
-            report.append(f"    Duration: {analysis.duration_minutes} min")
-            report.append(f"    Zones: Z1={analysis.zone1_percent:.0f}% Z2={analysis.zone2_percent:.0f}% Z3={analysis.zone3_percent:.0f}%")
-            if analysis.average_hr:
-                report.append(f"    Avg HR: {analysis.average_hr} bpm")
-            if analysis.average_power:
-                report.append(f"    Avg Power: {analysis.average_power}W")
-        
-        return "\n".join(report)
+            self._add_activity_details(report, analysis)
+    
+    def _add_activity_details(self, report: list, analysis: ActivityAnalysis):
+        """Add details for a single activity"""
+        report.append(f"  {analysis.name} ({analysis.date[:10]}) - {analysis.sport_type}")
+        report.append(f"    Duration: {analysis.duration_minutes} min")
+        report.append(f"    Zones: Z1={analysis.zone1_percent:.0f}% Z2={analysis.zone2_percent:.0f}% Z3={analysis.zone3_percent:.0f}%")
+        if analysis.average_hr:
+            report.append(f"    Avg HR: {analysis.average_hr} bpm")
+        if analysis.average_power:
+            report.append(f"    Avg Power: {analysis.average_power}W")
     
     def _filter_activities_for_recommendations(self, analyses: List[ActivityAnalysis], 
                                              days: int = 14) -> List[ActivityAnalysis]:
@@ -745,7 +989,7 @@ class TrainingAnalyzer:
         recommendations = []
         
         # Filter to last 14 days for recommendations (research-based window)
-        recent_analyses = self._filter_activities_for_recommendations(all_analyses, days=14)
+        recent_analyses = self._filter_activities_for_recommendations(all_analyses, days=ANALYSIS_WINDOW_DAYS)
         
         if not recent_analyses:
             # If no recent activities, provide general guidance
@@ -775,8 +1019,8 @@ class TrainingAnalyzer:
         zone1_minutes = recent_distribution.zone1_minutes
         
         # Minimum thresholds based on research (per week)
-        min_zone3_per_week = 30  # Minimum 30 minutes/week of Zone 3 for fitness maintenance
-        min_total_volume_per_week = 180  # Minimum 3 hours/week for meaningful training
+        min_zone3_per_week = MIN_ZONE3_MINUTES_PER_WEEK  # Minimum 30 minutes/week of Zone 3 for fitness maintenance
+        min_total_volume_per_week = MIN_WEEKLY_VOLUME_MINUTES  # Minimum 3 hours/week for meaningful training
         
         # Analyze recent workout pattern
         last_workout_zones = self._analyze_recent_pattern(recent_analyses)
@@ -793,15 +1037,15 @@ class TrainingAnalyzer:
             recommendations.append(self._recommend_intensity_workout_volume(zone3_minutes / 2, days_since_last_intensity))
         
         # Check Zone 1 percentage deviation - need more aerobic base
-        elif zone1_deviation < -10 or (zone1_minutes < total_training_minutes * 0.7):
+        elif zone1_deviation < -ZONE1_SIGNIFICANT_DEFICIT or (zone1_minutes < total_training_minutes * 0.7):
             recommendations.append(self._recommend_aerobic_workout(zone1_deviation, target_weekly_hours, zone1_minutes))
         
         # Check Zone 2 excess - too much threshold work
-        elif zone2_deviation > 5:
+        elif zone2_deviation > ZONE2_EXCESS_THRESHOLD:
             recommendations.append(self._recommend_polarize_workout())
         
         # Check Zone 3 percentage deviation - need intensity but have minimum volume
-        elif zone3_deviation < -3 and days_since_last_intensity > 3:
+        elif zone3_deviation < -ZONE3_DEFICIT_THRESHOLD and days_since_last_intensity > ZONE3_DEFICIT_THRESHOLD:
             recommendations.append(self._recommend_intensity_workout(days_since_last_intensity))
         
         # Balanced approach - maintain good distribution
@@ -839,7 +1083,7 @@ class TrainingAnalyzer:
             return 7
         
         for i, analysis in enumerate(reversed(recent_analyses)):
-            if analysis.zone3_percent > 15:  # Significant Zone 3 time
+            if analysis.zone3_percent > ZONE3_SIGNIFICANT_PERCENT:  # Significant Zone 3 time
                 return i
         
         return 7  # Default if no recent intensity found
@@ -851,9 +1095,9 @@ class TrainingAnalyzer:
         return WorkoutRecommendation(
             workout_type=WorkoutType.EASY_AEROBIC,
             primary_zone=1,
-            duration_minutes=int(volume_deficit * 0.6),  # 60% of deficit in one workout
+            duration_minutes=int(volume_deficit * VOLUME_DEFICIT_WORKOUT_FACTOR),  # 60% of deficit in one workout
             description="Volume building aerobic workout",
-            structure=f"{int(volume_deficit * 0.6)} minutes easy pace in Zone 1 to build training volume",
+            structure=f"{int(volume_deficit * VOLUME_DEFICIT_WORKOUT_FACTOR)} minutes easy pace in Zone 1 to build training volume",
             reasoning=f"Your weekly training volume ({current_weekly_volume:.0f}min) is below minimum recommended ({min_weekly_volume}min)",
             priority="high"
         )
@@ -863,10 +1107,10 @@ class TrainingAnalyzer:
         return WorkoutRecommendation(
             workout_type=WorkoutType.INTERVALS,
             primary_zone=3,
-            duration_minutes=75,
+            duration_minutes=DEFAULT_INTERVAL_WORKOUT_MINUTES,
             description="High-intensity interval session",
             structure="15min warmup + 4x5min @ Zone 3 (3min recovery) + 15min cooldown",
-            reasoning=f"You're only getting {current_zone3_per_week:.0f}min/week of Zone 3 (need ≥30min) and it's been {days_since_intensity} days",
+            reasoning=f"You're only getting {current_zone3_per_week:.0f}min/week of Zone 3 (need ≥{MIN_ZONE3_MINUTES_PER_WEEK}min) and it's been {days_since_intensity} days",
             priority="high"
         )
     
@@ -875,7 +1119,7 @@ class TrainingAnalyzer:
         severity = abs(zone1_deviation)
         
         if severity > 20:
-            duration = int(target_weekly_hours * 60 * 0.4)  # 40% of weekly volume
+            duration = int(target_weekly_hours * 60 * WEEKLY_VOLUME_LONG_WORKOUT_FACTOR)  # 40% of weekly volume
             workout_type = WorkoutType.LONG_AEROBIC
             description = "Long aerobic base ride/run"
             if self.lthr > 0:
@@ -884,7 +1128,7 @@ class TrainingAnalyzer:
                 structure = f"{duration} minutes steady in Zone 1 (≤{self.hr_zones.zone1_max} bpm)"
             priority = "high"
         else:
-            duration = int(target_weekly_hours * 60 * 0.25)  # 25% of weekly volume
+            duration = int(target_weekly_hours * 60 * WEEKLY_VOLUME_EASY_WORKOUT_FACTOR)  # 25% of weekly volume
             workout_type = WorkoutType.EASY_AEROBIC
             description = "Easy aerobic workout"
             structure = f"{duration} minutes easy pace in Zone 1"

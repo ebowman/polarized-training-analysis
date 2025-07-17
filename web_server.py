@@ -24,6 +24,12 @@ from strava_client import StravaClient
 from download_manager import DownloadManager, DownloadStatus
 from cache_manager import CacheManager
 
+# Import constants
+from constants import CACHE_DURATION_SECONDS, AI_SESSION_EXPIRY_SECONDS, DEFAULT_WEB_PORT, DEFAULT_HOST
+from logging_config import get_logger, setup_logging, StravaAPIError, ConfigurationError, CacheError
+
+logger = get_logger(__name__)
+
 # Import sport configuration
 try:
     from sport_config_service import SportConfigService
@@ -36,6 +42,7 @@ except ImportError:
     SportConfigService = None
     MetricType = None
     ConfigGenerator = None
+    logger.info("Sport config service not available, using default configuration")
 
 app = Flask(__name__, template_folder='templates')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -43,7 +50,6 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-product
 # Global variables for caching
 cached_data = None
 cache_timestamp = None
-CACHE_DURATION = 300  # 5 minutes in seconds
 
 # Global variables for AI session management
 ai_sessions = {}  # session_id -> {"status": "pending|ready|error", "data": ..., "timestamp": ...}
@@ -77,7 +83,7 @@ def cleanup_old_sessions():
         current_time = time.time()
         expired_sessions = []
         for session_id, session_data in ai_sessions.items():
-            if current_time - session_data.get('timestamp', 0) > 3600:  # 1 hour
+            if current_time - session_data.get('timestamp', 0) > AI_SESSION_EXPIRY_SECONDS:  # 1 hour
                 expired_sessions.append(session_id)
         
         for session_id in expired_sessions:
@@ -87,11 +93,7 @@ def start_ai_generation(session_id: str, training_data: dict):
     """Start AI recommendation generation in background thread"""
     def generate():
         try:
-            with ai_sessions_lock:
-                ai_sessions[session_id] = {
-                    "status": "pending",
-                    "timestamp": time.time()
-                }
+            _set_session_status(session_id, "pending")
             
             # Generate AI recommendations
             ai_recommendations = ai_engine.generate_ai_recommendations(training_data)
@@ -100,64 +102,14 @@ def start_ai_generation(session_id: str, training_data: dict):
             ai_engine.save_recommendation_history(ai_recommendations)
             
             # Convert to dict format for JSON response
-            recommendations_dict = [
-                {
-                    'pathway_name': rec.pathway_name,
-                    'today': {
-                        'workout_type': rec.today.workout_type,
-                        'duration_minutes': rec.today.duration_minutes,
-                        'description': rec.today.description,
-                        'structure': rec.today.structure,
-                        'reasoning': rec.today.reasoning,
-                        'equipment': rec.today.equipment,
-                        'intensity_zones': rec.today.intensity_zones
-                    },
-                    'tomorrow': {
-                        'workout_type': rec.tomorrow.workout_type,
-                        'duration_minutes': rec.tomorrow.duration_minutes,
-                        'description': rec.tomorrow.description,
-                        'structure': rec.tomorrow.structure,
-                        'reasoning': rec.tomorrow.reasoning,
-                        'equipment': rec.tomorrow.equipment,
-                        'intensity_zones': rec.tomorrow.intensity_zones
-                    },
-                    'overall_reasoning': rec.overall_reasoning,
-                    'priority': rec.priority,
-                    'generated_at': rec.generated_at
-                }
-                for rec in ai_recommendations
-            ]
+            recommendations_dict = _convert_recommendations_to_dict(ai_recommendations)
             
-            with ai_sessions_lock:
-                ai_sessions[session_id] = {
-                    "status": "ready",
-                    "data": {
-                        'ai_recommendations': recommendations_dict,
-                        'generated_at': datetime.now().isoformat()
-                    },
-                    "timestamp": time.time()
-                }
+            _set_session_ready(session_id, recommendations_dict)
                 
         except Exception as e:
             print(f"Error in background AI generation: {e}")
-            error_message = str(e)
-            
-            # Provide more specific error messages
-            if "openai" in error_message.lower() and ("503" in error_message or "service" in error_message):
-                error_message = "OpenAI service is temporarily unavailable. Please try again in a few moments."
-            elif "rate limit" in error_message.lower():
-                error_message = "OpenAI rate limit reached. Please wait a minute before trying again."
-            elif "api key" in error_message.lower():
-                error_message = "Invalid OpenAI API key. Please check your .env file configuration."
-            elif "timeout" in error_message.lower():
-                error_message = "Request timed out. The AI service might be overloaded. Please try again."
-            
-            with ai_sessions_lock:
-                ai_sessions[session_id] = {
-                    "status": "error",
-                    "error": error_message,
-                    "timestamp": time.time()
-                }
+            error_message = _get_user_friendly_error_message(str(e))
+            _set_session_error(session_id, error_message)
     
     # Start background thread
     thread = threading.Thread(target=generate)
@@ -165,6 +117,82 @@ def start_ai_generation(session_id: str, training_data: dict):
     thread.start()
     
     return session_id
+
+
+def _set_session_status(session_id: str, status: str):
+    """Update session status with thread safety"""
+    with ai_sessions_lock:
+        ai_sessions[session_id] = {
+            "status": status,
+            "timestamp": time.time()
+        }
+
+
+def _set_session_ready(session_id: str, recommendations_dict: list):
+    """Set session as ready with recommendations"""
+    with ai_sessions_lock:
+        ai_sessions[session_id] = {
+            "status": "ready",
+            "data": {
+                'ai_recommendations': recommendations_dict,
+                'generated_at': datetime.now().isoformat()
+            },
+            "timestamp": time.time()
+        }
+
+
+def _set_session_error(session_id: str, error_message: str):
+    """Set session error status"""
+    with ai_sessions_lock:
+        ai_sessions[session_id] = {
+            "status": "error",
+            "error": error_message,
+            "timestamp": time.time()
+        }
+
+
+def _convert_recommendations_to_dict(ai_recommendations: list) -> list:
+    """Convert AI recommendation objects to dictionary format"""
+    return [
+        {
+            'pathway_name': rec.pathway_name,
+            'today': _convert_workout_to_dict(rec.today),
+            'tomorrow': _convert_workout_to_dict(rec.tomorrow),
+            'overall_reasoning': rec.overall_reasoning,
+            'priority': rec.priority,
+            'generated_at': rec.generated_at
+        }
+        for rec in ai_recommendations
+    ]
+
+
+def _convert_workout_to_dict(workout) -> dict:
+    """Convert workout object to dictionary format"""
+    return {
+        'workout_type': workout.workout_type,
+        'duration_minutes': workout.duration_minutes,
+        'description': workout.description,
+        'structure': workout.structure,
+        'reasoning': workout.reasoning,
+        'equipment': workout.equipment,
+        'intensity_zones': workout.intensity_zones
+    }
+
+
+def _get_user_friendly_error_message(error_message: str) -> str:
+    """Convert technical error messages to user-friendly ones"""
+    error_lower = error_message.lower()
+    
+    if "openai" in error_lower and ("503" in error_message or "service" in error_lower):
+        return "OpenAI service is temporarily unavailable. Please try again in a few moments."
+    elif "rate limit" in error_lower:
+        return "OpenAI rate limit reached. Please wait a minute before trying again."
+    elif "api key" in error_lower:
+        return "Invalid OpenAI API key. Please check your .env file configuration."
+    elif "timeout" in error_lower:
+        return "Request timed out. The AI service might be overloaded. Please try again."
+    
+    return error_message
 
 def start_pathway_ai_generation(session_id: str, training_data: dict, pathway_context: dict):
     """Start AI recommendation generation for recovery pathways with context"""
@@ -243,114 +271,109 @@ def get_zone_calculations():
     # Try to use sport config if available
     if USE_SPORT_CONFIG and SportConfigService:
         try:
-            sport_config_service = SportConfigService()
-            
-            # Update thresholds in sport config
-            if lthr > 0:
-                sport_config_service.update_threshold('lthr', lthr)
-            sport_config_service.update_threshold('ftp', ftp)
-            sport_config_service.update_threshold('max_hr', max_hr)
-            
-            # Get zones for cycling (power-based)
-            cycling_sport = sport_config_service.get_sport_by_name('Cycling')
-            if cycling_sport:
-                power_zones_data = sport_config_service.calculate_zones(cycling_sport, MetricType.POWER, ftp)
-                power_zones = {}
-                for i, (zone_name, lower, upper, polarized_zone) in enumerate(power_zones_data, 1):
-                    if upper == float('inf'):
-                        power_zones[f'pz{i}_range'] = f"{int(lower)}+W"
-                    else:
-                        power_zones[f'pz{i}_range'] = f"{int(lower)}-{int(upper)}W"
-                    if i == 3:
-                        power_zones['pz3_watts'] = int(upper)
-            else:
-                # Fallback to legacy power zones
-                power_zones = {
-                    'pz1_range': f"0-{int(ftp * 0.55)}W",
-                    'pz2_range': f"{int(ftp * 0.55)}-{int(ftp * 0.75)}W",
-                    'pz3_range': f"{int(ftp * 0.75)}-{int(ftp * 0.90)}W",
-                    'pz3_watts': int(ftp * 0.90),
-                    'pz4_range': f"{int(ftp * 0.90)}-{int(ftp * 1.05)}W",
-                    'pz5_range': f"{int(ftp * 1.05)}-{int(ftp * 1.20)}W",
-                    'pz6_range': f"{int(ftp * 1.20)}+W"
-                }
-            
-            # Get zones for running/rowing (HR-based)
-            rowing_sport = sport_config_service.get_sport_by_name('Rowing')
-            if rowing_sport:
-                threshold = lthr if lthr > 0 else max_hr
-                hr_zones_data = sport_config_service.calculate_zones(rowing_sport, MetricType.HEART_RATE, threshold)
-                hr_zones = {}
-                polarized_zones = {1: [], 2: [], 3: []}
-                
-                for i, (zone_name, lower, upper, polarized_zone) in enumerate(hr_zones_data, 1):
-                    if upper == float('inf'):
-                        hr_zones[f'hr{i}_range'] = f"{int(lower)}+"
-                    else:
-                        hr_zones[f'hr{i}_range'] = f"{int(lower)}-{int(upper)}"
-                    
-                    # Group by polarized zones
-                    polarized_zones[polarized_zone].append((int(lower), int(upper)))
-                
-                # Create combined ranges for polarized zones
-                for pz_num, ranges in polarized_zones.items():
-                    if ranges:
-                        min_val = min(r[0] for r in ranges)
-                        max_val = max(r[1] for r in ranges)
-                        if max_val == float('inf'):
-                            hr_zones[f'hr_zone{pz_num}_combined'] = f"{min_val}+ bpm"
-                        else:
-                            hr_zones[f'hr_zone{pz_num}_combined'] = f"{min_val}-{max_val} bpm"
-            else:
-                # Fallback to legacy HR zones
-                hr_zones = {
-                    'hr1_range': f"{int(max_hr * 0.50)}-{int(max_hr * 0.70)}",
-                    'hr2_range': f"{int(max_hr * 0.70)}-{int(max_hr * 0.82)}",
-                    'hr3_range': f"{int(max_hr * 0.82)}-{int(max_hr * 0.87)}",
-                    'hr4_range': f"{int(max_hr * 0.87)}-{int(max_hr * 0.93)}",
-                    'hr5_range': f"{int(max_hr * 0.93)}+",
-                    'hr_zone1_combined': f"{int(max_hr * 0.50)}-{int(max_hr * 0.82)} bpm",
-                    'hr_zone2_combined': f"{int(max_hr * 0.82)}-{int(max_hr * 0.93)} bpm",
-                    'hr_zone3_combined': f"{int(max_hr * 0.93)}+ bpm"
-                }
-            
-            # Get training philosophy and zone targets
-            philosophy = sport_config_service.get_training_philosophy()
-            zone_targets = sport_config_service.get_zone_distribution_target()
-            
-            return {
-                'max_hr': max_hr,
-                'ftp': ftp,
-                'lthr': lthr,
-                'training_philosophy': philosophy.value if hasattr(philosophy, 'value') else str(philosophy),
-                'zone_targets': zone_targets,
-                **hr_zones,
-                **power_zones
-            }
+            return _calculate_zones_with_sport_config(max_hr, ftp, lthr)
         except Exception as e:
             print(f"Warning: Could not use sport config for zone calculations: {e}")
     
     # Legacy calculations
-    hr_zones = {
-        'hr1_range': f"{int(max_hr * 0.50)}-{int(max_hr * 0.70)}",
-        'hr2_range': f"{int(max_hr * 0.70)}-{int(max_hr * 0.82)}",
-        'hr3_range': f"{int(max_hr * 0.82)}-{int(max_hr * 0.87)}",
-        'hr4_range': f"{int(max_hr * 0.87)}-{int(max_hr * 0.93)}",
-        'hr5_range': f"{int(max_hr * 0.93)}+",
-        'hr_zone1_combined': f"{int(max_hr * 0.50)}-{int(max_hr * 0.82)} bpm",
-        'hr_zone2_combined': f"{int(max_hr * 0.82)}-{int(max_hr * 0.93)} bpm",
-        'hr_zone3_combined': f"{int(max_hr * 0.93)}+ bpm"
-    }
+    return _calculate_legacy_zones(max_hr, ftp, lthr)
+
+
+def _calculate_zones_with_sport_config(max_hr: int, ftp: int, lthr: int) -> dict:
+    """Calculate zones using sport configuration service"""
+    sport_config_service = SportConfigService()
     
-    power_zones = {
-        'pz1_range': f"0-{int(ftp * 0.55)}W",
-        'pz2_range': f"{int(ftp * 0.55)}-{int(ftp * 0.75)}W",
-        'pz3_range': f"{int(ftp * 0.75)}-{int(ftp * 0.90)}W",
-        'pz3_watts': int(ftp * 0.90),
-        'pz4_range': f"{int(ftp * 0.90)}-{int(ftp * 1.05)}W",
-        'pz5_range': f"{int(ftp * 1.05)}-{int(ftp * 1.20)}W",
-        'pz6_range': f"{int(ftp * 1.20)}+W"
+    # Update thresholds in sport config
+    _update_sport_config_thresholds(sport_config_service, max_hr, ftp, lthr)
+    
+    # Get power and HR zones
+    power_zones = _get_power_zones_from_config(sport_config_service, ftp)
+    hr_zones = _get_hr_zones_from_config(sport_config_service, lthr, max_hr)
+    
+    # Get training philosophy and zone targets
+    philosophy = sport_config_service.get_training_philosophy()
+    zone_targets = sport_config_service.get_zone_distribution_target()
+    
+    return {
+        'max_hr': max_hr,
+        'ftp': ftp,
+        'lthr': lthr,
+        'training_philosophy': philosophy.value if hasattr(philosophy, 'value') else str(philosophy),
+        'zone_targets': zone_targets,
+        **hr_zones,
+        **power_zones
     }
+
+
+def _update_sport_config_thresholds(sport_config_service, max_hr: int, ftp: int, lthr: int):
+    """Update thresholds in sport configuration service"""
+    if lthr > 0:
+        sport_config_service.update_threshold('lthr', lthr)
+    sport_config_service.update_threshold('ftp', ftp)
+    sport_config_service.update_threshold('max_hr', max_hr)
+
+
+def _get_power_zones_from_config(sport_config_service, ftp: int) -> dict:
+    """Get power zones from sport configuration"""
+    cycling_sport = sport_config_service.get_sport_by_name('Cycling')
+    if cycling_sport:
+        power_zones_data = sport_config_service.calculate_zones(cycling_sport, MetricType.POWER, ftp)
+        power_zones = {}
+        for i, (zone_name, lower, upper, polarized_zone) in enumerate(power_zones_data, 1):
+            if upper == float('inf'):
+                power_zones[f'pz{i}_range'] = f"{int(lower)}+W"
+            else:
+                power_zones[f'pz{i}_range'] = f"{int(lower)}-{int(upper)}W"
+            if i == 3:
+                power_zones['pz3_watts'] = int(upper)
+        return power_zones
+    else:
+        # Fallback to legacy power zones
+        return _calculate_legacy_power_zones(ftp)
+
+
+def _get_hr_zones_from_config(sport_config_service, lthr: int, max_hr: int) -> dict:
+    """Get heart rate zones from sport configuration"""
+    rowing_sport = sport_config_service.get_sport_by_name('Rowing')
+    if rowing_sport:
+        threshold = lthr if lthr > 0 else max_hr
+        hr_zones_data = sport_config_service.calculate_zones(rowing_sport, MetricType.HEART_RATE, threshold)
+        hr_zones = {}
+        polarized_zones = {1: [], 2: [], 3: []}
+        
+        for i, (zone_name, lower, upper, polarized_zone) in enumerate(hr_zones_data, 1):
+            if upper == float('inf'):
+                hr_zones[f'hr{i}_range'] = f"{int(lower)}+"
+            else:
+                hr_zones[f'hr{i}_range'] = f"{int(lower)}-{int(upper)}"
+            
+            # Group by polarized zones
+            polarized_zones[polarized_zone].append((int(lower), int(upper)))
+        
+        # Create combined ranges for polarized zones
+        _add_polarized_zone_ranges(hr_zones, polarized_zones)
+        return hr_zones
+    else:
+        # Fallback to legacy HR zones
+        return _calculate_legacy_hr_zones(max_hr)
+
+
+def _add_polarized_zone_ranges(hr_zones: dict, polarized_zones: dict):
+    """Add combined ranges for polarized zones"""
+    for pz_num, ranges in polarized_zones.items():
+        if ranges:
+            min_val = min(r[0] for r in ranges)
+            max_val = max(r[1] for r in ranges)
+            if max_val == float('inf'):
+                hr_zones[f'hr_zone{pz_num}_combined'] = f"{min_val}+ bpm"
+            else:
+                hr_zones[f'hr_zone{pz_num}_combined'] = f"{min_val}-{max_val} bpm"
+
+
+def _calculate_legacy_zones(max_hr: int, ftp: int, lthr: int) -> dict:
+    """Calculate zones using legacy method"""
+    hr_zones = _calculate_legacy_hr_zones(max_hr)
+    power_zones = _calculate_legacy_power_zones(ftp)
     
     return {
         'max_hr': max_hr,
@@ -362,6 +385,33 @@ def get_zone_calculations():
         **power_zones
     }
 
+
+def _calculate_legacy_hr_zones(max_hr: int) -> dict:
+    """Calculate legacy heart rate zones"""
+    return {
+        'hr1_range': f"{int(max_hr * 0.50)}-{int(max_hr * 0.70)}",
+        'hr2_range': f"{int(max_hr * 0.70)}-{int(max_hr * 0.82)}",
+        'hr3_range': f"{int(max_hr * 0.82)}-{int(max_hr * 0.87)}",
+        'hr4_range': f"{int(max_hr * 0.87)}-{int(max_hr * 0.93)}",
+        'hr5_range': f"{int(max_hr * 0.93)}+",
+        'hr_zone1_combined': f"{int(max_hr * 0.50)}-{int(max_hr * 0.82)} bpm",
+        'hr_zone2_combined': f"{int(max_hr * 0.82)}-{int(max_hr * 0.93)} bpm",
+        'hr_zone3_combined': f"{int(max_hr * 0.93)}+ bpm"
+    }
+
+
+def _calculate_legacy_power_zones(ftp: int) -> dict:
+    """Calculate legacy power zones"""
+    return {
+        'pz1_range': f"0-{int(ftp * 0.55)}W",
+        'pz2_range': f"{int(ftp * 0.55)}-{int(ftp * 0.75)}W",
+        'pz3_range': f"{int(ftp * 0.75)}-{int(ftp * 0.90)}W",
+        'pz3_watts': int(ftp * 0.90),
+        'pz4_range': f"{int(ftp * 0.90)}-{int(ftp * 1.05)}W",
+        'pz5_range': f"{int(ftp * 1.05)}-{int(ftp * 1.20)}W",
+        'pz6_range': f"{int(ftp * 1.20)}+W"
+    }
+
 def get_training_data(force_refresh=False):
     """Get training data, using cache if available and not expired"""
     global cached_data, cache_timestamp
@@ -370,7 +420,7 @@ def get_training_data(force_refresh=False):
     
     # Check if we have cached data and it's still valid
     if not force_refresh and cached_data and cache_timestamp:
-        if current_time - cache_timestamp < CACHE_DURATION:
+        if current_time - cache_timestamp < CACHE_DURATION_SECONDS:
             return cached_data
     
     try:
@@ -426,12 +476,27 @@ def get_training_data(force_refresh=False):
         raise FileNotFoundError("No training data found. Please download workouts from Strava.")
         
     except Exception as e:
-        print(f"Error getting training data: {e}")
+        logger.error(f"Error getting training data: {e}", exc_info=True)
         raise
 
 @app.route('/download-workouts')
 def download_workouts():
-    """Initiate Strava OAuth2 flow to download latest workouts"""
+    """Initiate Strava OAuth2 flow to download latest workouts.
+    
+    This endpoint handles the OAuth2 authentication flow with Strava. If the user
+    already has valid tokens stored, it validates/refreshes them and redirects to
+    the download progress page. Otherwise, it redirects to Strava's authorization
+    page for the user to grant access.
+    
+    Returns:
+        Response: Either:
+            - Redirect to Strava OAuth authorization page if new auth needed
+            - Redirect to download progress page if valid tokens exist
+            - JSON error response if initialization fails
+            
+    Raises:
+        500: If Strava client is not initialized or OAuth initiation fails
+    """
     try:
         # Use global strava_client for test compatibility
         if strava_client is None:
@@ -452,7 +517,7 @@ def download_workouts():
                 return redirect(url_for('download_progress'))
             except Exception as e:
                 # Token invalid or refresh failed, need to re-authorize
-                print(f"Token validation/refresh failed: {e}")
+                logger.warning(f"Token validation/refresh failed: {e}")
                 # Clear invalid tokens
                 strava_client.access_token = None
                 strava_client.refresh_token = None
@@ -569,7 +634,25 @@ def download_progress():
 
 @app.route('/api/download-latest', methods=['POST'])
 def api_download_latest():
-    """Simplified API endpoint to download latest workouts from Strava"""
+    """Simplified API endpoint to download latest workouts from Strava.
+    
+    This endpoint initiates a download of the latest workout data from Strava.
+    It handles authentication checks, token refresh, and download initiation.
+    If authentication is needed, it returns auth URL for client-side redirect.
+    
+    Returns:
+        JSON response containing either:
+            - Success message with job_id if download started
+            - Auth URL if authentication is required
+            - Error message if download is already in progress or fails
+            
+    Raises:
+        500: If Strava client initialization or download fails
+        
+    Example:
+        >>> POST /api/download-latest
+        >>> Response: {"success": true, "job_id": "download_job", "message": "Download started"}
+    """
     try:
         # Use global strava_client for test compatibility
         if strava_client is None:
@@ -747,7 +830,22 @@ def download_status():
 
 @app.route('/')
 def index():
-    """Main page with workout visualizations"""
+    """Main page with workout visualizations.
+    
+    Renders the main dashboard page with training intensity distribution charts,
+    zone breakdowns, activity lists, and AI-generated recommendations. Handles
+    loading cached training data and initiating AI recommendation generation
+    in the background.
+    
+    Returns:
+        Rendered HTML template with training data, or download page if no data exists.
+        
+    Template Variables:
+        - training_data: Complete training analysis including distribution and activities
+        - zones: Heart rate and power zone definitions
+        - ai_session_id: UUID for tracking AI recommendation generation status
+        - ai_enabled: Boolean indicating if AI recommendations are available
+    """
     # Clean up old sessions periodically
     cleanup_old_sessions()
     
@@ -805,6 +903,7 @@ def api_workouts():
             }), 401
         return jsonify({'error': str(e)}), 500
     except FileNotFoundError:
+        logger.info("Training data not found, suggesting download")
         return jsonify({
             'error': 'No training data found. Please download workouts from Strava.',
             'needs_download': True,
@@ -1167,8 +1266,8 @@ def start_auto_download():
         
         try:
             client._ensure_valid_token()
-        except:
-            print("⚠️  Strava token expired. Please visit /download-workouts to reconnect.")
+        except (ConfigurationError, StravaAPIError) as e:
+            logger.warning(f"Strava token validation failed: {e}")
             return
         
         # Start download
@@ -1223,8 +1322,8 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)  # Termination signal
     
     parser = argparse.ArgumentParser(description="Web server for training analysis visualization")
-    parser.add_argument("--port", type=int, default=8080, help="Port to run the server on")
-    parser.add_argument("--host", default="127.0.0.1", help="Host to bind the server to")
+    parser.add_argument("--port", type=int, default=DEFAULT_WEB_PORT, help="Port to run the server on")
+    parser.add_argument("--host", default=DEFAULT_HOST, help="Host to bind the server to")
     parser.add_argument("--debug", action="store_true", help="Run in debug mode")
     parser.add_argument("--no-auto-download", action="store_true", help="Disable automatic download on startup")
     

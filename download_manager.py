@@ -8,6 +8,9 @@ import json
 import os
 import requests
 from cache_manager import CacheManager
+from logging_config import get_logger, StravaAPIError, CacheError
+
+logger = get_logger(__name__)
 
 
 class DownloadStatus(Enum):
@@ -64,7 +67,7 @@ class DownloadManager:
             try:
                 subscriber(state)
             except Exception as e:
-                print(f"Error notifying subscriber: {e}")
+                logger.error(f"Error notifying subscriber: {e}", exc_info=True)
     
     def get_state(self) -> Dict[str, Any]:
         """Get current download state"""
@@ -125,9 +128,9 @@ class DownloadManager:
                         if activity_id_str.isdigit():
                             current_activity_ids.add(int(activity_id_str))
                     except Exception as e:
-                        print(f"Warning: Could not parse activity ID from {file_path}: {e}")
+                        logger.warning(f"Could not parse activity ID from {file_path}: {e}")
             
-            print(f"Debug: Found {len(current_activity_ids)} activities in cache directory")
+            logger.debug(f"Found {len(current_activity_ids)} activities in cache directory")
             
             # Calculate date range (use UTC to match Strava's timezone)
             end_date = datetime.now(timezone.utc)
@@ -158,13 +161,13 @@ class DownloadManager:
                     
                     # Log first page for debugging
                     if page == 1:
-                        print(f"Debug: First page has {len(activities)} activities")
+                        logger.debug(f"First page has {len(activities)} activities")
                         if activities:
                             newest = datetime.fromisoformat(activities[0]['start_date'].replace('Z', '+00:00'))
                             oldest = datetime.fromisoformat(activities[-1]['start_date'].replace('Z', '+00:00'))
-                            print(f"Debug: Newest activity: {activities[0]['name']} at {newest}")
-                            print(f"Debug: Oldest on page: {activities[-1]['name']} at {oldest}")
-                            print(f"Debug: Date range: {start_date} to {end_date}")
+                            logger.debug(f"Newest activity: {activities[0]['name']} at {newest}")
+                            logger.debug(f"Oldest on page: {activities[-1]['name']} at {oldest}")
+                            logger.debug(f"Date range: {start_date} to {end_date}")
                     
                     # Filter activities within our date range
                     found_old_activity = False
@@ -187,6 +190,7 @@ class DownloadManager:
                 except requests.exceptions.HTTPError as e:
                     if e.response.status_code == 429:  # Rate limited
                         retry_after = int(e.response.headers.get('X-RateLimit-Limit', 900))
+                        logger.warning(f"Rate limited while fetching activities page {page}, retrying in {retry_after} seconds")
                         self._update_state(
                             status=DownloadStatus.RATE_LIMITED,
                             message=f"Rate limited. Retrying in {retry_after} seconds...",
@@ -195,7 +199,8 @@ class DownloadManager:
                         time.sleep(retry_after)
                         continue
                     else:
-                        raise
+                        logger.error(f"HTTP error fetching activities page {page}: {e}")
+                        raise StravaAPIError(f"Failed to fetch activities page {page}: {e}") from e
             
             self._update_state(
                 total_activities=len(all_activities),
@@ -209,9 +214,9 @@ class DownloadManager:
                 if activity['id'] not in current_activity_ids:
                     new_activity_ids.append(activity['id'])
             
-            print(f"Debug: Found {len(all_activities)} activities from Strava in date range")
-            print(f"Debug: Have {len(current_activity_ids)} activities in cache")
-            print(f"Debug: Found {len(new_activity_ids)} new activities")
+            logger.info(f"Found {len(all_activities)} activities from Strava in date range")
+            logger.info(f"Have {len(current_activity_ids)} activities in cache")
+            logger.info(f"Found {len(new_activity_ids)} new activities")
             
             if not new_activity_ids:
                 # Check if we have minimum required data
@@ -260,7 +265,7 @@ class DownloadManager:
                         details['streams'] = streams
                     except requests.exceptions.HTTPError as e:
                         if e.response.status_code == 404:
-                            print(f"No streams available for activity {activity_id}")
+                            logger.info(f"No streams available for activity {activity_id}")
                             details['streams'] = None
                         elif e.response.status_code == 429:  # Rate limited
                             # Get retry-after from headers (Strava uses different header names)
@@ -271,6 +276,7 @@ class DownloadManager:
                                 # If we hit the 15-minute limit, wait longer
                                 retry_after = 900  # 15 minutes
                             
+                            logger.warning(f"Rate limited while fetching streams for activity {activity_id}, waiting {retry_after} seconds")
                             self._update_state(
                                 status=DownloadStatus.RATE_LIMITED,
                                 message=f"Rate limited. Waiting {retry_after} seconds...",
@@ -294,15 +300,16 @@ class DownloadManager:
                                     message=f"Resumed: {activity['name']} ({idx + 1}/{len(new_activity_ids)})",
                                     rate_limit_retry_after=None
                                 )
-                            except:
+                            except Exception as retry_error:
                                 # If still failing, just skip streams
-                                print(f"Skipping streams for activity {activity_id} after rate limit")
+                                logger.warning(f"Skipping streams for activity {activity_id} after rate limit retry: {retry_error}")
                                 details['streams'] = None
                         else:
-                            raise
+                            logger.error(f"HTTP error fetching streams for activity {activity_id}: {e}")
+                            raise StravaAPIError(f"Failed to fetch streams for activity {activity_id}: {e}") from e
                     except Exception as e:
                         # For any other stream errors, just skip streams
-                        print(f"Error getting streams for activity {activity_id}: {e}")
+                        logger.warning(f"Error getting streams for activity {activity_id}: {e}")
                         details['streams'] = None
                     
                     detailed_activities.append(details)
@@ -314,6 +321,7 @@ class DownloadManager:
                     if e.response.status_code == 429:  # Rate limited on activity details
                         # Handle rate limit for activity details
                         retry_after = int(e.response.headers.get('Retry-After', 15))
+                        logger.warning(f"Rate limited on activity details for {activity_id}, waiting {retry_after} seconds")
                         self._update_state(
                             status=DownloadStatus.RATE_LIMITED,
                             message=f"Rate limited on activity details. Waiting {retry_after} seconds...",
@@ -331,10 +339,10 @@ class DownloadManager:
                         idx -= 1  # Retry this activity
                         continue
                     else:
-                        print(f"HTTP error downloading activity {activity_id}: {e}")
+                        logger.error(f"HTTP error downloading activity {activity_id}: {e}")
                         # Skip this activity and continue
                 except Exception as e:
-                    print(f"Error downloading activity {activity_id}: {e}")
+                    logger.error(f"Error downloading activity {activity_id}: {e}")
                     # Continue with other activities
             
             # Process and save
@@ -346,8 +354,8 @@ class DownloadManager:
             
             # For full analysis, we need to get ALL activities with details, not just new ones
             # This is because the cached data is simplified and doesn't have all the raw data
-            print(f"Debug: Downloaded {len(detailed_activities)} new activities")
-            print(f"Debug: Need to fetch all {len(all_activities)} activities for complete analysis")
+            logger.info(f"Downloaded {len(detailed_activities)} new activities")
+            logger.info(f"Need to fetch all {len(all_activities)} activities for complete analysis")
             
             # Use CacheManager to properly merge new activities with all cached ones
             cache_manager = CacheManager()
@@ -450,7 +458,7 @@ class DownloadManager:
             )
             
         except Exception as e:
-            print(f"Download error: {e}")
+            logger.error(f"Download error: {e}", exc_info=True)
             self._update_state(
                 status=DownloadStatus.ERROR,
                 message=f"Download failed: {str(e)}",

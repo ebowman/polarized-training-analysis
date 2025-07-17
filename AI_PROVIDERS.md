@@ -25,9 +25,41 @@ Get your API key from: https://console.anthropic.com/settings/keys
 
 ## Auto Mode
 
-When `AI_PROVIDER=auto` (or not set), the system will:
+When `AI_PROVIDER=auto` (or not set), the system will automatically select the best available provider.
+
+### Configurable Priority
+
+You can now configure which provider to try first when using auto mode:
+
+```env
+AI_PROVIDER=auto
+AI_PRIMARY_PROVIDER=claude     # Try this provider first
+AI_FALLBACK_PROVIDER=openai    # Fall back to this if primary fails
+```
+
+**Available options:**
+- `claude` or `anthropic` - Anthropic's Claude
+- `openai` - OpenAI's GPT models
+
+**Default behavior** (if not configured):
 1. First try Claude if configured
 2. Fall back to OpenAI if Claude is not available
+
+**Example configurations:**
+
+```env
+# Prefer OpenAI over Claude
+AI_PRIMARY_PROVIDER=openai
+AI_FALLBACK_PROVIDER=claude
+
+# Only use Claude (no fallback)
+AI_PRIMARY_PROVIDER=claude
+AI_FALLBACK_PROVIDER=claude
+
+# Use default priority (Claude → OpenAI)
+# AI_PRIMARY_PROVIDER=claude
+# AI_FALLBACK_PROVIDER=openai
+```
 3. Show an error if neither is configured
 
 This is useful when one service is down - just configure both and the system will use whichever is available.

@@ -13,6 +13,58 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
 from dotenv import load_dotenv
 from ai_providers import AIProviderFactory, AIProvider
+from logging_config import get_logger, DataValidationError, ConfigurationError
+
+logger = get_logger(__name__)
+
+# Import constants
+from constants import (
+    POLARIZED_ZONE1_TARGET_PERCENT,
+    POLARIZED_ZONE2_TARGET_PERCENT,
+    POLARIZED_ZONE3_TARGET_PERCENT,
+    PYRAMIDAL_ZONE1_TARGET_PERCENT,
+    PYRAMIDAL_ZONE2_TARGET_PERCENT,
+    PYRAMIDAL_ZONE3_TARGET_PERCENT,
+    LOW_VOLUME_THRESHOLD_HOURS,
+    PYRAMIDAL_VOLUME_THRESHOLD_HOURS,
+    ANALYSIS_WINDOW_DAYS,
+    MIN_ZONE3_MINUTES_PER_WEEK,
+    MIN_WEEKLY_VOLUME_MINUTES,
+    DEFAULT_EASY_WORKOUT_MINUTES,
+    DEFAULT_INTERVAL_WORKOUT_MINUTES,
+    DEFAULT_LONG_WORKOUT_MINUTES,
+    DEFAULT_RECOVERY_WORKOUT_MINUTES,
+    ZONE1_DEVIATION_WEIGHT,
+    ZONE2_DEVIATION_WEIGHT,
+    ZONE3_DEVIATION_WEIGHT,
+    MIN_ADHERENCE_FOR_LOW_VOLUME,
+    GOOD_ADHERENCE_FOR_LOW_VOLUME,
+    ZONE1_SIGNIFICANT_DEFICIT,
+    ZONE2_EXCESS_THRESHOLD,
+    ZONE3_DEFICIT_THRESHOLD,
+    ZONE3_OVERLOAD_PERCENT,
+    ZONE3_CLOSE_TO_TARGET_PERCENT,
+    RECENT_DATA_STALENESS_DAYS,
+    ZONE3_RECENT_DAYS,
+    DEFAULT_MAX_HEART_RATE,
+    DEFAULT_FTP_WATTS,
+    DEFAULT_LTHR,
+    HR_ZONE1_MAX_MULTIPLIER,
+    HR_ZONE2_MAX_MULTIPLIER,
+    HR_ZONE3_MAX_MULTIPLIER,
+    HR_ZONE4_MAX_MULTIPLIER,
+    HR_ZONE5A_MAX_MULTIPLIER,
+    HR_ZONE5B_MAX_MULTIPLIER,
+    HR_ZONE2_MAX_HR_MULTIPLIER,
+    LTHR_FROM_MAX_HR_MULTIPLIER,
+    POWER_ZONE1_MAX_MULTIPLIER,
+    POWER_ZONE2_MAX_MULTIPLIER,
+    POWER_ZONE3_MAX_MULTIPLIER,
+    POWER_ZONE4_MAX_MULTIPLIER,
+    POWER_ZONE5_MAX_MULTIPLIER,
+    POWER_ZONE6_MAX_MULTIPLIER,
+    POWER_ZONE7_MIN_MULTIPLIER
+)
 
 # Import sport configuration
 try:
@@ -24,15 +76,15 @@ except ImportError:
     SportConfigService = None
     TrainingPhilosophy = None
     MetricType = None
+    logger.info("Sport config service not available, using default configuration")
 
 load_dotenv()
 
 # Training approach constants (legacy - will be replaced by sport config)
-POLARIZED_TARGETS = {'zone1': 80, 'zone2': 10, 'zone3': 10}
-PYRAMIDAL_TARGETS = {'zone1': 70, 'zone2': 20, 'zone3': 10}
-LOW_VOLUME_THRESHOLD = 4  # hours per week
-PYRAMIDAL_VOLUME_THRESHOLD = 6  # hours per week
-ANALYSIS_WINDOW_DAYS = 14
+POLARIZED_TARGETS = {'zone1': POLARIZED_ZONE1_TARGET_PERCENT, 'zone2': POLARIZED_ZONE2_TARGET_PERCENT, 'zone3': POLARIZED_ZONE3_TARGET_PERCENT}
+PYRAMIDAL_TARGETS = {'zone1': PYRAMIDAL_ZONE1_TARGET_PERCENT, 'zone2': PYRAMIDAL_ZONE2_TARGET_PERCENT, 'zone3': PYRAMIDAL_ZONE3_TARGET_PERCENT}
+LOW_VOLUME_THRESHOLD = LOW_VOLUME_THRESHOLD_HOURS  # hours per week
+PYRAMIDAL_VOLUME_THRESHOLD = PYRAMIDAL_VOLUME_THRESHOLD_HOURS  # hours per week
 
 @dataclass
 class AIWorkoutRecommendation:
@@ -117,6 +169,7 @@ class TrainingDataAnalyzer:
                         preferences = f.read().lower()
                         break
                 except FileNotFoundError:
+                    logger.debug(f"File not found: {file_path}")
                     continue
             
             if preferences:
@@ -339,6 +392,10 @@ class TrainingDataAnalyzer:
     
     def analyze_training_data(self, training_data: Dict) -> TrainingAnalysis:
         """Complete analysis of training data"""
+        # Handle None or invalid training data
+        if training_data is None:
+            training_data = {}
+        
         activities = training_data.get('activities', [])
         recent_activities = self.filter_recent_activities(activities)
         
@@ -490,6 +547,7 @@ class PromptBuilder:
                     print(f"📝 Using preferences from: {preference_file}")
                     return self._process_hr_ranges(content)
             except FileNotFoundError:
+                logger.debug(f"File not found: {file_path}")
                 continue
         
         return "No user preferences file found. Using general recommendations."
@@ -596,6 +654,7 @@ class PromptBuilder:
             with open('nih_polarized_training_summary.md', 'r') as f:
                 return f.read()
         except FileNotFoundError:
+            logger.debug("NIH research summary not available")
             return "NIH research summary not available."
     
     def create_training_context(self, analysis: TrainingAnalysis, 
@@ -758,6 +817,12 @@ class PromptBuilder:
     
     def build_recovery_pathway_prompt(self, training_data: Dict, pathway_context: Dict) -> str:
         """Build AI prompt specifically for recovery pathway recommendations"""
+        # Handle None or invalid training data
+        if training_data is None:
+            training_data = {}
+        if pathway_context is None:
+            pathway_context = {}
+        
         # Analyze training data
         analysis = self.analyzer.analyze_training_data(training_data)
         scheduling = self.scheduling_provider.get_current_context(analysis.recent_activities)
@@ -864,6 +929,10 @@ Return as JSON:
 
     def build_prompt(self, training_data: Dict, num_recommendations: int = 3) -> str:
         """Build complete AI prompt from components"""
+        # Handle None or invalid training data
+        if training_data is None:
+            training_data = {}
+        
         # Analyze training data
         analysis = self.analyzer.analyze_training_data(training_data)
         scheduling = self.scheduling_provider.get_current_context(analysis.recent_activities)
@@ -1060,9 +1129,29 @@ Return ONLY the JSON array, no other text or markdown.
         return prompt
 
 class AIRecommendationEngine:
-    """AI-powered workout recommendation engine with multi-provider support"""
+    """AI-powered workout recommendation engine with multi-provider support.
+    
+    This engine generates personalized workout recommendations using AI language models
+    based on training data, polarized training principles, and user preferences.
+    It supports multiple AI providers (OpenAI, Anthropic, Google, Local LLMs) and
+    handles prompt generation, response parsing, and recommendation history.
+    
+    Attributes:
+        provider: AI provider instance for generating recommendations
+        prompt_builder: Handles prompt construction with training context
+        max_retries: Maximum retry attempts for AI generation (default: 3)
+    """
     
     def __init__(self, provider: Optional[AIProvider] = None):
+        """Initialize the AI recommendation engine.
+        
+        Args:
+            provider: Optional pre-configured AI provider. If not provided,
+                creates one using AIProviderFactory based on environment configuration.
+                
+        Raises:
+            ValueError: If no valid AI provider can be configured
+        """
         # Use provided provider or create one from factory
         if provider:
             self.provider = provider
@@ -1076,7 +1165,34 @@ class AIRecommendationEngine:
     
     def generate_pathway_recommendations(self, training_data: Dict, 
                                        pathway_context: Dict) -> Dict[str, AIWorkoutRecommendation]:
-        """Generate AI-powered recovery pathway recommendations"""
+        """Generate AI-powered recovery pathway recommendations.
+        
+        Creates workout recommendations for different recovery pathways based on
+        athlete recovery status, training load, and injury risk. Supports various
+        pathways like active recovery, progressive return, and injury recovery.
+        
+        Args:
+            training_data: Complete training analysis data including:
+                - distribution: Zone distribution percentages
+                - activities: List of recent activities
+                - config: User configuration (zones, thresholds)
+            pathway_context: Recovery pathway context including:
+                - pathway_type: Type of recovery pathway
+                - recovery_metrics: Metrics like consecutive days, fatigue
+                - current_status: Current recovery status
+                
+        Returns:
+            Dictionary mapping pathway types to AIWorkoutRecommendation objects
+            
+        Raises:
+            Exception: If AI generation fails after retries
+        """
+        
+        # Handle None or invalid training data
+        if training_data is None:
+            training_data = {}
+        if pathway_context is None:
+            pathway_context = {}
         
         # Build recovery pathway specific prompt
         prompt = self.prompt_builder.build_recovery_pathway_prompt(training_data, pathway_context)
@@ -1119,7 +1235,38 @@ class AIRecommendationEngine:
 
     def generate_ai_recommendations(self, training_data: Dict, 
                                   num_recommendations: int = 3) -> List[AIWorkoutPathway]:
-        """Generate AI-powered workout recommendations using the new architecture"""
+        """Generate AI-powered workout recommendations using the new architecture.
+        
+        Creates personalized workout pathways (today/tomorrow pairs) based on training
+        data analysis, zone distribution, recovery metrics, and user preferences.
+        Each pathway represents a different training approach (e.g., aerobic focus,
+        intensity boost, recovery focus).
+        
+        Args:
+            training_data: Complete training data including:
+                - distribution: Current zone distribution and adherence
+                - activities: List of analyzed activities
+                - config: User configuration (zones, equipment)
+                - ancillary_work_7days: Recent strength training data
+            num_recommendations: Number of workout pathways to generate (default: 3)
+            
+        Returns:
+            List of AIWorkoutPathway objects, each containing:
+                - pathway_name: Descriptive name of the training approach
+                - today: Workout recommendation for today
+                - tomorrow: Workout recommendation for tomorrow
+                - overall_reasoning: Explanation of the pathway strategy
+                - priority: High/Medium/Low priority rating
+                - generated_at: ISO timestamp of generation
+                
+        Raises:
+            Exception: If AI generation fails after all retry attempts
+            
+        Example:
+            >>> recommendations = engine.generate_ai_recommendations(training_data)
+            >>> for pathway in recommendations:
+            ...     print(f"{pathway.pathway_name}: {pathway.today.description}")
+        """
         
         # Build prompt using the new PromptBuilder
         prompt = self.prompt_builder.build_prompt(training_data, num_recommendations)
@@ -1174,122 +1321,7 @@ class AIRecommendationEngine:
         # If we get here, all retries failed
         return self._create_fallback_recommendations(f"All {self.max_retries} attempts failed")
     
-    def generate_pathway_recommendations_old(self, training_data: Dict, pathways: List[Dict]) -> Dict[str, AIWorkoutRecommendation]:
-        """Generate AI recommendations for multiple recovery pathways in a single call"""
-        
-        # Build special prompt for pathway recommendations
-        prompt = self._build_pathway_prompt(training_data, pathways)
-        
-        try:
-            provider_name = self.provider.get_provider_name()
-            print(f"🤖 Generating pathway recommendations using {provider_name}...")
-            
-            # Call AI provider
-            response_json = self.provider.generate_completion(prompt, temperature=0.5)
-            
-            # Parse response
-            parsed_data = json.loads(response_json)
-            
-            # Convert to recommendations by pathway type
-            pathway_recs = {}
-            for pathway in pathways:
-                pathway_type = pathway['type']
-                if pathway_type in parsed_data:
-                    rec_data = parsed_data[pathway_type]
-                    if rec_data:
-                        pathway_recs[pathway_type] = AIWorkoutRecommendation(
-                            workout_type=rec_data.get('workout_type', 'Unknown'),
-                            duration_minutes=rec_data.get('duration_minutes', pathway['todayMinutes']),
-                            description=rec_data.get('description', ''),
-                            structure=rec_data.get('structure', ''),
-                            reasoning=rec_data.get('reasoning', ''),
-                            equipment=rec_data.get('equipment', 'General'),
-                            intensity_zones=rec_data.get('intensity_zones', [1]),
-                            priority=rec_data.get('priority', 'medium'),
-                            generated_at=datetime.now().isoformat()
-                        )
-            
-            return pathway_recs
-            
-        except Exception as e:
-            print(f"Error generating pathway recommendations: {e}")
-            # Return fallback recommendations for each pathway
-            fallback_recs = {}
-            for pathway in pathways:
-                if pathway['todayMinutes'] == 0:
-                    fallback_recs[pathway['type']] = AIWorkoutRecommendation(
-                        workout_type="Rest Day",
-                        duration_minutes=0,
-                        description="Complete rest for recovery",
-                        structure="No training - focus on recovery",
-                        reasoning="Rest day selected for this pathway",
-                        equipment="None",
-                        intensity_zones=[],
-                        priority="high",
-                        generated_at=datetime.now().isoformat()
-                    )
-                else:
-                    fallback_recs[pathway['type']] = self._create_fallback_recommendations(str(e))[0]
-                    fallback_recs[pathway['type']].duration_minutes = pathway['todayMinutes']
-            
-            return fallback_recs
     
-    def _build_pathway_prompt(self, training_data: Dict, pathways: List[Dict]) -> str:
-        """Build prompt for pathway-specific recommendations"""
-        # Get base training context
-        analyzer = TrainingDataAnalyzer()
-        analysis = analyzer.analyze_training_data(training_data)
-        
-        prompt = f"""You are an expert endurance coach. The athlete needs workout recommendations for different recovery pathway options.
-
-Current Training Status:
-- Zone distribution: Zone 1: {analysis.zone1_percent:.1f}%, Zone 2: {analysis.zone2_percent:.1f}%, Zone 3: {analysis.zone3_percent:.1f}%
-- Rolling 7-day volume: {analysis.total_minutes} minutes
-- Equipment available: {', '.join(self._get_available_equipment())}
-
-Generate specific workout recommendations for EACH of these recovery pathways:
-
-"""
-        
-        for pathway in pathways:
-            prompt += f"""
-{pathway['name']} ({pathway['type']}):
-- Today: {pathway['todayMinutes']} minutes
-- Tomorrow: {pathway['tomorrowMinutes']} minutes
-"""
-        
-        prompt += """
-For each pathway, recommend an appropriate workout that:
-1. Matches the exact duration for today
-2. Considers the athlete's current zone distribution
-3. Is appropriate for the recovery approach (gentle/steady/aggressive)
-4. For 0 minute days, confirm it's a rest day
-
-Return ONLY a JSON object with this structure:
-{
-"""
-        
-        for i, pathway in enumerate(pathways):
-            if i > 0:
-                prompt += ","
-            prompt += f"""
-  "{pathway['type']}": {{
-    "workout_type": "string",
-    "duration_minutes": {pathway['todayMinutes']},
-    "description": "string",
-    "structure": "string",
-    "reasoning": "string",
-    "equipment": "string",
-    "intensity_zones": [array],
-    "priority": "string"
-  }}"""
-        
-        prompt += """
-}
-
-Return ONLY the JSON, no other text."""
-        
-        return prompt
     
     def _parse_response(self, response_json: str) -> List[AIWorkoutPathway]:
         """Parse and validate AI response"""

@@ -6,10 +6,37 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from dotenv import load_dotenv
 
+from logging_config import get_logger, StravaAPIError, ConfigurationError
+
 load_dotenv()
+logger = get_logger(__name__)
 
 class StravaClient:
+    """Client for interacting with the Strava API.
+    
+    This client handles OAuth authentication, token management, API requests,
+    and caching of responses to minimize API calls.
+    
+    Attributes:
+        client_id: Strava OAuth client ID
+        client_secret: Strava OAuth client secret
+        cache_dir: Directory for storing cached API responses
+        access_token: Current access token for API requests
+        refresh_token: Token for refreshing access when expired
+        token_expires_at: Unix timestamp when access token expires
+        redirect_uri: OAuth redirect URI for authorization flow
+    """
+    
     def __init__(self, cache_dir: str = "cache"):
+        """Initialize the Strava client.
+        
+        Args:
+            cache_dir: Directory path for storing cache files. Defaults to "cache".
+            
+        Raises:
+            ValueError: If STRAVA_CLIENT_ID or STRAVA_CLIENT_SECRET environment
+                variables are not set.
+        """
         self.client_id = os.getenv("STRAVA_CLIENT_ID")
         self.client_secret = os.getenv("STRAVA_CLIENT_SECRET")
         self.cache_dir = cache_dir
@@ -19,31 +46,51 @@ class StravaClient:
         self.redirect_uri = "http://localhost:5000/strava-callback"  # For test compatibility
         
         if not self.client_id or not self.client_secret:
-            raise ValueError("STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET must be set in .env file")
+            logger.error("Missing Strava credentials in environment")
+            raise ConfigurationError("STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET must be set in .env file")
         
         os.makedirs(self.cache_dir, exist_ok=True)
         self._load_tokens()
     
     def _load_tokens(self):
-        """Load tokens from cache file"""
+        """Load OAuth tokens from cache file.
+        
+        Reads previously saved access token, refresh token, and expiration
+        timestamp from the tokens.json file in the cache directory. If the
+        file doesn't exist or is missing data, the attributes remain None.
+        """
         token_file = os.path.join(self.cache_dir, "tokens.json")
         if os.path.exists(token_file):
-            with open(token_file, 'r') as f:
-                tokens = json.load(f)
-                self.access_token = tokens.get("access_token")
-                self.refresh_token = tokens.get("refresh_token")
-                self.token_expires_at = tokens.get("expires_at")
+            try:
+                with open(token_file, 'r') as f:
+                    tokens = json.load(f)
+                    self.access_token = tokens.get("access_token")
+                    self.refresh_token = tokens.get("refresh_token")
+                    self.token_expires_at = tokens.get("expires_at")
+                    logger.debug("Loaded tokens from cache")
+            except (json.JSONDecodeError, IOError) as e:
+                logger.error(f"Failed to load tokens from cache: {e}")
+                # Continue with None values
     
     def _save_tokens(self):
-        """Save tokens to cache file"""
+        """Save OAuth tokens to cache file.
+        
+        Persists the current access token, refresh token, and expiration
+        timestamp to tokens.json in the cache directory for reuse across
+        sessions.
+        """
         token_file = os.path.join(self.cache_dir, "tokens.json")
         tokens = {
             "access_token": self.access_token,
             "refresh_token": self.refresh_token,
             "expires_at": self.token_expires_at
         }
-        with open(token_file, 'w') as f:
-            json.dump(tokens, f)
+        try:
+            with open(token_file, 'w') as f:
+                json.dump(tokens, f)
+            logger.debug("Saved tokens to cache")
+        except IOError as e:
+            logger.error(f"Failed to save tokens to cache: {e}")
     
     def get_authorization_url(self, redirect_uri: str = None) -> str:
         """Get URL for OAuth authorization"""
@@ -67,21 +114,27 @@ class StravaClient:
             "grant_type": "authorization_code"
         }
         
-        response = requests.post(url, data=data)
-        response.raise_for_status()
-        
-        token_data = response.json()
-        self.access_token = token_data["access_token"]
-        self.refresh_token = token_data["refresh_token"]
-        self.token_expires_at = token_data["expires_at"]
-        
-        self._save_tokens()
-        return token_data
+        try:
+            response = requests.post(url, data=data)
+            response.raise_for_status()
+            
+            token_data = response.json()
+            self.access_token = token_data["access_token"]
+            self.refresh_token = token_data["refresh_token"]
+            self.token_expires_at = token_data["expires_at"]
+            
+            self._save_tokens()
+            logger.info("Successfully exchanged code for tokens")
+            return token_data
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to exchange code for tokens: {e}")
+            raise StravaAPIError(f"Failed to exchange authorization code: {e}") from e
     
     def refresh_access_token(self) -> Dict:
         """Refresh the access token using refresh token"""
         if not self.refresh_token:
-            raise ValueError("No refresh token available")
+            logger.error("No refresh token available for refresh")
+            raise ConfigurationError("No refresh token available")
         
         url = "https://www.strava.com/oauth/token"
         data = {
@@ -91,55 +144,103 @@ class StravaClient:
             "grant_type": "refresh_token"
         }
         
-        response = requests.post(url, data=data)
-        response.raise_for_status()
-        
-        token_data = response.json()
-        self.access_token = token_data["access_token"]
-        self.refresh_token = token_data["refresh_token"]
-        self.token_expires_at = token_data["expires_at"]
-        
-        self._save_tokens()
-        return token_data
+        try:
+            response = requests.post(url, data=data)
+            response.raise_for_status()
+            
+            token_data = response.json()
+            self.access_token = token_data["access_token"]
+            self.refresh_token = token_data["refresh_token"]
+            self.token_expires_at = token_data["expires_at"]
+            
+            self._save_tokens()
+            logger.info("Successfully refreshed access token")
+            return token_data
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to refresh access token: {e}")
+            raise StravaAPIError(f"Failed to refresh access token: {e}") from e
     
     def _ensure_valid_token(self):
         """Ensure we have a valid access token"""
         if not self.access_token:
-            raise ValueError("No access token available. Please authorize first.")
+            logger.error("No access token available")
+            raise ConfigurationError("No access token available. Please authorize first.")
         
         if self.token_expires_at and time.time() >= self.token_expires_at:
-            print("Token expired, refreshing...")
+            logger.info("Token expired, refreshing...")
             self.refresh_access_token()
     
     def _get_cache_file(self, endpoint: str, params: Dict = None) -> str:
-        """Generate cache file path for given endpoint and params"""
+        """Generate cache file path for given endpoint and params.
+        
+        Creates a unique filename based on the API endpoint and request parameters
+        to enable caching of different API responses. Forward slashes in the
+        endpoint are replaced with underscores to create valid filenames.
+        
+        Args:
+            endpoint: API endpoint path (e.g., "/athlete/activities")
+            params: Query parameters dictionary. Will be sorted and included
+                in the filename to differentiate cached responses.
+                
+        Returns:
+            Full path to the cache file.
+            
+        Example:
+            >>> client._get_cache_file("/athlete/activities", {"page": 1})
+            "cache/_athlete_activities_page_1.json"
+        """
         param_str = "_".join(f"{k}_{v}" for k, v in sorted((params or {}).items()))
         cache_key = f"{endpoint}_{param_str}".replace("/", "_")
         return os.path.join(self.cache_dir, f"{cache_key}.json")
     
     def _is_cache_valid(self, cache_file: str, max_age_hours: int = 1) -> bool:
-        """Check if cache file is valid (exists and not too old)"""
+        """Check if cache file is valid (exists and not too old).
+        
+        Determines whether a cached response can be used instead of making
+        a new API request based on the file's existence and age.
+        
+        Args:
+            cache_file: Path to the cache file to check
+            max_age_hours: Maximum age in hours before cache is considered stale.
+                Defaults to 1 hour.
+                
+        Returns:
+            True if the cache file exists and is newer than max_age_hours,
+            False otherwise.
+            
+        Example:
+            >>> client._is_cache_valid("cache/athlete.json", max_age_hours=24)
+            True  # If file exists and is less than 24 hours old
+        """
         if not os.path.exists(cache_file):
             return False
         
-        file_age = time.time() - os.path.getmtime(cache_file)
-        return file_age < (max_age_hours * 3600)
+        try:
+            file_age = time.time() - os.path.getmtime(cache_file)
+            return file_age < (max_age_hours * 3600)
+        except OSError as e:
+            logger.warning(f"Failed to check cache file age: {e}")
+            return False
     
     def _api_request(self, endpoint: str, params: Dict = None, cache_hours: int = 1) -> Dict:
         """Make API request with caching"""
         cache_file = self._get_cache_file(endpoint, params)
         
         if self._is_cache_valid(cache_file, cache_hours):
-            print(f"Using cached data for {endpoint}")
-            with open(cache_file, 'r') as f:
-                return json.load(f)
+            logger.debug(f"Using cached data for {endpoint}")
+            try:
+                with open(cache_file, 'r') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                logger.warning(f"Failed to read cache file: {e}")
+                # Continue to fetch fresh data
         
         self._ensure_valid_token()
         
         url = f"https://www.strava.com/api/v3{endpoint}"
         headers = {"Authorization": f"Bearer {self.access_token}"}
         
-        print(f"Making API request to {endpoint}")
+        logger.info(f"Making API request to {endpoint}")
         
         try:
             response = requests.get(url, headers=headers, params=params)
@@ -147,26 +248,30 @@ class StravaClient:
         except requests.exceptions.HTTPError as e:
             # Handle token expiration (Strava returns 401 or sometimes 400 for auth issues)
             if e.response.status_code in [400, 401]:
-                print(f"Auth error ({e.response.status_code}), attempting to refresh token...")
+                logger.warning(f"Auth error ({e.response.status_code}), attempting to refresh token...")
                 try:
                     self.refresh_access_token()
-                    print("Token refreshed successfully, retrying request...")
+                    logger.info("Token refreshed successfully, retrying request...")
                     # Retry with new token
                     headers = {"Authorization": f"Bearer {self.access_token}"}
                     response = requests.get(url, headers=headers, params=params)
                     response.raise_for_status()
-                    print(f"Request succeeded after token refresh")
+                    logger.info(f"Request succeeded after token refresh")
                 except Exception as refresh_error:
-                    print(f"Failed to refresh token: {refresh_error}")
-                    print("You may need to re-authorize the application")
-                    raise ValueError(f"Token refresh failed: {refresh_error}. Please re-authorize the application.") from refresh_error
+                    logger.error(f"Failed to refresh token: {refresh_error}")
+                    raise StravaAPIError(f"Token refresh failed: {refresh_error}. Please re-authorize the application.") from refresh_error
             else:
-                raise
+                logger.error(f"API request failed: {e}")
+                raise StravaAPIError(f"API request to {endpoint} failed: {e}") from e
         
         data = response.json()
         
-        with open(cache_file, 'w') as f:
-            json.dump(data, f, indent=2)
+        try:
+            with open(cache_file, 'w') as f:
+                json.dump(data, f, indent=2)
+        except IOError as e:
+            logger.warning(f"Failed to cache response: {e}")
+            # Continue - caching failure is not critical
         
         time.sleep(0.1)  # Rate limiting
         return data
@@ -200,7 +305,7 @@ class StravaClient:
         
         detailed_activities = []
         for activity in activities:
-            print(f"Fetching details for activity: {activity['name']} ({activity['id']})")
+            logger.info(f"Fetching details for activity: {activity['name']} ({activity['id']})")
             
             details = self.get_activity_details(activity['id'])
             
@@ -209,10 +314,14 @@ class StravaClient:
                 details['streams'] = streams
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 404:
-                    print(f"No streams available for activity {activity['id']}")
+                    logger.info(f"No streams available for activity {activity['id']}")
                     details['streams'] = None
                 else:
-                    raise
+                    logger.error(f"Failed to fetch streams for activity {activity['id']}: {e}")
+                    raise StravaAPIError(f"Failed to fetch activity streams: {e}") from e
+            except Exception as e:
+                logger.error(f"Unexpected error fetching streams for activity {activity['id']}: {e}")
+                details['streams'] = None
             
             detailed_activities.append(details)
         

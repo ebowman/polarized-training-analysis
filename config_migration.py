@@ -19,6 +19,9 @@ from sport_config import (
 )
 from sport_config_service import SportConfigService
 from config_generator import ConfigGenerator
+from logging_config import get_logger, DataValidationError, ConfigurationError
+
+logger = get_logger(__name__)
 
 
 class ConfigMigration:
@@ -46,7 +49,7 @@ class ConfigMigration:
         """
         # Check if already migrated
         if os.path.exists("sport_config.json") and not force:
-            print("Configuration already exists. Use force=True to re-migrate.")
+            logger.info("Configuration already exists. Use force=True to re-migrate.")
             return False
         
         print("Starting migration to new configuration system...")
@@ -127,13 +130,13 @@ class ConfigMigration:
                         if key.upper() == "FTP":
                             try:
                                 data["thresholds"]["ftp"] = float(value)
-                            except ValueError:
-                                pass
+                            except ValueError as e:
+                                logger.warning(f"Failed to parse heart rate value for {key}: {e}")
                         elif key.upper() == "LTHR":
                             try:
                                 data["thresholds"]["lthr"] = float(value)
-                            except ValueError:
-                                pass
+                            except ValueError as e:
+                                logger.warning(f"Failed to parse heart rate value for {key}: {e}")
         
         # Analyze cached activities to detect sports used
         if os.path.exists("cache"):
@@ -160,8 +163,8 @@ class ConfigMigration:
                     results = json.load(f)
                     # Look for threshold values in results
                     # This would need to be adapted based on actual structure
-            except:
-                pass
+            except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+                logger.debug(f"Could not parse training analysis results: {e}")
         
         return data
     

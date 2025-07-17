@@ -11,7 +11,9 @@ from datetime import datetime
 import openai
 import anthropic
 from dotenv import load_dotenv
+from logging_config import get_logger, AIProviderError
 
+logger = get_logger(__name__)
 load_dotenv()
 
 
@@ -51,8 +53,12 @@ class OpenAIProvider(AIProvider):
         
         if self.api_key and self.api_key != "your_openai_api_key_here":
             try:
+                # Initialize OpenAI client with minimal configuration
                 self.client = openai.OpenAI(api_key=self.api_key)
+                # Test the client with a simple request to ensure it works
+                # We'll do this lazily on first use to avoid startup delays
             except Exception as e:
+                logger.error(f"Failed to initialize OpenAI client: {e}")
                 self.error_message = f"Failed to initialize OpenAI client: {str(e)}"
         else:
             self.error_message = "OpenAI API key not configured in .env file"
@@ -194,6 +200,22 @@ class AIProviderFactory:
             
         Raises:
             ValueError if no provider is available
+            
+        Environment Variables:
+            AI_PROVIDER: Provider selection ('openai', 'claude', 'auto')
+            AI_PRIMARY_PROVIDER: Primary provider for auto mode (default: 'claude')
+            AI_FALLBACK_PROVIDER: Fallback provider for auto mode (default: 'openai')
+            
+        Examples:
+            # Use specific provider
+            provider = AIProviderFactory.create_provider('openai')
+            
+            # Auto-detect with default preference (Claude → OpenAI)
+            provider = AIProviderFactory.create_provider('auto')
+            
+            # Auto-detect with custom preference (set in .env):
+            # AI_PRIMARY_PROVIDER=openai
+            # AI_FALLBACK_PROVIDER=claude
         """
         if provider_name is None:
             provider_name = os.getenv("AI_PROVIDER", "auto").lower()
@@ -217,24 +239,48 @@ class AIProviderFactory:
                 raise ValueError(f"Claude provider not available: {provider.get_error_message()}")
         
         elif provider_name == "auto":
-            # Try providers in order of preference
-            providers = [
-                ("Claude", ClaudeProvider),
-                ("OpenAI", OpenAIProvider)
-            ]
+            # Get provider preference from .env file
+            primary_provider = os.getenv("AI_PRIMARY_PROVIDER", "claude").lower()
+            fallback_provider = os.getenv("AI_FALLBACK_PROVIDER", "openai").lower()
+            
+            # Map provider names to classes
+            provider_mapping = {
+                "claude": ("Claude", ClaudeProvider),
+                "anthropic": ("Claude", ClaudeProvider),
+                "openai": ("OpenAI", OpenAIProvider)
+            }
+            
+            # Build providers list based on preference
+            providers = []
+            
+            # Add primary provider first
+            if primary_provider in provider_mapping:
+                providers.append(provider_mapping[primary_provider])
+            
+            # Add fallback provider if different from primary
+            if fallback_provider in provider_mapping and fallback_provider != primary_provider:
+                providers.append(provider_mapping[fallback_provider])
+            
+            # Add any remaining providers not already included
+            for name, provider_class in [("Claude", ClaudeProvider), ("OpenAI", OpenAIProvider)]:
+                if (name, provider_class) not in providers:
+                    providers.append((name, provider_class))
+            
+            print(f"🔍 AI Provider preference: {primary_provider} (primary) → {fallback_provider} (fallback)")
             
             for name, provider_class in providers:
                 try:
                     provider = provider_class()
                     if provider.is_available():
-                        print(f"✅ Auto-detected {name} for AI recommendations")
+                        print(f"✅ Using {name} for AI recommendations")
                         return provider
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"Failed to initialize {name} provider: {e}")
                     continue
             
             # No provider available, collect error messages
             error_messages = []
-            for name, provider_class in providers:
+            for name, provider_class in [("Claude", ClaudeProvider), ("OpenAI", OpenAIProvider)]:
                 provider = provider_class()
                 if not provider.is_available():
                     error_messages.append(f"{name}: {provider.get_error_message()}")

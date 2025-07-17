@@ -1216,7 +1216,6 @@
         
         
         function displaySummary(activities) {
-            console.log('displaySummary called with', activities.length, 'activities');
             const summaryDiv = document.getElementById('summary');
             
             // Get selected time range
@@ -1347,20 +1346,7 @@
                 Zone 2: ${Math.round(zone2Percent)}% (target: 10%)<br>
                 Zone 3: ${Math.round(zone3Percent)}% (target: 10%)
             `;
-            
-            console.log('Summary calculations:', {
-                totalActivities,
-                totalMinutes,
-                zone1Percent,
-                zone2Percent,
-                zone3Percent,
-                totalZone1Minutes,
-                totalZone2Minutes,
-                totalZone3Minutes
-            });
-            
             summaryDiv.style.display = 'grid';
-            console.log('Summary div display set to grid');
         }
         
         function createAchievementSparkline(activities, timeRange) {
@@ -1683,14 +1669,7 @@
         }
         
         function displayCombinedChart(activities, fullData) {
-            console.log('=== displayCombinedChart START ===');
-            console.log('Cache buster:', '{{ cache_buster }}');
-            console.log('Activities:', activities?.length);
-            console.log('FullData keys:', fullData ? Object.keys(fullData) : 'null');
-            
             const combinedChartDiv = document.getElementById('combined-chart');
-            console.log('Combined chart div:', combinedChartDiv);
-            
             if (!combinedChartDiv) {
                 console.error('Combined chart div not found!');
                 return;
@@ -1698,7 +1677,6 @@
             
             // Ensure we have access to activities data
             if (!activities || activities.length === 0) {
-                console.log('No activities provided to displayCombinedChart');
                 return;
             }
             
@@ -1716,15 +1694,11 @@
             
             // Filter to selected range from ALL activities - always use the full dataset
             const allActivities = window.workoutData?.activities || activities || [];
-            console.log('All activities:', allActivities.length);
             const filteredActivities = allActivities.filter(activity => {
                 const activityDate = new Date(activity.date);
                 return activityDate >= rangeStartDate && activityDate <= today;
             });
-            console.log(`Last ${timeRange} days activities:`, filteredActivities.length);
-            
             if (filteredActivities.length === 0) {
-                console.log(`No activities in last ${timeRange} days, hiding chart`);
                 combinedChartDiv.style.display = 'none';
                 return;
             }
@@ -1745,24 +1719,6 @@
             const zone1Percent = totalMinutes > 0 ? (totalZone1Minutes / totalMinutes) * 100 : 0;
             const zone2Percent = totalMinutes > 0 ? (totalZone2Minutes / totalMinutes) * 100 : 0;
             const zone3Percent = totalMinutes > 0 ? (totalZone3Minutes / totalMinutes) * 100 : 0;
-            
-            console.log('Zone calculations:', {
-                totalMinutes,
-                totalZone1Minutes,
-                totalZone2Minutes,
-                totalZone3Minutes,
-                zone1Percent,
-                zone2Percent,
-                zone3Percent,
-                activities: filteredActivities.length,
-                rangeStartDate: rangeStartDate.toISOString(),
-                today: today.toISOString()
-            });
-            
-            console.log('About to show combined chart div');
-            console.log('Combined chart div element:', combinedChartDiv);
-            console.log('Current display style:', combinedChartDiv.style.display);
-            
             // Calculate target based on time range (360 minutes per week)
             const weeklyTarget = 360;
             const dailyTarget = weeklyTarget / 7;
@@ -1856,7 +1812,6 @@
             
             // Create or update combined chart
             const ctx = document.getElementById('combinedChart');
-            console.log('Combined chart canvas context:', ctx);
             if (!ctx) {
                 console.error('Could not find combinedChart canvas element!');
                 return;
@@ -1960,7 +1915,6 @@
                     maintainAspectRatio: false,
                     animation: {
                         onComplete: function() {
-                            console.log('Combined chart animation complete');
                             // Ensure the chart div stays visible
                             const chartDiv = document.getElementById('combined-chart');
                             if (chartDiv && chartDiv.style.display !== 'block') {
@@ -2074,20 +2028,12 @@
             });
             
             combinedChartDiv.style.display = 'block';
-            console.log('Combined chart div display set to block');
-            console.log('New display style:', combinedChartDiv.style.display);
-            
             // Force a reflow to ensure the display change takes effect
             combinedChartDiv.offsetHeight;
             
             // Check if the chart was created successfully
             setTimeout(() => {
-                console.log('After timeout - Combined chart div visible?', combinedChartDiv.style.display);
-                console.log('Combined chart instance:', window.combinedChart);
                 if (window.combinedChart) {
-                    console.log('Chart canvas:', window.combinedChart.canvas);
-                    console.log('Chart width:', window.combinedChart.width);
-                    console.log('Chart height:', window.combinedChart.height);
                 }
             }, 100);
             
@@ -2261,9 +2207,6 @@
                 displayAIError('AI recommendations are not available');
                 return;
             }
-            
-            console.log('Starting AI recommendations polling for session:', aiSessionId);
-            
             // Show loading state
             displayAILoading();
             
@@ -2281,8 +2224,6 @@
                 }
                 
                 const data = await response.json();
-                console.log('AI status:', data.status);
-                
                 if (data.status === 'pending') {
                     // Continue polling
                     aiPollingInterval = setTimeout(pollAIStatus, 2000); // Poll every 2 seconds
@@ -2419,12 +2360,8 @@
         }
         
         function displayVolumeTracking() {
-            console.log('displayVolumeTracking called');
             const volumeDiv = document.getElementById('volume-tracking');
             const volumeCanvas = document.getElementById('volumeChart');
-            console.log('Volume div:', volumeDiv);
-            console.log('Volume canvas:', volumeCanvas);
-            
             // Use all activities for volume tracking, not filtered ones
             if (!workoutData || !workoutData.activities || workoutData.activities.length === 0) {
                 volumeDiv.style.display = 'none';
@@ -2765,7 +2702,6 @@
             deficitElement.style.color = deficit > 0 ? '#e74c3c' : '#27ae60';
             
             // Create chart
-            console.log('Creating volume chart with canvas:', volumeCanvas);
             if (!volumeCanvas) {
                 console.error('Could not find volumeChart canvas element!');
                 return;
@@ -2916,8 +2852,6 @@
             });
             
             volumeDiv.style.display = 'block';
-            console.log('Volume div display set to block');
-            
             // Calculate zone percentages for pathway decision (always use 7 days for AI recommendations)
             const aiFilteredActivities = workoutData.activities.filter(activity => {
                 const activityDate = new Date(activity.date);
@@ -3020,9 +2954,6 @@
             try {
                 const response = await fetch(`/api/ai-status/${sessionId}`);
                 const data = await response.json();
-                
-                console.log('AI pathway response:', data);
-                
                 if (data.status === 'ready' && data.pathway_recommendations) {
                     displayAIRecoveryPathways(data.pathway_recommendations, deficit, alreadyWorkedOutToday, todayMinutes);
                 } else if (data.status === 'error') {
@@ -3146,17 +3077,6 @@
             const pathways = [];
             
             // Debug logging
-            console.log('Recovery pathway calculation v2:', {
-                version: 'v2-fixed',
-                deficit,
-                avgWorkoutMinutes,
-                consecutiveRestDays,
-                consecutiveTrainingDays,
-                currentMinutes,
-                pastWorkouts,
-                todayIndex
-            });
-            
             // If already at or above target, no recovery needed
             if (deficit <= 0) {
                 displayRecoveryPathways([], consecutiveRestDays, deficit, alreadyWorkedOutToday, todayMinutes);
@@ -3219,13 +3139,6 @@
             // Simulates when the rolling window will reach the target minutes
             
             // Debug logging
-            console.log('SimulateRollingWindow called with:', {
-                startingMinutes,
-                dailyPlan: dailyPlan.slice(0, 7),
-                avgMinutes,
-                pastWorkouts
-            });
-            
             // Build a complete workout history (past + future)
             const workoutHistory = [];
             
@@ -3245,8 +3158,6 @@
             }
             
             // Debug the workout history
-            console.log('Workout history (first 14 days):', workoutHistory.slice(0, 14));
-            
             // Now simulate rolling windows starting from today (day 0)
             for (let futureDay = 0; futureDay < 60; futureDay++) {
                 // Calculate rolling 7-day total that ENDS on futureDay
@@ -3263,7 +3174,6 @@
                 
                 // Debug first few days
                 if (futureDay < 5) {
-                    console.log(`Future day ${futureDay}: Rolling 7-day total = ${rollingTotal} (indices ${startIdx}-${endIdx})`);
                 }
                 
                 if (rollingTotal >= targetTotal) {
@@ -3429,14 +3339,6 @@
             let remainingDeficit = deficit - todayMinutes - tomorrowMinutes;
             
             // Spread remaining over next 5 days
-            console.log('Steady pathway initial:', {
-                deficit,
-                todayMinutes,
-                tomorrowMinutes,
-                remainingDeficit,
-                avgMinutes
-            });
-            
             for (let day = 2; day < 7; day++) {
                 if (remainingDeficit <= 0) {
                     // If deficit is already covered, just maintain moderate volume
@@ -3448,7 +3350,6 @@
                     const daysLeft = 7 - day;
                     const dayMinutes = Math.min(avgMinutes, remainingDeficit / daysLeft);
                     const finalMinutes = Math.max(30, dayMinutes); // Minimum 30 minutes
-                    console.log(`Day ${day + 1}: remainingDeficit=${remainingDeficit}, daysLeft=${daysLeft}, dayMinutes=${dayMinutes}, finalMinutes=${finalMinutes}`);
                     pathway.days.push({
                         day: `Day ${day + 1}`,
                         minutes: Math.round(finalMinutes)
@@ -3467,13 +3368,6 @@
             while (fullPlan.length < 30) {
                 fullPlan.push(sustainedVolume);
             }
-            
-            console.log('Steady pathway plan:', {
-                days: pathway.days,
-                fullPlan: fullPlan.slice(0, 14),
-                sustainedVolume,
-                avgMinutes
-            });
             pathway.backOnTrack = simulateRollingWindow(currentMinutes, fullPlan, avgMinutes, pastWorkouts);
             
             return pathway;
@@ -3726,7 +3620,6 @@
             
             recommendations.forEach((rec, index) => {
                 try {
-                    console.log(`Processing recommendation ${index}:`, rec);
                     const card = createAIRecommendationCard(rec);
                     cardsDiv.appendChild(card);
                 } catch (error) {
@@ -3981,7 +3874,6 @@
                 document.getElementById('error').textContent = 'Chart.js library failed to load. Please refresh the page.';
                 return;
             }
-            console.log('Chart.js loaded successfully, version:', Chart.version);
             loadData();
             
             // Check if we should auto-start download (after OAuth)

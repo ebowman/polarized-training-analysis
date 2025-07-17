@@ -19,6 +19,9 @@ from sport_config import (
     Equipment, WorkoutTemplate, Metric, MetricType, TrainingPhilosophy,
     ConfigValidator, ConfigLoader, create_default_config
 )
+from logging_config import get_logger, DataValidationError, ConfigurationError
+
+logger = get_logger(__name__)
 
 
 class ZoneCalculationStrategy:
@@ -61,7 +64,8 @@ class FormulaZoneStrategy(ZoneCalculationStrategy):
             try:
                 # Safe evaluation of simple arithmetic
                 return eval(formula, {"__builtins__": {}}, {})
-            except:
+            except (SyntaxError, NameError, TypeError, ValueError, ZeroDivisionError) as e:
+                logger.error(f"Error evaluating formula '{formula}': {e}")
                 return 0
         
         return 0
