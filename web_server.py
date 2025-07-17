@@ -44,6 +44,14 @@ except ImportError:
     ConfigGenerator = None
     logger.info("Sport config service not available, using default configuration")
 
+# Import settings API
+try:
+    from settings_api import register_settings_routes
+    SETTINGS_API_AVAILABLE = True
+except ImportError:
+    SETTINGS_API_AVAILABLE = False
+    logger.info("Settings API not available")
+
 app = Flask(__name__, template_folder='templates')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
 
@@ -887,6 +895,11 @@ def workout_preferences():
     """Serve the workout preferences with dynamic HR/power calculations"""
     return render_template('workout_preferences.html', **get_zone_calculations())
 
+@app.route('/settings')
+def settings():
+    """Serve the settings page for configuration management"""
+    return render_template('settings.html')
+
 @app.route('/api/workouts')
 def api_workouts():
     """API endpoint to get workout data as JSON"""
@@ -1135,6 +1148,120 @@ def api_status():
         'ai_enabled': os.getenv('OPENAI_API_KEY') is not None
     })
 
+@app.route('/api/settings', methods=['GET'])
+def get_settings():
+    """API endpoint to get current settings"""
+    try:
+        # If settings API is available, use it for enhanced functionality
+        if SETTINGS_API_AVAILABLE:
+            from settings_api import SettingsAPI
+            result = SettingsAPI.get_env_settings()
+            if result['success']:
+                settings = result['settings']
+            else:
+                settings = {}
+        else:
+            # Fallback to direct file reading
+            settings = {}
+            env_path = Path('.env')
+            if env_path.exists():
+                with open(env_path, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#') and '=' in line:
+                            key, value = line.split('=', 1)
+                            # Mask sensitive values
+                            if any(sensitive in key for sensitive in ['KEY', 'PASS', 'SECRET']):
+                                if value:
+                                    settings[key] = '***' + value[-4:] if len(value) > 4 else '***'
+                                else:
+                                    settings[key] = ''
+                            else:
+                                settings[key] = value
+        
+        # Add sport config if available
+        sport_config_path = Path('sport_config.json')
+        if sport_config_path.exists():
+            with open(sport_config_path, 'r') as f:
+                settings['SPORT_CONFIG_JSON'] = f.read()
+        
+        return jsonify(settings)
+    except Exception as e:
+        logger.error(f"Error loading settings: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/settings', methods=['POST'])
+def save_settings():
+    """API endpoint to save settings"""
+    try:
+        settings = request.json
+        
+        # DEBUG: Basic logging for settings updates
+        logger.info(f"Settings update request with {len(settings) if settings else 0} fields")
+        
+        # Separate sport config from env variables
+        sport_config_json = settings.pop('SPORT_CONFIG_JSON', None)
+        
+        # If settings API is available, use it for enhanced functionality
+        if SETTINGS_API_AVAILABLE:
+            from settings_api import SettingsAPI
+            # Update each setting through the settings API
+            for key, value in settings.items():
+                result = SettingsAPI.update_env_setting(key, value)
+                if not result['success']:
+                    error_msg = result.get('error', 'Failed to update setting')
+                    logger.error(f"Settings validation failed for {key}: {error_msg}")
+                    return jsonify({'error': f"{error_msg} (field: {key})"}), 400
+        else:
+            # Fallback to direct file writing
+            env_path = Path('.env')
+            env_lines = []
+            
+            # Read existing .env file
+            existing_keys = set()
+            if env_path.exists():
+                with open(env_path, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#'):
+                            if '=' in line:
+                                key = line.split('=', 1)[0]
+                                if key in settings:
+                                    env_lines.append(f"{key}={settings[key]}")
+                                    existing_keys.add(key)
+                                else:
+                                    env_lines.append(line)
+                            else:
+                                env_lines.append(line)
+                        else:
+                            env_lines.append(line)
+            
+            # Add new keys
+            for key, value in settings.items():
+                if key not in existing_keys:
+                    env_lines.append(f"{key}={value}")
+            
+            # Write updated .env file
+            with open(env_path, 'w') as f:
+                f.write('\n'.join(env_lines))
+                if env_lines and not env_lines[-1].endswith('\n'):
+                    f.write('\n')
+        
+        # Save sport config if provided
+        if sport_config_json:
+            try:
+                # Validate JSON
+                json.loads(sport_config_json)
+                with open('sport_config.json', 'w') as f:
+                    f.write(sport_config_json)
+            except json.JSONDecodeError as e:
+                return jsonify({'error': f'Invalid sport config JSON: {str(e)}'}), 400
+        
+        return jsonify({'status': 'success', 'message': 'Settings saved successfully'})
+    except Exception as e:
+        logger.error(f"Error saving settings: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({'error': 'Not found'}), 404
@@ -1338,6 +1465,11 @@ def main():
     
     # Check and regenerate sport config if needed
     check_and_regenerate_sport_config()
+    
+    # Register settings API routes if available
+    if SETTINGS_API_AVAILABLE:
+        register_settings_routes(app)
+        print("✅ Settings API routes registered")
     
     # Check data and start auto-download if needed
     if not args.no_auto_download:
