@@ -1,0 +1,223 @@
+{
+  "version": "1.0.0",
+  "user_profile": {
+    "name": "Example User",
+    "training_philosophy": "polarized",
+    "training_distribution": {
+      "zone1_percent": 80,
+      "zone2_percent": 10,
+      "zone3_percent": 10
+    },
+    "volume_thresholds": {
+      "low_volume_hours": 4,
+      "high_volume_hours": 6
+    }
+  },
+  "sports": [
+    {
+      "id": "cycling",
+      "name": "Cycling",
+      "activity_types": ["Ride", "VirtualRide", "EBikeRide"],
+      "primary_metric": "power",
+      "secondary_metrics": ["heart_rate", "cadence"],
+      "equipment": [
+        {
+          "name": "Indoor Bike",
+          "brand": "Peloton",
+          "model": "Bike+",
+          "capabilities": ["power", "heart_rate", "cadence"],
+          "workout_types": ["Power Zone Endurance", "Power Zone", "Power Zone Max", "Recovery"]
+        },
+        {
+          "name": "Road Bike",
+          "brand": "Trek",
+          "model": "Domane",
+          "capabilities": ["heart_rate", "speed", "cadence"],
+          "workout_types": ["Endurance", "Tempo", "Intervals", "Recovery"]
+        }
+      ],
+      "zone_models": {
+        "power": {
+          "name": "Coggan Power Zones",
+          "type": "percentage",
+          "base_metric": "FTP",
+          "zones": [
+            {"number": 1, "name": "Active Recovery", "min": 0, "max": 0.55},
+            {"number": 2, "name": "Endurance", "min": 0.56, "max": 0.75},
+            {"number": 3, "name": "Tempo", "min": 0.76, "max": 0.90},
+            {"number": 4, "name": "Lactate Threshold", "min": 0.91, "max": 1.05},
+            {"number": 5, "name": "VO2 Max", "min": 1.06, "max": 1.20},
+            {"number": 6, "name": "Anaerobic Capacity", "min": 1.21, "max": 1.50},
+            {"number": 7, "name": "Neuromuscular Power", "min": 1.51, "max": 10.0}
+          ]
+        },
+        "heart_rate": {
+          "name": "Heart Rate Zones",
+          "type": "percentage",
+          "base_metric": "LTHR",
+          "zones": [
+            {"number": 1, "name": "Recovery", "min": 0, "max": 0.68},
+            {"number": 2, "name": "Aerobic", "min": 0.69, "max": 0.83},
+            {"number": 3, "name": "Tempo", "min": 0.84, "max": 0.94},
+            {"number": 4, "name": "SubThreshold", "min": 0.95, "max": 1.05},
+            {"number": 5, "name": "SuperThreshold", "min": 1.06, "max": 1.20}
+          ]
+        }
+      },
+      "training_zones": {
+        "zone1": {
+          "name": "Easy",
+          "description": "Base aerobic development",
+          "metric_zones": [1, 2]
+        },
+        "zone2": {
+          "name": "Moderate",
+          "description": "Threshold development",
+          "metric_zones": [3, 4]
+        },
+        "zone3": {
+          "name": "Hard",
+          "description": "VO2max and anaerobic development",
+          "metric_zones": [5, 6, 7]
+        }
+      },
+      "workout_templates": [
+        {
+          "name": "Endurance Ride",
+          "training_zone": 1,
+          "duration_range": {"min_minutes": 45, "max_minutes": 180},
+          "description": "Steady Zone 2 power/HR"
+        },
+        {
+          "name": "Sweet Spot",
+          "training_zone": 2,
+          "duration_range": {"min_minutes": 30, "max_minutes": 60},
+          "description": "88-93% FTP intervals"
+        }
+      ]
+    },
+    {
+      "id": "rowing",
+      "name": "Rowing",
+      "activity_types": ["Rowing"],
+      "primary_metric": "heart_rate",
+      "secondary_metrics": ["pace", "stroke_rate"],
+      "equipment": [
+        {
+          "name": "Rowing Machine",
+          "brand": "Concept2",
+          "model": "RowErg",
+          "capabilities": ["heart_rate", "pace", "distance", "stroke_rate"],
+          "workout_types": ["Steady State", "Intervals", "Recovery"]
+        }
+      ],
+      "zone_models": {
+        "heart_rate": {
+          "name": "Rowing HR Zones",
+          "type": "formula",
+          "base_metric": "custom",
+          "zones": [
+            {"number": 1, "name": "UT2", "min": "LTHR-30", "max": "LTHR-20"},
+            {"number": 2, "name": "UT1", "min": "LTHR-19", "max": "LTHR-10"},
+            {"number": 3, "name": "AT", "min": "LTHR-9", "max": "LTHR+5"},
+            {"number": 4, "name": "TR", "min": "LTHR+6", "max": "LTHR+15"},
+            {"number": 5, "name": "AN", "min": "LTHR+16", "max": "MAX"}
+          ]
+        }
+      },
+      "training_zones": {
+        "zone1": {
+          "name": "Base",
+          "description": "Aerobic base building",
+          "metric_zones": [1, 2]
+        },
+        "zone2": {
+          "name": "Threshold",
+          "description": "Anaerobic threshold work",
+          "metric_zones": [3]
+        },
+        "zone3": {
+          "name": "Power",
+          "description": "VO2max and anaerobic power",
+          "metric_zones": [4, 5]
+        }
+      }
+    },
+    {
+      "id": "swimming",
+      "name": "Swimming",
+      "activity_types": ["Swim"],
+      "primary_metric": "pace",
+      "secondary_metrics": ["heart_rate", "stroke_rate"],
+      "equipment": [
+        {
+          "name": "Pool",
+          "capabilities": ["pace", "distance"],
+          "workout_types": ["Technique", "Endurance", "Speed", "Recovery"]
+        }
+      ],
+      "zone_models": {
+        "pace": {
+          "name": "Swimming Pace Zones",
+          "type": "absolute",
+          "base_metric": "threshold_pace",
+          "zones": [
+            {"number": 1, "name": "Easy", "min": "TP+20", "max": "TP+15"},
+            {"number": 2, "name": "Steady", "min": "TP+14", "max": "TP+8"},
+            {"number": 3, "name": "Threshold", "min": "TP+7", "max": "TP-2"},
+            {"number": 4, "name": "VO2max", "min": "TP-3", "max": "TP-8"},
+            {"number": 5, "name": "Sprint", "min": "TP-9", "max": "MAX"}
+          ]
+        }
+      },
+      "training_zones": {
+        "zone1": {
+          "name": "Aerobic",
+          "metric_zones": [1, 2]
+        },
+        "zone2": {
+          "name": "Threshold",
+          "metric_zones": [3]
+        },
+        "zone3": {
+          "name": "Speed",
+          "metric_zones": [4, 5]
+        }
+      }
+    }
+  ],
+  "metric_thresholds": {
+    "max_heart_rate": 180,
+    "lactate_threshold_heart_rate": 165,
+    "functional_threshold_power": 250,
+    "threshold_pace": "1:35/100m"
+  },
+  "preferences": {
+    "goals": ["Improve endurance", "Increase FTP"],
+    "constraints": ["Limited to indoor training on weekdays"],
+    "schedule": {
+      "monday": "rest",
+      "tuesday": "cycling",
+      "wednesday": "rowing",
+      "thursday": "cycling",
+      "friday": "swimming",
+      "saturday": "cycling",
+      "sunday": "rest or easy"
+    }
+  },
+  "data_sources": [
+    {
+      "type": "strava",
+      "config": {
+        "auto_sync": true,
+        "sync_interval": 300
+      },
+      "activity_mapping": {
+        "Ride": "cycling",
+        "VirtualRide": "cycling",
+        "Rowing": "rowing",
+        "Swim": "swimming"
+      }
+    }
+  ]
+}

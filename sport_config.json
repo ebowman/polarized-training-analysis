@@ -1,0 +1,153 @@
+{
+  "version": "1.0.0",
+  "user_profile": {
+    "philosophy": "polarized",
+    "volume_levels": {
+      "low": 5,
+      "medium": 10,
+      "high": 15
+    },
+    "preferences": {},
+    "thresholds": {
+      "ftp": 301,
+      "lthr": 153,
+      "max_hr": 171
+    }
+  },
+  "sports": [
+    {
+      "name": "Cycling",
+      "activity_types": [
+        "Ride",
+        "VirtualRide"
+      ],
+      "primary_metric": {
+        "type": "power",
+        "unit": "watts",
+        "threshold_field": "ftp",
+        "decimal_places": 0,
+        "custom_formula": null
+      },
+      "secondary_metric": {
+        "type": "heart_rate",
+        "unit": "bpm",
+        "threshold_field": "lthr",
+        "decimal_places": 0,
+        "custom_formula": null
+      },
+      "zone_model": "percentage",
+      "zones": [
+        {
+          "name": "Recovery",
+          "lower": 0,
+          "upper": 55,
+          "description": "Easy recovery",
+          "polarized_zone": 1
+        },
+        {
+          "name": "Endurance",
+          "lower": 56,
+          "upper": 75,
+          "description": "Aerobic endurance",
+          "polarized_zone": 1
+        },
+        {
+          "name": "Tempo",
+          "lower": 76,
+          "upper": 90,
+          "description": "Moderate effort",
+          "polarized_zone": 2
+        },
+        {
+          "name": "Threshold",
+          "lower": 91,
+          "upper": 105,
+          "description": "Lactate threshold",
+          "polarized_zone": 2
+        },
+        {
+          "name": "VO2 Max",
+          "lower": 106,
+          "upper": 120,
+          "description": "Maximum aerobic power",
+          "polarized_zone": 3
+        },
+        {
+          "name": "Anaerobic",
+          "lower": 121,
+          "upper": 150,
+          "description": "Short intense efforts",
+          "polarized_zone": 3
+        },
+        {
+          "name": "Neuromuscular",
+          "lower": 151,
+          "upper": 200,
+          "description": "Sprint power",
+          "polarized_zone": 3
+        }
+      ],
+      "equipment": [],
+      "workout_templates": [],
+      "custom_fields": {},
+      "tags": []
+    },
+    {
+      "name": "Running",
+      "activity_types": [
+        "Run"
+      ],
+      "primary_metric": {
+        "type": "heart_rate",
+        "unit": "bpm",
+        "threshold_field": "lthr",
+        "decimal_places": 0,
+        "custom_formula": null
+      },
+      "secondary_metric": null,
+      "zone_model": "percentage",
+      "zones": [
+        {
+          "name": "Zone 1",
+          "lower": 0,
+          "upper": 85,
+          "description": "Easy aerobic",
+          "polarized_zone": 1
+        },
+        {
+          "name": "Zone 2",
+          "lower": 85,
+          "upper": 89,
+          "description": "Moderate aerobic",
+          "polarized_zone": 1
+        },
+        {
+          "name": "Zone 3",
+          "lower": 90,
+          "upper": 94,
+          "description": "Threshold",
+          "polarized_zone": 2
+        },
+        {
+          "name": "Zone 4",
+          "lower": 95,
+          "upper": 99,
+          "description": "VO2 Max",
+          "polarized_zone": 3
+        },
+        {
+          "name": "Zone 5",
+          "lower": 100,
+          "upper": 110,
+          "description": "Max effort",
+          "polarized_zone": 3
+        }
+      ],
+      "equipment": [],
+      "workout_templates": [],
+      "custom_fields": {},
+      "tags": []
+    }
+  ],
+  "global_settings": {}
+}

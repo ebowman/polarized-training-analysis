@@ -153,35 +153,6 @@ class TrainingDataAnalyzer:
             
         return equipment
     
-    def _get_equipment_specific_zone_guidelines(self, training_data: Dict) -> str:
-        """Get zone guidelines based on user's actual equipment"""
-        equipment = self._get_available_equipment()
-        guidelines = []
-        
-        # Only show guidelines for equipment the user actually has
-        if 'Swimming' in equipment:
-            guidelines.append("""**For Swimming:**
-- Easy pace (conversational effort) = Polarized Zone 1
-- Moderate pace (comfortably hard) = Polarized Zone 2  
-- Fast pace (hard effort) = Polarized Zone 3""")
-        
-        if 'Running' in equipment:
-            lthr = training_data.get('config', {}).get('lthr', 153)
-            max_hr = training_data.get('config', {}).get('max_hr', 171)
-            guidelines.append(f"""**For Running (HR-based):**
-- Zone 1: Easy pace (<{int(lthr * 0.85)} bpm) = Polarized Zone 1
-- Zone 2-3: Tempo pace ({int(lthr * 0.85)}-{int(lthr * 0.95)} bpm) = Polarized Zone 2
-- Zone 4-5: Hard intervals (>{int(lthr * 0.95)} bpm) = Polarized Zone 3""")
-        
-        if 'Road Bike' in equipment:
-            ftp = training_data.get('config', {}).get('ftp', 301)
-            guidelines.append(f"""**For Cycling (Power-based):**
-- Power Zone 1-2 (0-75% FTP / 0-{int(ftp * 0.75)}W) = Polarized Zone 1
-- Power Zone 3-4 (76-105% FTP / {int(ftp * 0.76)}-{int(ftp * 1.05)}W) = Polarized Zone 2
-- Power Zone 5-7 (106%+ FTP / >{int(ftp * 1.06)}W) = Polarized Zone 3""")
-        
-        return '\n\n'.join(guidelines)
-    
     def filter_recent_activities(self, activities: List[Dict], days: int = ANALYSIS_WINDOW_DAYS) -> List[Dict]:
         """Filter activities to recent time window"""
         cutoff_date = datetime.now() - timedelta(days=days)
@@ -475,6 +446,35 @@ class PromptBuilder:
             equipment = ['Bodyweight', 'None']
             
         return equipment
+    
+    def _get_equipment_specific_zone_guidelines(self, training_data: Dict) -> str:
+        """Get zone guidelines based on user's actual equipment"""
+        equipment = self._get_available_equipment()
+        guidelines = []
+        
+        # Only show guidelines for equipment the user actually has
+        if 'Swimming' in equipment:
+            guidelines.append("""**For Swimming:**
+- Easy pace (conversational effort) = Polarized Zone 1
+- Moderate pace (comfortably hard) = Polarized Zone 2  
+- Fast pace (hard effort) = Polarized Zone 3""")
+        
+        if 'Running' in equipment:
+            lthr = training_data.get('config', {}).get('lthr', 153)
+            max_hr = training_data.get('config', {}).get('max_hr', 171)
+            guidelines.append(f"""**For Running (HR-based):**
+- Zone 1: Easy pace (<{int(lthr * 0.85)} bpm) = Polarized Zone 1
+- Zone 2-3: Tempo pace ({int(lthr * 0.85)}-{int(lthr * 0.95)} bpm) = Polarized Zone 2
+- Zone 4-5: Hard intervals (>{int(lthr * 0.95)} bpm) = Polarized Zone 3""")
+        
+        if 'Road Bike' in equipment:
+            ftp = training_data.get('config', {}).get('ftp', 301)
+            guidelines.append(f"""**For Cycling (Power-based):**
+- Power Zone 1-2 (0-75% FTP / 0-{int(ftp * 0.75)}W) = Polarized Zone 1
+- Power Zone 3-4 (76-105% FTP / {int(ftp * 0.76)}-{int(ftp * 1.05)}W) = Polarized Zone 2
+- Power Zone 5-7 (106%+ FTP / >{int(ftp * 1.06)}W) = Polarized Zone 3""")
+        
+        return '\n\n'.join(guidelines)
     
     def load_user_preferences(self) -> str:
         """Load user workout preferences from markdown file with fallback"""
@@ -832,9 +832,9 @@ Generate 3 specific recovery pathway recommendations for an athlete who is {defi
 ## Task
 Generate exactly 3 recovery pathway recommendations:
 
-1. **Quick Catch-up** (1-2 days): Fast but sustainable approach
-2. **Moderate Plan** (3-4 days): Balanced distribution  
-3. **Gentle Recovery** (5-7 days): Conservative, sustainable approach
+1. **Aggressive** (1-2 days): Fast but sustainable approach to catch up quickly
+2. **Steady** (3-4 days): Balanced distribution for moderate recovery
+3. **Conservative** (5-7 days): Gentle, sustainable approach
 
 For each pathway, provide:
 - **workout_type**: Specific workout name/type
@@ -855,9 +855,9 @@ For each pathway, provide:
 
 Return as JSON:
 {{
-  "catch-up": {{workout_recommendation}},
-  "moderate": {{workout_recommendation}},
-  "gentle": {{workout_recommendation}}
+  "aggressive": {{workout_recommendation}},
+  "steady": {{workout_recommendation}},
+  "conservative": {{workout_recommendation}}
 }}
 """
         return prompt

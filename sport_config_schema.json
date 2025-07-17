@@ -1,0 +1,242 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Sport Configuration Schema",
+  "description": "Flexible configuration schema for any sport or training activity",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version for future compatibility",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "user_profile": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "training_philosophy": {
+          "type": "string",
+          "enum": ["polarized", "pyramidal", "threshold", "custom"],
+          "default": "polarized"
+        },
+        "training_distribution": {
+          "type": "object",
+          "properties": {
+            "zone1_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+            "zone2_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+            "zone3_percent": { "type": "number", "minimum": 0, "maximum": 100 }
+          },
+          "required": ["zone1_percent", "zone2_percent", "zone3_percent"]
+        },
+        "volume_thresholds": {
+          "type": "object",
+          "properties": {
+            "low_volume_hours": { "type": "number", "default": 4 },
+            "high_volume_hours": { "type": "number", "default": 6 }
+          }
+        }
+      }
+    },
+    "sports": {
+      "type": "array",
+      "description": "List of configured sports/activities",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for this sport configuration"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name for the sport"
+          },
+          "activity_types": {
+            "type": "array",
+            "description": "List of activity types that map to this sport (e.g., Strava activity types)",
+            "items": { "type": "string" }
+          },
+          "primary_metric": {
+            "type": "string",
+            "enum": ["power", "heart_rate", "pace", "speed", "custom"],
+            "description": "Primary intensity metric for this sport"
+          },
+          "secondary_metrics": {
+            "type": "array",
+            "description": "Additional metrics to track",
+            "items": { "type": "string" }
+          },
+          "equipment": {
+            "type": "array",
+            "description": "Available equipment for this sport",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "brand": { "type": "string" },
+                "model": { "type": "string" },
+                "capabilities": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "workout_types": {
+                  "type": "array",
+                  "description": "Available workout types on this equipment",
+                  "items": { "type": "string" }
+                }
+              },
+              "required": ["name"]
+            }
+          },
+          "zone_models": {
+            "type": "object",
+            "description": "Zone calculation models for different metrics",
+            "properties": {
+              "power": { "$ref": "#/definitions/zone_model" },
+              "heart_rate": { "$ref": "#/definitions/zone_model" },
+              "pace": { "$ref": "#/definitions/zone_model" },
+              "custom": { "$ref": "#/definitions/zone_model" }
+            }
+          },
+          "training_zones": {
+            "type": "object",
+            "description": "Mapping of training zones for polarized model",
+            "properties": {
+              "zone1": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "default": "Easy" },
+                  "description": { "type": "string" },
+                  "metric_zones": {
+                    "type": "array",
+                    "description": "Which zones from zone_model map to this training zone",
+                    "items": { "type": "integer" }
+                  }
+                }
+              },
+              "zone2": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "default": "Moderate" },
+                  "description": { "type": "string" },
+                  "metric_zones": {
+                    "type": "array",
+                    "items": { "type": "integer" }
+                  }
+                }
+              },
+              "zone3": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "default": "Hard" },
+                  "description": { "type": "string" },
+                  "metric_zones": {
+                    "type": "array",
+                    "items": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "workout_templates": {
+            "type": "array",
+            "description": "Predefined workout templates for this sport",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "training_zone": { "type": "integer", "minimum": 1, "maximum": 3 },
+                "duration_range": {
+                  "type": "object",
+                  "properties": {
+                    "min_minutes": { "type": "integer" },
+                    "max_minutes": { "type": "integer" }
+                  }
+                },
+                "description": { "type": "string" },
+                "equipment_required": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "required": ["id", "name", "activity_types", "primary_metric"]
+      }
+    },
+    "metric_thresholds": {
+      "type": "object",
+      "description": "User's personal thresholds for each metric",
+      "properties": {
+        "max_heart_rate": { "type": "integer" },
+        "lactate_threshold_heart_rate": { "type": "integer" },
+        "functional_threshold_power": { "type": "integer" },
+        "threshold_pace": { "type": "string" },
+        "custom_thresholds": {
+          "type": "object",
+          "additionalProperties": {
+            "type": ["string", "number", "integer"]
+          }
+        }
+      }
+    },
+    "preferences": {
+      "type": "object",
+      "description": "Additional user preferences from workout_preferences_personal.md",
+      "properties": {
+        "goals": { "type": "array", "items": { "type": "string" } },
+        "constraints": { "type": "array", "items": { "type": "string" } },
+        "schedule": { "type": "object" },
+        "notes": { "type": "string" }
+      }
+    },
+    "data_sources": {
+      "type": "array",
+      "description": "Configured data sources for activity import",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "enum": ["strava", "garmin", "wahoo", "csv", "manual"] },
+          "config": { "type": "object" },
+          "activity_mapping": {
+            "type": "object",
+            "description": "Map source activity types to configured sports",
+            "additionalProperties": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "required": ["version", "sports"],
+  "definitions": {
+    "zone_model": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["percentage", "absolute", "formula", "custom"]
+        },
+        "base_metric": {
+          "type": "string",
+          "description": "What the percentages are based on (e.g., FTP, LTHR, max)"
+        },
+        "zones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "number": { "type": "integer" },
+              "name": { "type": "string" },
+              "min": { "type": ["number", "string"] },
+              "max": { "type": ["number", "string"] },
+              "description": { "type": "string" }
+            },
+            "required": ["number", "name", "min", "max"]
+          }
+        }
+      },
+      "required": ["name", "type", "zones"]
+    }
+  }
+}
