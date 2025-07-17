@@ -1,16 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:pmc.ncbi.nlm.nih.gov)",
-      "Bash(grep:*)",
-      "Bash(find:*)",
-      "Bash(rg:*)",
-      "Bash(python3:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(ls:*)",
-      "Bash(pytest:*)",
-      "Bash(python:*)"
+      "mcp__ruv-swarm",
+      "mcp__claude-flow"
     ],
     "deny": []
   }

@@ -19,6 +19,16 @@ from enum import Enum
 import numpy as np
 from dotenv import load_dotenv
 
+# Import sport configuration
+try:
+    from sport_config_service import SportConfigService
+    from sport_config import MetricType
+    USE_SPORT_CONFIG = os.getenv('USE_SPORT_CONFIG', 'true').lower() == 'true'
+except ImportError:
+    USE_SPORT_CONFIG = False
+    SportConfigService = None
+    MetricType = None
+
 load_dotenv()
 
 @dataclass
@@ -165,6 +175,21 @@ class TrainingAnalyzer:
         else:
             self.ftp = ftp or int(os.getenv("FTP", "250"))
         
+        # Initialize sport config service if available
+        self.sport_config_service = None
+        if USE_SPORT_CONFIG and SportConfigService:
+            try:
+                self.sport_config_service = SportConfigService()
+                # Update thresholds in sport config
+                if self.lthr > 0:
+                    self.sport_config_service.update_threshold('lthr', self.lthr)
+                if self.ftp > 0:
+                    self.sport_config_service.update_threshold('ftp', self.ftp)
+                self.sport_config_service.update_threshold('max_hr', self.max_hr)
+            except Exception as e:
+                print(f"Warning: Could not initialize SportConfigService: {e}")
+                self.sport_config_service = None
+        
         # Use LTHR-based zones if available, otherwise fall back to max HR
         if self.lthr > 0:
             self.hr_zones = TrainingZones.from_lthr(self.lthr)
@@ -173,13 +198,33 @@ class TrainingAnalyzer:
         
         self.power_zones = PowerZones.from_ftp(self.ftp)
         
-        # Target distribution based on polarized training (80/10/10 approach)
-        self.target_zone1_percent = 80.0
-        self.target_zone2_percent = 10.0
-        self.target_zone3_percent = 10.0
+        # Get target distribution from sport config or use default
+        if self.sport_config_service:
+            targets = self.sport_config_service.get_zone_distribution_target()
+            self.target_zone1_percent = targets.get(1, 80.0)
+            self.target_zone2_percent = targets.get(2, 10.0)
+            self.target_zone3_percent = targets.get(3, 10.0)
+        else:
+            # Target distribution based on polarized training (80/10/10 approach)
+            self.target_zone1_percent = 80.0
+            self.target_zone2_percent = 10.0
+            self.target_zone3_percent = 10.0
     
-    def _get_hr_zone(self, hr: int) -> int:
+    def _get_hr_zone(self, hr: int, sport_type: Optional[str] = None) -> int:
         """Get zone number (1-7) for a given heart rate"""
+        if self.sport_config_service and sport_type:
+            sport = self.sport_config_service.get_sport_by_activity_type(sport_type)
+            if sport:
+                # Use dynamic zone calculation
+                threshold = self.sport_config_service.get_threshold_value(sport, MetricType.HEART_RATE)
+                if threshold:
+                    zones = self.sport_config_service.calculate_zones(sport, MetricType.HEART_RATE, threshold)
+                    for i, (zone_name, lower, upper, polarized_zone) in enumerate(zones, 1):
+                        if lower <= hr <= upper:
+                            return i
+                    return len(zones)  # Max zone if above all
+        
+        # Fall back to legacy calculation
         if hr <= self.hr_zones.zone1_max:
             return 1
         elif hr <= self.hr_zones.zone2_max:
@@ -195,8 +240,21 @@ class TrainingAnalyzer:
         else:
             return 7
     
-    def _get_power_zone(self, power: int) -> int:
+    def _get_power_zone(self, power: int, sport_type: Optional[str] = None) -> int:
         """Get zone number (1-7) for a given power value"""
+        if self.sport_config_service and sport_type:
+            sport = self.sport_config_service.get_sport_by_activity_type(sport_type)
+            if sport:
+                # Use dynamic zone calculation
+                threshold = self.sport_config_service.get_threshold_value(sport, MetricType.POWER)
+                if threshold:
+                    zones = self.sport_config_service.calculate_zones(sport, MetricType.POWER, threshold)
+                    for i, (zone_name, lower, upper, polarized_zone) in enumerate(zones, 1):
+                        if lower <= power <= upper:
+                            return i
+                    return len(zones)  # Max zone if above all
+        
+        # Fall back to legacy calculation
         if power <= self.power_zones.zone1_max:
             return 1
         elif power <= self.power_zones.zone2_max:
@@ -212,8 +270,16 @@ class TrainingAnalyzer:
         else:
             return 7
     
-    def _map_to_3zone(self, zone_7: int) -> int:
+    def _map_to_3zone(self, zone_7: int, sport_type: Optional[str] = None) -> int:
         """Map 7-zone model to simplified 3-zone model for polarized training"""
+        if self.sport_config_service and sport_type:
+            sport = self.sport_config_service.get_sport_by_activity_type(sport_type)
+            if sport:
+                # Use the polarized zone mapping from the sport config
+                if zone_7 <= len(sport.zones):
+                    return sport.zones[zone_7 - 1].polarized_zone
+        
+        # Fall back to legacy mapping
         if zone_7 <= 2:  # Z1-Z2 -> Zone 1 (Low intensity)
             return 1
         elif zone_7 <= 4:  # Z3-Z4 -> Zone 2 (Threshold)
@@ -278,13 +344,28 @@ class TrainingAnalyzer:
             else:
                 time_delta = 1  # Default 1 second for last point
             
-            zone = self._get_hr_zone(hr)
+            sport_type = activity.get('sport_type', activity.get('type', 'Unknown'))
+            zone = self._get_hr_zone(hr, sport_type)
             zone_seconds[zone] += time_delta
         
         # Map to 3-zone model for polarized training analysis
-        zone1_seconds = zone_seconds[1] + zone_seconds[2]  # Z1+Z2
-        zone2_seconds = zone_seconds[3] + zone_seconds[4]  # Z3+Z4
-        zone3_seconds = zone_seconds[5] + zone_seconds[6] + zone_seconds[7]  # Z5+Z6+Z7
+        if self.sport_config_service and sport_type:
+            sport = self.sport_config_service.get_sport_by_activity_type(sport_type)
+            if sport:
+                # Dynamic mapping based on polarized zones
+                zone1_seconds = sum(zone_seconds[i] for i in range(1, 8) if i <= len(sport.zones) and sport.zones[i-1].polarized_zone == 1)
+                zone2_seconds = sum(zone_seconds[i] for i in range(1, 8) if i <= len(sport.zones) and sport.zones[i-1].polarized_zone == 2)
+                zone3_seconds = sum(zone_seconds[i] for i in range(1, 8) if i <= len(sport.zones) and sport.zones[i-1].polarized_zone == 3)
+            else:
+                # Legacy mapping
+                zone1_seconds = zone_seconds[1] + zone_seconds[2]  # Z1+Z2
+                zone2_seconds = zone_seconds[3] + zone_seconds[4]  # Z3+Z4
+                zone3_seconds = zone_seconds[5] + zone_seconds[6] + zone_seconds[7]  # Z5+Z6+Z7
+        else:
+            # Legacy mapping
+            zone1_seconds = zone_seconds[1] + zone_seconds[2]  # Z1+Z2
+            zone2_seconds = zone_seconds[3] + zone_seconds[4]  # Z3+Z4
+            zone3_seconds = zone_seconds[5] + zone_seconds[6] + zone_seconds[7]  # Z5+Z6+Z7
         
         total_seconds = sum(zone_seconds.values())
         if total_seconds == 0:
@@ -335,13 +416,28 @@ class TrainingAnalyzer:
             else:
                 time_delta = 1  # Default 1 second for last point
             
-            zone = self._get_power_zone(power)
+            sport_type = activity.get('sport_type', activity.get('type', 'Unknown'))
+            zone = self._get_power_zone(power, sport_type)
             zone_seconds[zone] += time_delta
         
         # Map to 3-zone model for polarized training analysis
-        zone1_seconds = zone_seconds[1] + zone_seconds[2]  # Z1+Z2
-        zone2_seconds = zone_seconds[3] + zone_seconds[4]  # Z3+Z4
-        zone3_seconds = zone_seconds[5] + zone_seconds[6] + zone_seconds[7]  # Z5+Z6+Z7
+        if self.sport_config_service and sport_type:
+            sport = self.sport_config_service.get_sport_by_activity_type(sport_type)
+            if sport:
+                # Dynamic mapping based on polarized zones
+                zone1_seconds = sum(zone_seconds[i] for i in range(1, 8) if i <= len(sport.zones) and sport.zones[i-1].polarized_zone == 1)
+                zone2_seconds = sum(zone_seconds[i] for i in range(1, 8) if i <= len(sport.zones) and sport.zones[i-1].polarized_zone == 2)
+                zone3_seconds = sum(zone_seconds[i] for i in range(1, 8) if i <= len(sport.zones) and sport.zones[i-1].polarized_zone == 3)
+            else:
+                # Legacy mapping
+                zone1_seconds = zone_seconds[1] + zone_seconds[2]  # Z1+Z2
+                zone2_seconds = zone_seconds[3] + zone_seconds[4]  # Z3+Z4
+                zone3_seconds = zone_seconds[5] + zone_seconds[6] + zone_seconds[7]  # Z5+Z6+Z7
+        else:
+            # Legacy mapping
+            zone1_seconds = zone_seconds[1] + zone_seconds[2]  # Z1+Z2
+            zone2_seconds = zone_seconds[3] + zone_seconds[4]  # Z3+Z4
+            zone3_seconds = zone_seconds[5] + zone_seconds[6] + zone_seconds[7]  # Z5+Z6+Z7
         
         total_seconds = sum(zone_seconds.values())
         if total_seconds == 0:
@@ -388,24 +484,52 @@ class TrainingAnalyzer:
         for activity in activities:
             sport_type = activity.get('sport_type', activity.get('type', 'Unknown'))
             
-            # Strength training is tracked as ancillary work, not polarized training
-            if sport_type in ['WeightTraining', 'Workout']:
-                duration = activity.get('elapsed_time', 0) / 60  # Convert to minutes
-                ancillary_work['strength_training_minutes'] += int(duration)
-                ancillary_work['strength_training_count'] += 1
-                continue
-            
-            # Use power zones for cycling, HR zones for running/rowing
-            if sport_type in ['Ride', 'VirtualRide', 'EBikeRide']:
-                analysis = self.analyze_activity_power(activity)
-                # If no power data, fall back to HR
-                if not analysis:
+            # Check if sport config service can handle this activity type
+            if self.sport_config_service:
+                sport = self.sport_config_service.get_sport_by_activity_type(sport_type)
+                if sport:
+                    # Check if this is ancillary work
+                    if sport.tags and 'ancillary' in sport.tags:
+                        duration = activity.get('elapsed_time', 0) / 60  # Convert to minutes
+                        ancillary_work['strength_training_minutes'] += int(duration)
+                        ancillary_work['strength_training_count'] += 1
+                        continue
+                    
+                    # Use the appropriate metric based on sport config
+                    supported_metrics = self.sport_config_service.get_supported_metrics(sport)
+                    if MetricType.POWER in supported_metrics:
+                        analysis = self.analyze_activity_power(activity)
+                        # If no power data, fall back to HR if supported
+                        if not analysis and MetricType.HEART_RATE in supported_metrics:
+                            analysis = self.analyze_activity_hr(activity)
+                    elif MetricType.HEART_RATE in supported_metrics:
+                        analysis = self.analyze_activity_hr(activity)
+                    else:
+                        # Try HR as fallback
+                        analysis = self.analyze_activity_hr(activity)
+                else:
+                    # Unknown sport type, try HR
                     analysis = self.analyze_activity_hr(activity)
-            elif sport_type in ['Run', 'VirtualRun', 'Rowing', 'Walk', 'Hike']:
-                analysis = self.analyze_activity_hr(activity)
             else:
-                # For other activities, try HR first
-                analysis = self.analyze_activity_hr(activity)
+                # Legacy behavior
+                # Strength training is tracked as ancillary work, not polarized training
+                if sport_type in ['WeightTraining', 'Workout']:
+                    duration = activity.get('elapsed_time', 0) / 60  # Convert to minutes
+                    ancillary_work['strength_training_minutes'] += int(duration)
+                    ancillary_work['strength_training_count'] += 1
+                    continue
+                
+                # Use power zones for cycling, HR zones for running/rowing
+                if sport_type in ['Ride', 'VirtualRide', 'EBikeRide']:
+                    analysis = self.analyze_activity_power(activity)
+                    # If no power data, fall back to HR
+                    if not analysis:
+                        analysis = self.analyze_activity_hr(activity)
+                elif sport_type in ['Run', 'VirtualRun', 'Rowing', 'Walk', 'Hike']:
+                    analysis = self.analyze_activity_hr(activity)
+                else:
+                    # For other activities, try HR first
+                    analysis = self.analyze_activity_hr(activity)
             
             if analysis:
                 analyses.append(analysis)

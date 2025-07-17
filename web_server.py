@@ -24,6 +24,19 @@ from strava_client import StravaClient
 from download_manager import DownloadManager, DownloadStatus
 from cache_manager import CacheManager
 
+# Import sport configuration
+try:
+    from sport_config_service import SportConfigService
+    from sport_config import MetricType
+    from config_generator import ConfigGenerator
+    from pathlib import Path
+    USE_SPORT_CONFIG = os.getenv('USE_SPORT_CONFIG', 'true').lower() == 'true'
+except ImportError:
+    USE_SPORT_CONFIG = False
+    SportConfigService = None
+    MetricType = None
+    ConfigGenerator = None
+
 app = Flask(__name__, template_folder='templates')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
 
@@ -216,7 +229,7 @@ def start_pathway_ai_generation(session_id: str, training_data: dict, pathway_co
     return session_id
 
 def get_zone_calculations():
-    """Helper function to calculate zone ranges from .env values"""
+    """Helper function to calculate zone ranges from .env values or sport config"""
     import os
     from dotenv import load_dotenv
     
@@ -225,8 +238,99 @@ def get_zone_calculations():
     # Get current configuration
     max_hr = int(os.getenv('MAX_HEART_RATE', 171))
     ftp = int(os.getenv('FTP', 301))
+    lthr = int(os.getenv('AVERAGE_FTP_HR', '0'))
     
-    # Calculate HR zone ranges
+    # Try to use sport config if available
+    if USE_SPORT_CONFIG and SportConfigService:
+        try:
+            sport_config_service = SportConfigService()
+            
+            # Update thresholds in sport config
+            if lthr > 0:
+                sport_config_service.update_threshold('lthr', lthr)
+            sport_config_service.update_threshold('ftp', ftp)
+            sport_config_service.update_threshold('max_hr', max_hr)
+            
+            # Get zones for cycling (power-based)
+            cycling_sport = sport_config_service.get_sport_by_name('Cycling')
+            if cycling_sport:
+                power_zones_data = sport_config_service.calculate_zones(cycling_sport, MetricType.POWER, ftp)
+                power_zones = {}
+                for i, (zone_name, lower, upper, polarized_zone) in enumerate(power_zones_data, 1):
+                    if upper == float('inf'):
+                        power_zones[f'pz{i}_range'] = f"{int(lower)}+W"
+                    else:
+                        power_zones[f'pz{i}_range'] = f"{int(lower)}-{int(upper)}W"
+                    if i == 3:
+                        power_zones['pz3_watts'] = int(upper)
+            else:
+                # Fallback to legacy power zones
+                power_zones = {
+                    'pz1_range': f"0-{int(ftp * 0.55)}W",
+                    'pz2_range': f"{int(ftp * 0.55)}-{int(ftp * 0.75)}W",
+                    'pz3_range': f"{int(ftp * 0.75)}-{int(ftp * 0.90)}W",
+                    'pz3_watts': int(ftp * 0.90),
+                    'pz4_range': f"{int(ftp * 0.90)}-{int(ftp * 1.05)}W",
+                    'pz5_range': f"{int(ftp * 1.05)}-{int(ftp * 1.20)}W",
+                    'pz6_range': f"{int(ftp * 1.20)}+W"
+                }
+            
+            # Get zones for running/rowing (HR-based)
+            rowing_sport = sport_config_service.get_sport_by_name('Rowing')
+            if rowing_sport:
+                threshold = lthr if lthr > 0 else max_hr
+                hr_zones_data = sport_config_service.calculate_zones(rowing_sport, MetricType.HEART_RATE, threshold)
+                hr_zones = {}
+                polarized_zones = {1: [], 2: [], 3: []}
+                
+                for i, (zone_name, lower, upper, polarized_zone) in enumerate(hr_zones_data, 1):
+                    if upper == float('inf'):
+                        hr_zones[f'hr{i}_range'] = f"{int(lower)}+"
+                    else:
+                        hr_zones[f'hr{i}_range'] = f"{int(lower)}-{int(upper)}"
+                    
+                    # Group by polarized zones
+                    polarized_zones[polarized_zone].append((int(lower), int(upper)))
+                
+                # Create combined ranges for polarized zones
+                for pz_num, ranges in polarized_zones.items():
+                    if ranges:
+                        min_val = min(r[0] for r in ranges)
+                        max_val = max(r[1] for r in ranges)
+                        if max_val == float('inf'):
+                            hr_zones[f'hr_zone{pz_num}_combined'] = f"{min_val}+ bpm"
+                        else:
+                            hr_zones[f'hr_zone{pz_num}_combined'] = f"{min_val}-{max_val} bpm"
+            else:
+                # Fallback to legacy HR zones
+                hr_zones = {
+                    'hr1_range': f"{int(max_hr * 0.50)}-{int(max_hr * 0.70)}",
+                    'hr2_range': f"{int(max_hr * 0.70)}-{int(max_hr * 0.82)}",
+                    'hr3_range': f"{int(max_hr * 0.82)}-{int(max_hr * 0.87)}",
+                    'hr4_range': f"{int(max_hr * 0.87)}-{int(max_hr * 0.93)}",
+                    'hr5_range': f"{int(max_hr * 0.93)}+",
+                    'hr_zone1_combined': f"{int(max_hr * 0.50)}-{int(max_hr * 0.82)} bpm",
+                    'hr_zone2_combined': f"{int(max_hr * 0.82)}-{int(max_hr * 0.93)} bpm",
+                    'hr_zone3_combined': f"{int(max_hr * 0.93)}+ bpm"
+                }
+            
+            # Get training philosophy and zone targets
+            philosophy = sport_config_service.get_training_philosophy()
+            zone_targets = sport_config_service.get_zone_distribution_target()
+            
+            return {
+                'max_hr': max_hr,
+                'ftp': ftp,
+                'lthr': lthr,
+                'training_philosophy': philosophy.value if hasattr(philosophy, 'value') else str(philosophy),
+                'zone_targets': zone_targets,
+                **hr_zones,
+                **power_zones
+            }
+        except Exception as e:
+            print(f"Warning: Could not use sport config for zone calculations: {e}")
+    
+    # Legacy calculations
     hr_zones = {
         'hr1_range': f"{int(max_hr * 0.50)}-{int(max_hr * 0.70)}",
         'hr2_range': f"{int(max_hr * 0.70)}-{int(max_hr * 0.82)}",
@@ -238,7 +342,6 @@ def get_zone_calculations():
         'hr_zone3_combined': f"{int(max_hr * 0.93)}+ bpm"
     }
     
-    # Calculate power zone ranges
     power_zones = {
         'pz1_range': f"0-{int(ftp * 0.55)}W",
         'pz2_range': f"{int(ftp * 0.55)}-{int(ftp * 0.75)}W",
@@ -252,6 +355,9 @@ def get_zone_calculations():
     return {
         'max_hr': max_hr,
         'ftp': ftp,
+        'lthr': lthr,
+        'training_philosophy': 'polarized',
+        'zone_targets': {1: 80.0, 2: 10.0, 3: 10.0},
         **hr_zones,
         **power_zones
     }
@@ -286,6 +392,10 @@ def get_training_data(force_refresh=False):
                 if 'all_activities' not in existing_report:
                     existing_report['all_activities'] = cache_manager.load_all_cached_activities()
                 
+                # Add zone calculation data if using sport config
+                if USE_SPORT_CONFIG:
+                    existing_report['zone_config'] = get_zone_calculations()
+                
                 cached_data = existing_report
                 cache_timestamp = current_time
                 return existing_report
@@ -294,6 +404,10 @@ def get_training_data(force_refresh=False):
         report_data = cache_manager.ensure_analysis_includes_all_activities()
         
         if report_data:
+            # Add zone calculation data if using sport config
+            if USE_SPORT_CONFIG:
+                report_data['zone_config'] = get_zone_calculations()
+            
             cached_data = report_data
             cache_timestamp = current_time
             return report_data
@@ -952,6 +1066,57 @@ def signal_handler(sig, frame):
     """Handle shutdown signals gracefully"""
     cleanup_and_exit()
 
+def check_and_regenerate_sport_config():
+    """Check if sport config needs to be regenerated from preferences"""
+    if not USE_SPORT_CONFIG or not ConfigGenerator:
+        return
+    
+    try:
+        preferences_files = ["workout_preferences_personal.md", "workout_preferences.md"]
+        preferences_file = None
+        
+        # Find which preferences file exists
+        for file in preferences_files:
+            if os.path.exists(file):
+                preferences_file = file
+                break
+        
+        if not preferences_file:
+            print("⚠️  No workout preferences file found")
+            return
+        
+        config_file = "sport_config.json"
+        
+        # Check if config exists and if preferences is newer
+        regenerate = False
+        if not os.path.exists(config_file):
+            print("🔄 Sport config not found, generating from preferences...")
+            regenerate = True
+        else:
+            # Compare modification times
+            preferences_mtime = os.path.getmtime(preferences_file)
+            config_mtime = os.path.getmtime(config_file)
+            
+            if preferences_mtime > config_mtime:
+                print(f"🔄 Preferences file ({preferences_file}) is newer than config, regenerating...")
+                regenerate = True
+        
+        if regenerate:
+            # Generate new config
+            generator = ConfigGenerator()
+            print(f"📝 Reading preferences from: {preferences_file}")
+            
+            # Generate and save config
+            os.system(f"python config_generator.py")
+            print("✅ Sport config regenerated successfully")
+        else:
+            print(f"✅ Sport config is up to date")
+            
+    except Exception as e:
+        print(f"⚠️  Error checking/regenerating sport config: {e}")
+        import traceback
+        traceback.print_exc()
+
 def check_and_start_initial_download():
     """Check if we have sufficient data, if not start an automatic download"""
     try:
@@ -1071,6 +1236,9 @@ def main():
     print(f"Starting server on http://{args.host}:{args.port}")
     print("Press Ctrl+C to stop the server")
     print("=" * 60)
+    
+    # Check and regenerate sport config if needed
+    check_and_regenerate_sport_config()
     
     # Check data and start auto-download if needed
     if not args.no_auto_download:

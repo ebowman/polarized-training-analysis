@@ -14,9 +14,20 @@ from dataclasses import dataclass, asdict
 from dotenv import load_dotenv
 from ai_providers import AIProviderFactory, AIProvider
 
+# Import sport configuration
+try:
+    from sport_config_service import SportConfigService
+    from sport_config import TrainingPhilosophy, MetricType
+    USE_SPORT_CONFIG = os.getenv('USE_SPORT_CONFIG', 'true').lower() == 'true'
+except ImportError:
+    USE_SPORT_CONFIG = False
+    SportConfigService = None
+    TrainingPhilosophy = None
+    MetricType = None
+
 load_dotenv()
 
-# Training approach constants
+# Training approach constants (legacy - will be replaced by sport config)
 POLARIZED_TARGETS = {'zone1': 80, 'zone2': 10, 'zone3': 10}
 PYRAMIDAL_TARGETS = {'zone1': 70, 'zone2': 20, 'zone3': 10}
 LOW_VOLUME_THRESHOLD = 4  # hours per week
@@ -75,6 +86,101 @@ class TrainingDataAnalyzer:
             'polarized': POLARIZED_TARGETS,
             'pyramidal': PYRAMIDAL_TARGETS
         }
+        
+        # Initialize sport config service if available
+        self.sport_config_service = None
+        if USE_SPORT_CONFIG and SportConfigService:
+            try:
+                self.sport_config_service = SportConfigService()
+            except Exception as e:
+                print(f"Warning: Could not initialize SportConfigService: {e}")
+                self.sport_config_service = None
+    
+    def _get_available_equipment(self) -> List[str]:
+        """Get available equipment from sport configuration or preferences"""
+        equipment = []
+        
+        if USE_SPORT_CONFIG and hasattr(self, 'sport_config_service') and self.sport_config_service:
+            # Get equipment from sport configuration
+            for sport in self.sport_config_service.get_all_sports():
+                for eq in sport.equipment:
+                    if eq.name not in equipment:
+                        equipment.append(eq.name)
+        
+        # Try to read preferences file directly in this class since load_user_preferences is in different class
+        try:
+            preference_files = ['workout_preferences_personal.md', 'workout_preferences.md']
+            preferences = ""
+            for file in preference_files:
+                try:
+                    with open(file, 'r') as f:
+                        preferences = f.read().lower()
+                        break
+                except FileNotFoundError:
+                    continue
+            
+            if preferences:
+                # Extract equipment from user's actual preferences
+                detected_equipment = []
+                
+                # Swimming (user mentions swimming)
+                if any(keyword in preferences for keyword in ['swimming', 'swim', 'pool']):
+                    detected_equipment.append('Swimming')
+                
+                # Running (user mentions running)
+                if any(keyword in preferences for keyword in ['running', 'run', 'jog']):
+                    detected_equipment.append('Running')
+                
+                # Gym equipment (user mentions gym machines)
+                if any(keyword in preferences for keyword in ['gym', 'strength', 'machines']):
+                    detected_equipment.append('Gym Equipment')
+                
+                # Road bike - ONLY if explicitly mentioned
+                if any(keyword in preferences for keyword in ['road bike', 'bike', 'giant', 'cycling']):
+                    detected_equipment.append('Road Bike')
+                
+                # Bodyweight (always available)
+                detected_equipment.append('Bodyweight')
+                
+                equipment.extend([eq for eq in detected_equipment if eq not in equipment])
+        
+        except Exception as e:
+            print(f"Warning: Could not load preferences for equipment detection: {e}")
+        
+        # Default equipment if none found
+        if not equipment:
+            equipment = ['Bodyweight', 'None']
+            
+        return equipment
+    
+    def _get_equipment_specific_zone_guidelines(self, training_data: Dict) -> str:
+        """Get zone guidelines based on user's actual equipment"""
+        equipment = self._get_available_equipment()
+        guidelines = []
+        
+        # Only show guidelines for equipment the user actually has
+        if 'Swimming' in equipment:
+            guidelines.append("""**For Swimming:**
+- Easy pace (conversational effort) = Polarized Zone 1
+- Moderate pace (comfortably hard) = Polarized Zone 2  
+- Fast pace (hard effort) = Polarized Zone 3""")
+        
+        if 'Running' in equipment:
+            lthr = training_data.get('config', {}).get('lthr', 153)
+            max_hr = training_data.get('config', {}).get('max_hr', 171)
+            guidelines.append(f"""**For Running (HR-based):**
+- Zone 1: Easy pace (<{int(lthr * 0.85)} bpm) = Polarized Zone 1
+- Zone 2-3: Tempo pace ({int(lthr * 0.85)}-{int(lthr * 0.95)} bpm) = Polarized Zone 2
+- Zone 4-5: Hard intervals (>{int(lthr * 0.95)} bpm) = Polarized Zone 3""")
+        
+        if 'Road Bike' in equipment:
+            ftp = training_data.get('config', {}).get('ftp', 301)
+            guidelines.append(f"""**For Cycling (Power-based):**
+- Power Zone 1-2 (0-75% FTP / 0-{int(ftp * 0.75)}W) = Polarized Zone 1
+- Power Zone 3-4 (76-105% FTP / {int(ftp * 0.76)}-{int(ftp * 1.05)}W) = Polarized Zone 2
+- Power Zone 5-7 (106%+ FTP / >{int(ftp * 1.06)}W) = Polarized Zone 3""")
+        
+        return '\n\n'.join(guidelines)
     
     def filter_recent_activities(self, activities: List[Dict], days: int = ANALYSIS_WINDOW_DAYS) -> List[Dict]:
         """Filter activities to recent time window"""
@@ -122,20 +228,31 @@ class TrainingDataAnalyzer:
     def calculate_adherence_score(self, zone1_percent: float, zone2_percent: float, 
                                 zone3_percent: float, training_approach: str) -> float:
         """Calculate adherence score based on training approach targets"""
-        # For low-volume training, use a more flexible approach
-        if training_approach == "low-volume":
-            # Low volume doesn't have strict targets, so give a moderate score
-            # based on having some variety in training
-            if zone1_percent > 50 and zone3_percent < 30:
-                return 75.0  # Reasonable distribution for low volume
-            else:
-                return 50.0  # Could use improvement
+        # Get targets from sport config if available
+        if self.sport_config_service:
+            targets = self.sport_config_service.get_zone_distribution_target()
+            target_zone1 = targets.get(1, 80.0)
+            target_zone2 = targets.get(2, 10.0)
+            target_zone3 = targets.get(3, 10.0)
+        else:
+            # Legacy approach
+            # For low-volume training, use a more flexible approach
+            if training_approach == "low-volume":
+                # Low volume doesn't have strict targets, so give a moderate score
+                # based on having some variety in training
+                if zone1_percent > 50 and zone3_percent < 30:
+                    return 75.0  # Reasonable distribution for low volume
+                else:
+                    return 50.0  # Could use improvement
+            
+            targets = self.targets[training_approach]
+            target_zone1 = targets['zone1']
+            target_zone2 = targets['zone2']
+            target_zone3 = targets['zone3']
         
-        targets = self.targets[training_approach]
-        
-        zone1_deviation = abs(zone1_percent - targets['zone1'])
-        zone2_deviation = abs(zone2_percent - targets['zone2'])
-        zone3_deviation = abs(zone3_percent - targets['zone3'])
+        zone1_deviation = abs(zone1_percent - target_zone1)
+        zone2_deviation = abs(zone2_percent - target_zone2)
+        zone3_deviation = abs(zone3_percent - target_zone3)
         
         total_deviation = (zone1_deviation * 0.5) + (zone2_deviation * 0.25) + (zone3_deviation * 0.25)
         adherence_score = max(0, 100 - total_deviation)
@@ -306,6 +423,58 @@ class PromptBuilder:
     def __init__(self):
         self.analyzer = TrainingDataAnalyzer()
         self.scheduling_provider = SchedulingContextProvider()
+        
+        # Initialize sport config service if available
+        self.sport_config_service = None
+        if USE_SPORT_CONFIG and SportConfigService:
+            try:
+                self.sport_config_service = SportConfigService()
+            except Exception as e:
+                print(f"Warning: Could not initialize SportConfigService: {e}")
+                self.sport_config_service = None
+    
+    def _get_available_equipment(self) -> List[str]:
+        """Get available equipment from sport configuration or preferences"""
+        equipment = []
+        
+        if USE_SPORT_CONFIG and hasattr(self, 'sport_config_service') and self.sport_config_service:
+            # Get equipment from sport configuration
+            for sport in self.sport_config_service.get_all_sports():
+                for eq in sport.equipment:
+                    if eq.name not in equipment:
+                        equipment.append(eq.name)
+        
+        # Also check user preferences for equipment mentions
+        preferences = self.load_user_preferences()
+        if preferences:
+            # Extract equipment from preferences text
+            pref_text = preferences.lower()
+            
+            # Common equipment keywords - ONLY add equipment that user actually mentions
+            equipment_keywords = {
+                'road bike': 'Road Bike',
+                'bike': 'Road Bike', 
+                'giant': 'Road Bike',  # User mentions GIANT bike
+                'cycling': 'Road Bike',
+                'gym': 'Gym Equipment',
+                'strength': 'Gym Equipment',
+                'soho house': 'Gym Equipment',  # User mentions soho house gym
+                'bodyweight': 'Bodyweight',
+                'swimming': 'Swimming Pool',
+                'swim': 'Swimming Pool',
+                'pool': 'Swimming Pool'
+                # Removed: concept2, rowing, peloton - user doesn't have these
+            }
+            
+            for keyword, eq_name in equipment_keywords.items():
+                if keyword in pref_text and eq_name not in equipment:
+                    equipment.append(eq_name)
+        
+        # Default equipment if none found
+        if not equipment:
+            equipment = ['Bodyweight', 'None']
+            
+        return equipment
     
     def load_user_preferences(self) -> str:
         """Load user workout preferences from markdown file with fallback"""
@@ -330,6 +499,24 @@ class PromptBuilder:
         lthr = int(os.getenv("AVERAGE_FTP_HR", "0"))
         max_hr = training_data.get('config', {}).get('max_hr', 171)
         
+        # Try to get zone definitions from sport config
+        if self.sport_config_service:
+            # Get rowing sport (as an example for HR-based sport)
+            rowing_sport = self.sport_config_service.get_sport_by_name('Rowing')
+            if rowing_sport:
+                threshold = self.sport_config_service.get_threshold_value(rowing_sport, MetricType.HEART_RATE)
+                if threshold:
+                    zones = self.sport_config_service.calculate_zones(rowing_sport, MetricType.HEART_RATE, threshold)
+                    zone_lines = []
+                    for zone_name, lower, upper, polarized_zone in zones:
+                        if upper == float('inf'):
+                            zone_lines.append(f"- {zone_name}: >{int(lower)} bpm = Polarized Zone {polarized_zone}")
+                        else:
+                            zone_lines.append(f"- {zone_name}: {int(lower)}-{int(upper)} bpm = Polarized Zone {polarized_zone}")
+                    zone_lines.append(f"- Current LTHR: {lthr} bpm (from FTP test)" if lthr > 0 else f"- Current Max HR: {max_hr} bpm")
+                    return "\n".join(zone_lines)
+        
+        # Legacy definitions
         if lthr > 0:
             # Use LTHR-based 7-zone model
             z1_max = int(lthr * 0.81)
@@ -568,6 +755,7 @@ class PromptBuilder:
         
         return "\\n".join(context)
     
+    
     def build_recovery_pathway_prompt(self, training_data: Dict, pathway_context: Dict) -> str:
         """Build AI prompt specifically for recovery pathway recommendations"""
         # Analyze training data
@@ -580,6 +768,7 @@ class PromptBuilder:
         # Load context components
         user_preferences = self.load_user_preferences()
         training_context = self.create_training_context(analysis, scheduling, training_data, recovery_metrics)
+        
         
         deficit = pathway_context.get('deficit', 0)
         current_minutes = pathway_context.get('currentWeeklyMinutes', 0)
@@ -612,8 +801,8 @@ Generate 3 specific recovery pathway recommendations for an athlete who is {defi
 
 ⚠️ **POLARIZED ZONE-SPECIFIC GUIDANCE**:
 - If Polarized Zone 1 > 85%: RECOMMEND more intensity work (Polarized Zone 2/3) to rebalance
-- If Polarized Zone 2 < 5%: RECOMMEND threshold sessions (use Power Zone 3-4 for cycling, HR Zone 3-4 for rowing)
-- If Polarized Zone 3 < 5%: RECOMMEND high-intensity intervals (use Power Zone 5-7 for cycling, HR Zone 5+ for rowing)
+- If Polarized Zone 2 < 5%: RECOMMEND threshold sessions (use Power Zone 3-4 for cycling)
+- If Polarized Zone 3 < 5%: RECOMMEND high-intensity intervals (use Power Zone 5-7 for cycling)
 - If Polarized Zone 2 > 15%: AVOID threshold work
 - If Polarized Zone 3 > 10%: AVOID high-intensity work
 
@@ -629,7 +818,7 @@ Generate 3 specific recovery pathway recommendations for an athlete who is {defi
 - Power Zone 5-7 (106%+ FTP) = Polarized Zone 3 (high intensity)
 - Current FTP: {training_data.get('config', {}).get('ftp', 301)} watts
 
-**For Concept2 RowERG Workouts:**
+**For Alternative Cardio:**
 - Use "HR Zone X" terminology with BPM ranges
 {self._get_hr_zone_definitions(training_data)}
 
@@ -658,7 +847,7 @@ For each pathway, provide:
 - **priority**: "high", "medium", or "low" based on current training state
 
 🎯 **CRITICAL ZONE TERMINOLOGY REQUIREMENTS**:
-- **Peloton workouts**: MUST use "Power Zone X" (e.g., "Power Zone 2 endurance", "Power Zone 4 intervals")
+- **Cycling workouts**: Use power-based descriptions (e.g., "Zone 2 endurance", "Zone 4 intervals")
 - **Rowing workouts**: MUST use "HR Zone X with BPM" (e.g., "HR Zone 2 (140-150 bpm)")
 - **NEVER** use generic "Zone 1", "Zone 2" without equipment prefix
 
@@ -697,18 +886,11 @@ Based on the NIH research and the athlete's recent training data, provide person
 ## Zone System Guidelines
 Use activity-specific zone terminology:
 
-**For Cycling (Peloton/FTP-based):**
-- Use "Power Zone X" terminology (e.g., "Power Zone 2", "Power Zone 4")
-- Power Zone 1-2 (Active Recovery/Endurance, 0-75% FTP) = Polarized Zone 1 (easy aerobic)
-- Power Zone 3-4 (Tempo/Threshold, 76-105% FTP) = Polarized Zone 2 (threshold work)
-- Power Zone 5-7 (VO2 Max/Anaerobic/Neuromuscular, 106%+ FTP) = Polarized Zone 3 (high intensity)
-- Current FTP: {training_data.get('config', {}).get('ftp', 301)} watts
+**Zone Guidelines Based on Available Equipment:**
+
+{self._get_equipment_specific_zone_guidelines(training_data)}
 
 IMPORTANT: Recommend zones based on current Polarized Zone distribution and deficits. Use equipment-specific terminology.
-
-**For Rowing (HR-based):**
-- Use "HR Zone X" terminology with actual BPM ranges
-{self._get_hr_zone_definitions(training_data)}
 
 **For Strength Training:**
 - Use HR Zone 1-2 for recovery-focused strength (keep HR below aerobic threshold)
@@ -729,10 +911,8 @@ Generate {num_recommendations} specific workout recommendation pathways. Each pa
 Consider the current day of the week and whether they've already trained today.
 
 🚫 EQUIPMENT RESTRICTION: You MUST ONLY recommend workouts using the following equipment:
-- **Peloton bike** (for cycling workouts)
-- **Concept2 RowERG** (for rowing workouts)
-- **Dumbbells/Bodyweight** (for strength training)
-- **NO RUNNING** - Do not recommend any running, jogging, or treadmill workouts
+Available equipment based on user configuration:
+{', '.join(self._get_available_equipment())}
 
 ⚠️ CRITICAL POLARIZED ZONE BALANCE CHECK:
 - Polarized Zone 1: {analysis.zone1_percent:.1f}% (Target: 80%) - {'EXCESS' if analysis.zone1_percent > 85 else 'DEFICIT' if analysis.zone1_percent < 75 else 'OK'}
@@ -760,26 +940,28 @@ POLARIZED ZONE-SPECIFIC RECOMMENDATIONS:
 
 Each recommendation should be formatted as valid JSON with these fields:
 - workout_type: MUST be one of these types ONLY:
-  - Cycling: "Power Zone Endurance Ride", "Power Zone Intervals", "Power Zone Max Ride", "Recovery Ride"
-  - Rowing: "Steady State Row", "Rowing Intervals", "Technical Row", "Recovery Row"
+  - Swimming: "Easy Swim", "Swim Intervals", "Technique Swim", "Recovery Swim"
+  - Running: "Easy Run", "Tempo Run", "Track Intervals", "Recovery Run"
+  - Cycling: "Endurance Ride", "Tempo Intervals", "VO2 Max Intervals", "Recovery Ride"
   - Strength: "Functional Strength", "Core Workout", "Upper Body Strength", "Lower Body Strength"
   - Rest: "Rest Day", "Active Recovery"
 - duration_minutes: (integer)
 - description: (brief, engaging description using correct zone terminology)
-- structure: (detailed workout structure with specific power zones for cycling, HR zones for rowing)
+- structure: (detailed workout structure with specific zones for the chosen equipment)
 - reasoning: (why this workout fits their current needs and goals)
-- equipment: MUST be EXACTLY one of: "Peloton", "Concept2 RowERG", "Dumbbells", "Bodyweight", "None"
+- equipment: MUST be EXACTLY one of: {', '.join([f'"{eq}"' for eq in self._get_available_equipment()])}
 - intensity_zones: (array of polarized zones used for analysis, e.g., [1], [2], [3], [1,3])
 - priority: ("high", "medium", or "low")
 
 **ZONE TERMINOLOGY EXAMPLES:**
-- **Peloton for Polarized Zone 1**: "Power Zone 2 endurance ride (56-75% FTP)"
-- **Peloton for Polarized Zone 2**: "Power Zone 3-4 tempo intervals (76-105% FTP)" 
-- **Peloton for Polarized Zone 3**: "Power Zone 5-6 VO2 max intervals (106-150% FTP)"
-- **Rowing for Polarized Zone 1**: "HR Zone 1-2 steady state (below 140 bpm)"
-- **Rowing for Polarized Zone 2**: "HR Zone 3-4 tempo (140-160 bpm)"
-- **Rowing for Polarized Zone 3**: "HR Zone 5+ intervals (above 160 bpm)"
-- **Strength**: "Functional strength circuit (HR Zone 1-2, below 140 bpm)"
+- **Swimming for Polarized Zone 1**: "Easy swimming pace"
+- **Swimming for Polarized Zone 2**: "Moderate swimming intervals"  
+- **Swimming for Polarized Zone 3**: "Fast swimming intervals"
+- **Running for Polarized Zone 1**: "Easy pace run"
+- **Running for Polarized Zone 2**: "Tempo run"
+- **Running for Polarized Zone 3**: "Hard intervals/track work"
+- **Gym Equipment**: "Functional strength circuit"
+- **Bodyweight**: "Bodyweight strength exercises"
 
 **❌ WRONG**: "Zone 2 workout", "20min Zone 1"
 **✅ CORRECT**: "Power Zone 2 endurance", "20min HR Zone 1 (below 140 bpm)"
@@ -794,7 +976,7 @@ Consider:
    - **Polarized (>{PYRAMIDAL_VOLUME_THRESHOLD} hrs/week)**: If Polarized Zone 1 < 80% OR Polarized Zone 3 > 10%, focus on Polarized Zone 1
    - **Pyramidal ({LOW_VOLUME_THRESHOLD}-{PYRAMIDAL_VOLUME_THRESHOLD} hrs/week)**: If Polarized Zone 1 < 70% OR Polarized Zone 2 < 20%, adjust accordingly
    - Only recommend Polarized Zone 3 if current Polarized Zone 3 is significantly below target
-4. Equipment preferences (Peloton, RowERG, dumbbells)
+4. Equipment preferences from user configuration
 5. Recovery needs based on recent training
 6. Progressive overload principles
 7. Variety to prevent boredom
@@ -1063,7 +1245,7 @@ class AIRecommendationEngine:
 Current Training Status:
 - Zone distribution: Zone 1: {analysis.zone1_percent:.1f}%, Zone 2: {analysis.zone2_percent:.1f}%, Zone 3: {analysis.zone3_percent:.1f}%
 - Rolling 7-day volume: {analysis.total_minutes} minutes
-- Equipment available: Peloton bike, Concept2 RowERG, dumbbells/bodyweight
+- Equipment available: {', '.join(self._get_available_equipment())}
 
 Generate specific workout recommendations for EACH of these recovery pathways:
 
