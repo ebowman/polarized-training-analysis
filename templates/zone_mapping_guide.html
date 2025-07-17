@@ -114,162 +114,193 @@
         <h2>Understanding Different Zone Systems</h2>
         <p>There are multiple zone systems used in endurance training. This guide explains how they relate to each other and when to use each system.</p>
 
+        <div class="config-box">
+            <h3>📊 Your Current Training Configuration</h3>
+            <ul>
+                <li><strong>Training Philosophy</strong>: {{ training_philosophy|title }}</li>
+                <li><strong>Cycling FTP</strong>: {{ ftp }} watts</li>
+                <li><strong>Max Heart Rate</strong>: {{ max_hr }} bpm</li>
+                {% if lthr > 0 %}<li><strong>Lactate Threshold HR</strong>: {{ lthr }} bpm</li>{% endif %}
+            </ul>
+        </div>
+
         <h2>1. Polarized Training Zones (Research-Based)</h2>
-        <p>The NIH research defines <strong>3 simple zones</strong> for training distribution analysis:</p>
+        <p>Your training follows the <strong>{{ training_philosophy|title }}</strong> approach with these zone distribution targets:</p>
 
         <table>
             <tr>
                 <th>Polarized Zone</th>
                 <th>Purpose</th>
-                <th>Target Distribution</th>
+                <th>Your Target Distribution</th>
             </tr>
             <tr class="zone-1">
                 <td><strong>Zone 1</strong></td>
                 <td>Low Intensity / Aerobic Base</td>
-                <td><strong>80%</strong> of training time</td>
+                <td><strong>{% if zone_targets %}{{ zone_targets.get(1, 80) }}%{% else %}80%{% endif %}</strong> of training time</td>
             </tr>
             <tr class="zone-2">
                 <td><strong>Zone 2</strong></td>
                 <td>Threshold / "Gray Zone"</td>
-                <td><strong>10%</strong> of training time</td>
+                <td><strong>{% if zone_targets %}{{ zone_targets.get(2, 10) }}%{% else %}10%{% endif %}</strong> of training time</td>
             </tr>
             <tr class="zone-3">
                 <td><strong>Zone 3</strong></td>
                 <td>High Intensity / VO2 Max</td>
-                <td><strong>10%</strong> of training time</td>
+                <td><strong>{% if zone_targets %}{{ zone_targets.get(3, 10) }}%{% else %}10%{% endif %}</strong> of training time</td>
             </tr>
         </table>
 
-        <h2>2. Power Zones (Cycling - Peloton/FTP Based)</h2>
-        <p>For cycling activities, we use <strong>power zones</strong> based on your Functional Threshold Power (FTP):</p>
+        <h2>2. Power Zones (Cycling - Your Personal Zones)</h2>
+        <p>For cycling activities, we use <strong>power zones</strong> based on your Functional Threshold Power (<strong>{{ ftp }}W</strong>):</p>
 
         <table>
             <tr>
                 <th>Power Zone</th>
-                <th>% of FTP</th>
-                <th>Watts (Your FTP: <span id="ftp-value">{{ ftp }}</span>W)</th>
+                <th>Watts Range</th>
                 <th>Description</th>
                 <th>Maps to Polarized</th>
             </tr>
+            {% if pz1_range %}
             <tr class="zone-1">
                 <td><strong>Zone 1</strong></td>
-                <td>0-55%</td>
-                <td id="pz1-watts">{{ pz1_range }}</td>
+                <td><strong>{{ pz1_range }}</strong></td>
                 <td>Active Recovery</td>
                 <td>Zone 1</td>
             </tr>
+            {% endif %}
+            {% if pz2_range %}
             <tr class="zone-1">
                 <td><strong>Zone 2</strong></td>
-                <td>55-75%</td>
-                <td id="pz2-watts">{{ pz2_range }}</td>
+                <td><strong>{{ pz2_range }}</strong></td>
                 <td>Endurance/Aerobic Base</td>
                 <td>Zone 1</td>
             </tr>
+            {% endif %}
+            {% if pz3_range %}
             <tr class="zone-1">
                 <td><strong>Zone 3</strong></td>
-                <td>75-90%</td>
-                <td id="pz3-watts">{{ pz3_range }}</td>
+                <td><strong>{{ pz3_range }}</strong></td>
                 <td>Tempo</td>
                 <td>Zone 1</td>
             </tr>
+            {% endif %}
+            {% if pz4_range %}
             <tr class="zone-2">
                 <td><strong>Zone 4</strong></td>
-                <td>90-105%</td>
-                <td id="pz4-watts">{{ pz4_range }}</td>
+                <td><strong>{{ pz4_range }}</strong></td>
                 <td>Lactate Threshold</td>
                 <td>Zone 2</td>
             </tr>
+            {% endif %}
+            {% if pz5_range %}
             <tr class="zone-3">
                 <td><strong>Zone 5</strong></td>
-                <td>105-120%</td>
-                <td id="pz5-watts">{{ pz5_range }}</td>
+                <td><strong>{{ pz5_range }}</strong></td>
                 <td>VO2 Max</td>
                 <td>Zone 3</td>
             </tr>
+            {% endif %}
+            {% if pz6_range %}
             <tr class="zone-3">
                 <td><strong>Zone 6</strong></td>
-                <td>120%+</td>
-                <td id="pz6-watts">{{ pz6_range }}</td>
+                <td><strong>{{ pz6_range }}</strong></td>
                 <td>Anaerobic/Neuromuscular</td>
                 <td>Zone 3</td>
             </tr>
+            {% endif %}
+            {% if pz7_range %}
+            <tr class="zone-3">
+                <td><strong>Zone 7</strong></td>
+                <td><strong>{{ pz7_range }}</strong></td>
+                <td>Neuromuscular Power</td>
+                <td>Zone 3</td>
+            </tr>
+            {% endif %}
         </table>
 
-        <div class="code-block">Peloton Power Zone Mapping:
-Polarized Zone 1 (80% target) = Power Zones 1-3 (0-90% FTP)
-Polarized Zone 2 (10% target) = Power Zone 4 (90-105% FTP)  
-Polarized Zone 3 (10% target) = Power Zones 5-6 (105%+ FTP)</div>
+        <div class="code-block">Your Power Zone Distribution:
+{% if zone_targets %}Polarized Zone 1 ({{ zone_targets.get(1, 80) }}% target) = Power Zones 1-3
+Polarized Zone 2 ({{ zone_targets.get(2, 10) }}% target) = Power Zone 4
+Polarized Zone 3 ({{ zone_targets.get(3, 10) }}% target) = Power Zones 5+{% else %}Polarized Zone 1 (80% target) = Power Zones 1-3
+Polarized Zone 2 (10% target) = Power Zone 4
+Polarized Zone 3 (10% target) = Power Zones 5+{% endif %}</div>
 
-        <h2>3. Heart Rate Zones (Rowing/Running - HR Based)</h2>
-        <p>For rowing and other activities without power data, we use <strong>heart rate zones</strong> based on your maximum HR (<span id="max-hr-value">{{ max_hr }}</span> bpm):</p>
+        <h2>3. Heart Rate Zones (Your Personal Zones)</h2>
+        <p>For rowing and other activities without power data, we use <strong>heart rate zones</strong> based on your maximum HR (<strong>{{ max_hr }} bpm</strong>){% if lthr > 0 %} and lactate threshold HR (<strong>{{ lthr }} bpm</strong>){% endif %}:</p>
 
         <table>
             <tr>
                 <th>HR Zone</th>
                 <th>BPM Range</th>
-                <th>% of Max HR</th>
                 <th>Description</th>
                 <th>Maps to Polarized</th>
             </tr>
+            {% if hr1_range %}
             <tr class="zone-1">
                 <td><strong>Zone 1</strong></td>
-                <td id="hr1-range">{{ hr1_range }}</td>
-                <td>50-70%</td>
+                <td><strong>{{ hr1_range }}</strong></td>
                 <td>Recovery/Easy</td>
                 <td>Zone 1</td>
             </tr>
+            {% endif %}
+            {% if hr2_range %}
             <tr class="zone-1">
                 <td><strong>Zone 2</strong></td>
-                <td id="hr2-range">{{ hr2_range }}</td>
-                <td>70-82%</td>
+                <td><strong>{{ hr2_range }}</strong></td>
                 <td>Aerobic Base</td>
                 <td>Zone 1</td>
             </tr>
+            {% endif %}
+            {% if hr3_range %}
             <tr class="zone-2">
                 <td><strong>Zone 3</strong></td>
-                <td id="hr3-range">{{ hr3_range }}</td>
-                <td>82-87%</td>
+                <td><strong>{{ hr3_range }}</strong></td>
                 <td>Aerobic Threshold</td>
                 <td>Zone 2</td>
             </tr>
+            {% endif %}
+            {% if hr4_range %}
             <tr class="zone-2">
                 <td><strong>Zone 4</strong></td>
-                <td id="hr4-range">{{ hr4_range }}</td>
-                <td>87-93%</td>
+                <td><strong>{{ hr4_range }}</strong></td>
                 <td>Lactate Threshold</td>
                 <td>Zone 2</td>
             </tr>
+            {% endif %}
+            {% if hr5_range %}
             <tr class="zone-3">
                 <td><strong>Zone 5</strong></td>
-                <td id="hr5-range">{{ hr5_range }}</td>
-                <td>93%+</td>
+                <td><strong>{{ hr5_range }}</strong></td>
                 <td>VO2 Max/Anaerobic</td>
                 <td>Zone 3</td>
             </tr>
+            {% endif %}
         </table>
 
-        <div class="code-block">Rowing Heart Rate Zone Mapping:
-Polarized Zone 1 (80% target) = HR Zones 1-2 ({{ hr_zone1_combined }})
+        <div class="code-block">Your Heart Rate Zone Distribution:
+{% if zone_targets and hr_zone1_combined %}Polarized Zone 1 ({{ zone_targets.get(1, 80) }}% target) = HR Zones 1-2 ({{ hr_zone1_combined }})
+Polarized Zone 2 ({{ zone_targets.get(2, 10) }}% target) = HR Zones 3-4 ({{ hr_zone2_combined }})
+Polarized Zone 3 ({{ zone_targets.get(3, 10) }}% target) = HR Zone 5 ({{ hr_zone3_combined }}){% elif hr_zone1_combined %}Polarized Zone 1 (80% target) = HR Zones 1-2 ({{ hr_zone1_combined }})
 Polarized Zone 2 (10% target) = HR Zones 3-4 ({{ hr_zone2_combined }})
-Polarized Zone 3 (10% target) = HR Zone 5 ({{ hr_zone3_combined }})</div>
+Polarized Zone 3 (10% target) = HR Zone 5 ({{ hr_zone3_combined }}){% else %}Heart rate zones calculated based on your personal thresholds{% endif %}</div>
 
         <h2>4. Activity-Specific Recommendations</h2>
 
-        <h3>🚴 <strong>Cycling (Peloton) - Use Power Zones</strong></h3>
+        <h3>🚴 <strong>Cycling (Peloton) - Use Your Power Zones</strong></h3>
         <ul>
-            <li><strong>"Power Zone 2 Endurance Ride"</strong> instead of "Zone 1 Easy Ride"</li>
-            <li><strong>"Power Zone 4 Threshold Intervals"</strong> instead of "Zone 2 Threshold"</li>
-            <li><strong>"Power Zone 5 VO2 Max Intervals"</strong> instead of "Zone 3 High Intensity"</li>
+            <li><strong>"Power Zone 2 Endurance Ride"</strong> {% if pz2_range %}({{ pz2_range }}){% endif %} instead of "Zone 1 Easy Ride"</li>
+            <li><strong>"Power Zone 4 Threshold Intervals"</strong> {% if pz4_range %}({{ pz4_range }}){% endif %} instead of "Zone 2 Threshold"</li>
+            <li><strong>"Power Zone 5 VO2 Max Intervals"</strong> {% if pz5_range %}({{ pz5_range }}){% endif %} instead of "Zone 3 High Intensity"</li>
         </ul>
-        <p><em>Example: "Power Zone 2-3 endurance ride for 90 minutes (65-85% FTP) to build aerobic base"</em></p>
+        <p><em>Example with your FTP ({{ ftp }}W): "Power Zone 2-3 endurance ride for 90 minutes {% if pz2_range and pz3_range %}({{ pz2_range }} to {{ pz3_range }}){% endif %} to build aerobic base"</em></p>
 
-        <h3>🚣 <strong>Rowing (Concept2) - Use Heart Rate Zones</strong></h3>
+        <h3>🚣 <strong>Rowing (Concept2) - Use Your Heart Rate Zones</strong></h3>
         <ul>
-            <li><strong>"HR Zone 2 Steady State"</strong> instead of "Zone 1 Easy"</li>
-            <li><strong>"HR Zone 4 Threshold Pieces"</strong> instead of "Zone 2 Threshold"</li>
-            <li><strong>"HR Zone 5 Intervals"</strong> instead of "Zone 3 High Intensity"</li>
+            <li><strong>"HR Zone 2 Steady State"</strong> {% if hr2_range %}({{ hr2_range }} bpm){% endif %} instead of "Zone 1 Easy"</li>
+            <li><strong>"HR Zone 4 Threshold Pieces"</strong> {% if hr4_range %}({{ hr4_range }} bpm){% endif %} instead of "Zone 2 Threshold"</li>
+            <li><strong>"HR Zone 5 Intervals"</strong> {% if hr5_range %}({{ hr5_range }} bpm){% endif %} instead of "Zone 3 High Intensity"</li>
         </ul>
-        <p><em>Example: "HR Zone 2 steady state for 45 minutes ({{ hr2_range }}) for cross-training recovery"</em></p>
+        <p><em>Example with your max HR ({{ max_hr }} bpm): "HR Zone 2 steady state for 45 minutes {% if hr2_range %}({{ hr2_range }} bpm){% endif %} for cross-training recovery"</em></p>
 
         <h3>🏋️ <strong>Strength Training - Different System</strong></h3>
         <p>Strength training uses different metrics:</p>
@@ -280,11 +311,11 @@ Polarized Zone 3 (10% target) = HR Zone 5 ({{ hr_zone3_combined }})</div>
         </ul>
 
         <div class="config-box">
-            <h3>5. Your Current Configuration</h3>
+            <h3>5. Your Sport-Specific Configuration</h3>
             <ul>
-                <li><strong>Cycling FTP</strong>: {{ ftp }} watts (for power zone calculations)</li>
-                <li><strong>Max Heart Rate</strong>: {{ max_hr }} bpm (for HR zone calculations)</li>
-                <li><strong>Rowing FTP</strong>: Not set (will use HR zones for rowing)</li>
+                <li><strong>Cycling Power Zones</strong>: Based on {{ ftp }}W FTP{% if pz1_range %} ({{ pz1_range }} to {% if pz6_range %}{{ pz6_range }}{% elif pz5_range %}{{ pz5_range }}{% endif %}){% endif %}</li>
+                <li><strong>Heart Rate Zones</strong>: Based on {{ max_hr }} bpm max HR{% if lthr > 0 %} and {{ lthr }} bpm LTHR{% endif %}{% if hr1_range %} ({{ hr1_range }} to {% if hr5_range %}{{ hr5_range }}{% endif %}){% endif %}</li>
+                <li><strong>Training Philosophy</strong>: {{ training_philosophy|title }}{% if zone_targets %} (Zone 1: {{ zone_targets.get(1, 80) }}%, Zone 2: {{ zone_targets.get(2, 10) }}%, Zone 3: {{ zone_targets.get(3, 10) }}%){% endif %}</li>
             </ul>
         </div>
 
@@ -295,10 +326,15 @@ Polarized Zone 3 (10% target) = HR Zone 5 ({{ hr_zone3_combined }})</div>
 Zone 2 (Threshold): 15% [Target: 10%]
 Zone 3 (High): 10% [Target: 10%]</div>
 
-        <h3>Specific Workout Recommendations</h3>
-        <div class="code-block">🚴 "60-min Power Zone 2 Endurance Ride (65-75% FTP)"
-🚣 "45-min HR Zone 2 Steady State ({{ hr2_range }})"
-🏋️ "30-min Functional Strength Circuit (RPE 6-7)"</div>
+        <h3>Your Personalized Workout Recommendations</h3>
+        <div class="code-block">🚴 "60-min Power Zone 2 Endurance Ride{% if pz2_range %} ({{ pz2_range }}){% endif %}"
+🚣 "45-min HR Zone 2 Steady State{% if hr2_range %} ({{ hr2_range }} bpm){% endif %}"
+🏋️ "30-min Functional Strength Circuit (RPE 6-7)"
+
+Based on your {{ training_philosophy|title }} training approach:
+- Zone 1: {% if zone_targets %}{{ zone_targets.get(1, 80) }}%{% else %}80%{% endif %} easy/aerobic work
+- Zone 2: {% if zone_targets %}{{ zone_targets.get(2, 10) }}%{% else %}10%{% endif %} threshold efforts  
+- Zone 3: {% if zone_targets %}{{ zone_targets.get(3, 10) }}%{% else %}10%{% endif %} high-intensity intervals</div>
 
         <div class="highlight">
             <h3>7. Why This Approach?</h3>
