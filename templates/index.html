@@ -1242,6 +1242,19 @@
             const totalMinutes = filteredActivities.reduce((sum, a) => sum + a.duration_minutes, 0);
             const totalHours = totalMinutes / 60;
             
+            // Debug logging to trace the discrepancy
+            console.log('DisplaySummary Debug:', {
+                timeRange,
+                rangeStart: rangeStart.toISOString(),
+                totalActivities,
+                totalMinutes,
+                filteredActivities: filteredActivities.map(a => ({
+                    date: a.date,
+                    name: a.name,
+                    duration: a.duration_minutes
+                }))
+            });
+            
             // Calculate weighted zone percentages for selected time range
             let totalZone1Minutes = 0;
             let totalZone2Minutes = 0;
@@ -1293,6 +1306,12 @@
             const ctx = progressCanvas.getContext('2d');
             
             // Update text displays
+            console.log('Progress Card Update:', {
+                progressPercent,
+                totalMinutes,
+                targetMinutes,
+                timeRange
+            });
             document.getElementById('progress-percent').textContent = Math.round(progressPercent) + '%';
             document.getElementById('progress-label').textContent = `${Math.round(totalMinutes)} / ${targetMinutes} min`;
             document.getElementById('progress-title').textContent = `${timeRange}-Day Achievement`;
@@ -1804,6 +1823,15 @@
             
             const periodHours = (totalPeriodMinutes / 60).toFixed(1);
             const periodLabel = timeRange === 7 ? '/week' : `/${timeRange}-day period`;
+            
+            console.log('Warning Message Debug:', {
+                totalMinutes,
+                totalPeriodMinutes,
+                periodHours,
+                periodLabel,
+                polarizedMinimumMinutes
+            });
+            
             if (totalPeriodMinutes < generalHealthMinutes) {
                 timeWarningElement.style.cssText += 'background-color: #ffebee; color: #c62828; border: 1px solid #ef5350;';
                 timeWarningElement.textContent = `🚨 Below health minimum: ${Math.round(totalMinutes)}min${periodLabel} (${periodHours}h) - Need ${generalHealthMinutes}min${periodLabel} for basic health`;
