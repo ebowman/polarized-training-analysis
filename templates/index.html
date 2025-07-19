@@ -952,6 +952,7 @@
         let volumeChart = null;
         let aiSessionId = '{{ ai_session_id }}';
         let aiPollingInterval = null;
+        let globalSummaryTotalMinutes = null; // Store total minutes from displaySummary
         
         // Cookie functions
         function setCookie(name, value, days) {
@@ -1243,17 +1244,11 @@
             const totalHours = totalMinutes / 60;
             
             // Debug logging to trace the discrepancy
-            console.log('DisplaySummary Debug:', {
-                timeRange,
-                rangeStart: rangeStart.toISOString(),
-                totalActivities,
-                totalMinutes,
-                filteredActivities: filteredActivities.map(a => ({
-                    date: a.date,
-                    name: a.name,
-                    duration: a.duration_minutes
-                }))
-            });
+            console.log(`📊 DisplaySummary: Found ${totalActivities} activities, ${totalMinutes} total minutes in last ${timeRange} days`);
+            console.log('Activities:', filteredActivities.map(a => `${a.date}: ${a.name} (${a.duration_minutes}min)`));
+            
+            // Store total minutes globally for use in displayCombinedChart
+            globalSummaryTotalMinutes = totalMinutes;
             
             // Calculate weighted zone percentages for selected time range
             let totalZone1Minutes = 0;
@@ -1306,12 +1301,7 @@
             const ctx = progressCanvas.getContext('2d');
             
             // Update text displays
-            console.log('Progress Card Update:', {
-                progressPercent,
-                totalMinutes,
-                targetMinutes,
-                timeRange
-            });
+            console.log(`📈 Progress Card: ${Math.round(totalMinutes)}/${targetMinutes} minutes (${Math.round(progressPercent)}%)`);
             document.getElementById('progress-percent').textContent = Math.round(progressPercent) + '%';
             document.getElementById('progress-label').textContent = `${Math.round(totalMinutes)} / ${targetMinutes} min`;
             document.getElementById('progress-title').textContent = `${timeRange}-Day Achievement`;
@@ -1694,7 +1684,7 @@
             return daysMap[timeRange] || 14;
         }
         
-        function displayCombinedChart(activities, fullData) {
+        function displayCombinedChart(activities, fullData, summaryTotalMinutes = null) {
             const combinedChartDiv = document.getElementById('combined-chart');
             if (!combinedChartDiv) {
                 console.error('Combined chart div not found!');
@@ -1718,12 +1708,16 @@
             rangeStartDate.setDate(today.getDate() - (timeRange - 1));
             rangeStartDate.setHours(0, 0, 0, 0); // Start of range
             
+            console.log(`🎯 DisplayCombinedChart date range: ${rangeStartDate.toISOString()} to ${today.toISOString()}`);
+            
             // Filter to selected range from ALL activities - always use the full dataset
             const allActivities = window.workoutData?.activities || activities || [];
+            console.log(`🎯 DisplayCombinedChart: Starting with ${allActivities.length} activities`);
             const filteredActivities = allActivities.filter(activity => {
                 const activityDate = new Date(activity.date);
                 return activityDate >= rangeStartDate && activityDate <= today;
             });
+            console.log(`🎯 DisplayCombinedChart: Filtered to ${filteredActivities.length} activities`);
             if (filteredActivities.length === 0) {
                 combinedChartDiv.style.display = 'none';
                 return;
@@ -1731,6 +1725,8 @@
             
             // Calculate combined zone percentages for selected time range
             const totalMinutes = filteredActivities.reduce((sum, a) => sum + a.duration_minutes, 0);
+            console.log(`🎯 DisplayCombinedChart: Total minutes = ${totalMinutes}`);
+            console.log('Filtered activities:', filteredActivities.map(a => `${a.date}: ${a.name} (${a.duration_minutes}min)`));
             let totalZone1Minutes = 0;
             let totalZone2Minutes = 0;
             let totalZone3Minutes = 0;
@@ -1824,26 +1820,25 @@
             const periodHours = (totalPeriodMinutes / 60).toFixed(1);
             const periodLabel = timeRange === 7 ? '/week' : `/${timeRange}-day period`;
             
-            console.log('Warning Message Debug:', {
-                totalMinutes,
-                totalPeriodMinutes,
-                periodHours,
-                periodLabel,
-                polarizedMinimumMinutes
-            });
+            // Use global summary total minutes if available, otherwise use local calculation
+            const displayMinutes = globalSummaryTotalMinutes !== null ? globalSummaryTotalMinutes : totalMinutes;
+            const displayPeriodMinutes = globalSummaryTotalMinutes !== null ? globalSummaryTotalMinutes : totalPeriodMinutes;
+            const displayPeriodHours = (displayPeriodMinutes / 60).toFixed(1);
             
-            if (totalPeriodMinutes < generalHealthMinutes) {
+            console.log(`⚠️ Warning Message: displayMinutes=${displayMinutes} (from ${globalSummaryTotalMinutes !== null ? 'summary' : 'local'}), localTotalMinutes=${totalMinutes}`);
+            
+            if (displayPeriodMinutes < generalHealthMinutes) {
                 timeWarningElement.style.cssText += 'background-color: #ffebee; color: #c62828; border: 1px solid #ef5350;';
-                timeWarningElement.textContent = `🚨 Below health minimum: ${Math.round(totalMinutes)}min${periodLabel} (${periodHours}h) - Need ${generalHealthMinutes}min${periodLabel} for basic health`;
-            } else if (totalPeriodMinutes < polarizedMinimumMinutes) {
+                timeWarningElement.textContent = `🚨 Below health minimum: ${Math.round(displayMinutes)}min${periodLabel} (${displayPeriodHours}h) - Need ${generalHealthMinutes}min${periodLabel} for basic health`;
+            } else if (displayPeriodMinutes < polarizedMinimumMinutes) {
                 timeWarningElement.style.cssText += 'background-color: #fff3e0; color: #f57c00; border: 1px solid #ffb74d;';
-                timeWarningElement.textContent = `⚠️ Below polarized minimum: ${Math.round(totalMinutes)}min${periodLabel} (${periodHours}h) - Need ${polarizedMinimumMinutes}min${periodLabel} for effective polarized training`;
-            } else if (totalPeriodMinutes > maxHealthyWeeklyMinutes) {
+                timeWarningElement.textContent = `⚠️ Below polarized minimum: ${Math.round(displayMinutes)}min${periodLabel} (${displayPeriodHours}h) - Need ${polarizedMinimumMinutes}min${periodLabel} for effective polarized training`;
+            } else if (displayPeriodMinutes > maxHealthyWeeklyMinutes) {
                 timeWarningElement.style.cssText += 'background-color: #fff3e0; color: #f57c00; border: 1px solid #ffb74d;';
-                timeWarningElement.textContent = `⚠️ Risk of overtraining: ${Math.round(totalMinutes)}min${periodLabel} (${periodHours}h) - Consider reducing volume`;
+                timeWarningElement.textContent = `⚠️ Risk of overtraining: ${Math.round(displayMinutes)}min${periodLabel} (${displayPeriodHours}h) - Consider reducing volume`;
             } else {
                 timeWarningElement.style.cssText += 'background-color: #e8f5e8; color: #2e7d32; border: 1px solid #4caf50;';
-                timeWarningElement.textContent = `✅ Optimal polarized volume: ${Math.round(totalMinutes)}min${periodLabel} (${periodHours}h)`;
+                timeWarningElement.textContent = `✅ Optimal polarized volume: ${Math.round(displayMinutes)}min${periodLabel} (${displayPeriodHours}h)`;
             }
             
             // Create or update combined chart
