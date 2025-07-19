@@ -1702,20 +1702,18 @@
             // Update chart title
             document.getElementById('combined-chart-title').textContent = `Last ${timeRange} Days Training Distribution`;
             
-            const today = new Date();
-            today.setHours(23, 59, 59, 999); // End of today
-            const rangeStartDate = new Date(today);
-            rangeStartDate.setDate(today.getDate() - (timeRange - 1));
-            rangeStartDate.setHours(0, 0, 0, 0); // Start of range
+            // Use the same date range calculation as displaySummary
+            const now = new Date();
+            const rangeStart = new Date(now.getTime() - (timeRange * 24 * 60 * 60 * 1000));
             
-            console.log(`🎯 DisplayCombinedChart date range: ${rangeStartDate.toISOString()} to ${today.toISOString()}`);
+            console.log(`🎯 DisplayCombinedChart date range: ${rangeStart.toISOString()} to ${now.toISOString()}`);
             
             // Filter to selected range from ALL activities - always use the full dataset
             const allActivities = window.workoutData?.activities || activities || [];
             console.log(`🎯 DisplayCombinedChart: Starting with ${allActivities.length} activities`);
             const filteredActivities = allActivities.filter(activity => {
                 const activityDate = new Date(activity.date);
-                return activityDate >= rangeStartDate && activityDate <= today;
+                return activityDate >= rangeStart;
             });
             console.log(`🎯 DisplayCombinedChart: Filtered to ${filteredActivities.length} activities`);
             if (filteredActivities.length === 0) {
