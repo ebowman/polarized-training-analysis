@@ -1731,8 +1731,8 @@
             const dailyTarget = weeklyTarget / 7;
             const targetMinutes = Math.round(dailyTarget * timeRange);
             
-            // Weekly total is just the total from selected range
-            const totalWeeklyMinutes = totalMinutes;
+            // Period total is the total from selected range
+            const totalPeriodMinutes = totalMinutes;
             const polarizedMinimumMinutes = targetMinutes; // Scaled target for effective polarized training
             const generalHealthMinutes = Math.round(150 * timeRange / 7); // NIH general health recommendation scaled
             const maxHealthyWeeklyMinutes = Math.round(600 * timeRange / 7); // 10 hours/week overtraining threshold scaled
@@ -1802,19 +1802,20 @@
                 chartTitle.innerHTML = `${titleText}<br>${subtitleText}`;
             }
             
-            const weeklyHours = (totalWeeklyMinutes / 60).toFixed(1);
-            if (totalWeeklyMinutes < generalHealthMinutes) {
+            const periodHours = (totalPeriodMinutes / 60).toFixed(1);
+            const periodLabel = timeRange === 7 ? '/week' : `/${timeRange}-day period`;
+            if (totalPeriodMinutes < generalHealthMinutes) {
                 timeWarningElement.style.cssText += 'background-color: #ffebee; color: #c62828; border: 1px solid #ef5350;';
-                timeWarningElement.textContent = `🚨 Below health minimum: ${Math.round(totalMinutes)}min/week (${weeklyHours}h) - Need ${generalHealthMinutes}min/week for basic health`;
-            } else if (totalWeeklyMinutes < polarizedMinimumMinutes) {
+                timeWarningElement.textContent = `🚨 Below health minimum: ${Math.round(totalMinutes)}min${periodLabel} (${periodHours}h) - Need ${generalHealthMinutes}min${periodLabel} for basic health`;
+            } else if (totalPeriodMinutes < polarizedMinimumMinutes) {
                 timeWarningElement.style.cssText += 'background-color: #fff3e0; color: #f57c00; border: 1px solid #ffb74d;';
-                timeWarningElement.textContent = `⚠️ Below polarized minimum: ${Math.round(totalMinutes)}min/week (${weeklyHours}h) - Need ${polarizedMinimumMinutes}min/week for effective polarized training`;
-            } else if (totalWeeklyMinutes > maxHealthyWeeklyMinutes) {
+                timeWarningElement.textContent = `⚠️ Below polarized minimum: ${Math.round(totalMinutes)}min${periodLabel} (${periodHours}h) - Need ${polarizedMinimumMinutes}min${periodLabel} for effective polarized training`;
+            } else if (totalPeriodMinutes > maxHealthyWeeklyMinutes) {
                 timeWarningElement.style.cssText += 'background-color: #fff3e0; color: #f57c00; border: 1px solid #ffb74d;';
-                timeWarningElement.textContent = `⚠️ Risk of overtraining: ${Math.round(totalMinutes)}min/week (${weeklyHours}h) - Consider reducing volume`;
+                timeWarningElement.textContent = `⚠️ Risk of overtraining: ${Math.round(totalMinutes)}min${periodLabel} (${periodHours}h) - Consider reducing volume`;
             } else {
                 timeWarningElement.style.cssText += 'background-color: #e8f5e8; color: #2e7d32; border: 1px solid #4caf50;';
-                timeWarningElement.textContent = `✅ Optimal polarized volume: ${Math.round(totalMinutes)}min/week (${weeklyHours}h)`;
+                timeWarningElement.textContent = `✅ Optimal polarized volume: ${Math.round(totalMinutes)}min${periodLabel} (${periodHours}h)`;
             }
             
             // Create or update combined chart
@@ -1894,9 +1895,9 @@
                         yAxisID: 'y1'
                     }, {
                         label: 'Actual Weekly Time',
-                        data: [null, null, null, null, Math.round(totalWeeklyMinutes)],
-                        backgroundColor: totalWeeklyMinutes < generalHealthMinutes ? '#E91E63' : totalWeeklyMinutes < polarizedMinimumMinutes ? '#FF5722' : totalWeeklyMinutes > maxHealthyWeeklyMinutes ? '#FF5722' : '#2196F3',
-                        borderColor: totalWeeklyMinutes < generalHealthMinutes ? '#C2185B' : totalWeeklyMinutes < polarizedMinimumMinutes ? '#E64A19' : totalWeeklyMinutes > maxHealthyWeeklyMinutes ? '#E64A19' : '#1976D2',
+                        data: [null, null, null, null, Math.round(totalPeriodMinutes)],
+                        backgroundColor: totalPeriodMinutes < generalHealthMinutes ? '#E91E63' : totalPeriodMinutes < polarizedMinimumMinutes ? '#FF5722' : totalPeriodMinutes > maxHealthyWeeklyMinutes ? '#FF5722' : '#2196F3',
+                        borderColor: totalPeriodMinutes < generalHealthMinutes ? '#C2185B' : totalPeriodMinutes < polarizedMinimumMinutes ? '#E64A19' : totalPeriodMinutes > maxHealthyWeeklyMinutes ? '#E64A19' : '#1976D2',
                         borderWidth: 2,
                         yAxisID: 'y1'
                     }, {
@@ -2010,7 +2011,7 @@
                             display: true,
                             position: 'right',
                             beginAtZero: true,
-                            max: Math.max(700, totalWeeklyMinutes * 1.2),
+                            max: Math.max(700, totalPeriodMinutes * 1.2),
                             ticks: {
                                 callback: function(value) {
                                     return Math.round(value) + 'min';
@@ -2083,6 +2084,11 @@
             const zone2Minutes = isStrengthTraining ? 0 : Math.round(duration * ((activity.zone2_percent || 0) / 100));
             const zone3Minutes = isStrengthTraining ? 0 : Math.round(duration * ((activity.zone3_percent || 0) / 100));
             
+            // Check if there's actual zone data (any zone percentage > 0)
+            const hasZoneData = (activity.zone1_percent || 0) > 0 || 
+                               (activity.zone2_percent || 0) > 0 || 
+                               (activity.zone3_percent || 0) > 0;
+            
             if (isStrengthTraining) {
                 card.innerHTML = `
                     <div class="workout-header">
@@ -2100,17 +2106,8 @@
                     </div>
                 `;
             } else {
-                card.innerHTML = `
-                    <div class="workout-header">
-                        <h3 class="workout-title">${activity.name}</h3>
-                        <div class="workout-date">${date}</div>
-                    </div>
-                    <div class="workout-stats">
-                        <span>Duration: ${duration} min (${(duration/60).toFixed(1)}h)</span>
-                        <span>Zone 1: ${zone1Minutes} min</span>
-                        <span>Zone 2: ${zone2Minutes} min</span>
-                        <span>Zone 3: ${zone3Minutes} min</span>
-                    </div>
+                // Generate zone breakdown HTML only if there's actual zone data
+                const zoneBreakdownHTML = hasZoneData ? `
                     <div class="chart-container">
                         <canvas id="chart-${index}"></canvas>
                     </div>
@@ -2131,12 +2128,34 @@
                             <div>Zone 3</div>
                         </div>
                     </div>
+                ` : `
+                    <div style="padding: 20px; text-align: center; color: #666;">
+                        <div style="font-size: 1.5em;">📊</div>
+                        <div>No zone data available</div>
+                        <div style="font-size: 0.8em; margin-top: 5px;">Rest day or activity without power/HR zones</div>
+                    </div>
+                `;
+
+                card.innerHTML = `
+                    <div class="workout-header">
+                        <h3 class="workout-title">${activity.name}</h3>
+                        <div class="workout-date">${date}</div>
+                    </div>
+                    <div class="workout-stats">
+                        <span>Duration: ${duration} min (${(duration/60).toFixed(1)}h)</span>
+                        <span>Zone 1: ${zone1Minutes} min</span>
+                        <span>Zone 2: ${zone2Minutes} min</span>
+                        <span>Zone 3: ${zone3Minutes} min</span>
+                    </div>
+                    ${zoneBreakdownHTML}
                 `;
                 
-                // Create chart after the card is added to DOM (only for non-strength activities)
-                setTimeout(() => {
-                    createChart(activity, index);
-                }, 100);
+                // Create chart after the card is added to DOM (only for activities with zone data)
+                if (hasZoneData) {
+                    setTimeout(() => {
+                        createChart(activity, index);
+                    }, 100);
+                }
             }
             
             return card;
