@@ -1239,13 +1239,22 @@
             });
             
             // Calculate summary stats for selected time range
-            const totalActivities = filteredActivities.length;
-            const totalMinutes = filteredActivities.reduce((sum, a) => sum + a.duration_minutes, 0);
+            // Filter to only activities with zone data (matching displayVolumeTracking logic)
+            const activitiesWithZones = filteredActivities.filter(activity => {
+                const hasZoneData = (activity.zone1_percent || 0) > 0 || 
+                                   (activity.zone2_percent || 0) > 0 || 
+                                   (activity.zone3_percent || 0) > 0;
+                return hasZoneData;
+            });
+            
+            const totalActivities = activitiesWithZones.length;
+            const totalMinutes = activitiesWithZones.reduce((sum, a) => sum + a.duration_minutes, 0);
             const totalHours = totalMinutes / 60;
             
             // Debug logging to trace the discrepancy
-            console.log(`📊 DisplaySummary: Found ${totalActivities} activities, ${totalMinutes} total minutes in last ${timeRange} days`);
-            console.log('Activities:', filteredActivities.map(a => `${a.date}: ${a.name} (${a.duration_minutes}min)`));
+            console.log(`📊 DisplaySummary: Found ${filteredActivities.length} total activities, ${totalActivities} with zone data, ${totalMinutes} zone minutes in last ${timeRange} days`);
+            console.log('Activities with zones:', activitiesWithZones.map(a => `${a.date}: ${a.name} (${a.duration_minutes}min)`));
+            console.log('Activities without zones:', filteredActivities.filter(a => !activitiesWithZones.includes(a)).map(a => `${a.date}: ${a.name} (${a.duration_minutes}min)`));
             
             // Store total minutes globally for use in displayCombinedChart
             globalSummaryTotalMinutes = totalMinutes;
@@ -1255,7 +1264,7 @@
             let totalZone2Minutes = 0;
             let totalZone3Minutes = 0;
             
-            filteredActivities.forEach(activity => {
+            activitiesWithZones.forEach(activity => {
                 const activityMinutes = activity.duration_minutes;
                 totalZone1Minutes += activityMinutes * (activity.zone1_percent / 100);
                 totalZone2Minutes += activityMinutes * (activity.zone2_percent / 100);
@@ -1287,14 +1296,14 @@
             // Update achievement trend
             document.getElementById('achievement-current').textContent = Math.round(progressPercent) + '%';
             
-            // Create achievement sparkline
-            createAchievementSparkline(activities, timeRange);
+            // Create achievement sparkline (use activities with zones for consistency)
+            createAchievementSparkline(activitiesWithZones, timeRange);
             
             // Create adherence sparkline
-            createAdherenceSparkline(activities, timeRange);
+            createAdherenceSparkline(activitiesWithZones, timeRange);
             
             // Create zone distribution chart
-            createZoneDistributionChart(activities, timeRange);
+            createZoneDistributionChart(activitiesWithZones, timeRange);
             
             // Create progress chart
             const progressCanvas = document.getElementById('progressChart');
@@ -1722,14 +1731,22 @@
             }
             
             // Calculate combined zone percentages for selected time range
-            const totalMinutes = filteredActivities.reduce((sum, a) => sum + a.duration_minutes, 0);
-            console.log(`🎯 DisplayCombinedChart: Total minutes = ${totalMinutes}`);
-            console.log('Filtered activities:', filteredActivities.map(a => `${a.date}: ${a.name} (${a.duration_minutes}min)`));
+            // Filter to only activities with zone data for consistency
+            const activitiesWithZones = filteredActivities.filter(activity => {
+                const hasZoneData = (activity.zone1_percent || 0) > 0 || 
+                                   (activity.zone2_percent || 0) > 0 || 
+                                   (activity.zone3_percent || 0) > 0;
+                return hasZoneData;
+            });
+            
+            const totalMinutes = activitiesWithZones.reduce((sum, a) => sum + a.duration_minutes, 0);
+            console.log(`🎯 DisplayCombinedChart: Total minutes = ${totalMinutes} (${activitiesWithZones.length} activities with zones)`);
+            console.log('Activities with zones:', activitiesWithZones.map(a => `${a.date}: ${a.name} (${a.duration_minutes}min)`));
             let totalZone1Minutes = 0;
             let totalZone2Minutes = 0;
             let totalZone3Minutes = 0;
             
-            filteredActivities.forEach(activity => {
+            activitiesWithZones.forEach(activity => {
                 const activityMinutes = activity.duration_minutes;
                 totalZone1Minutes += activityMinutes * (activity.zone1_percent / 100);
                 totalZone2Minutes += activityMinutes * (activity.zone2_percent / 100);
@@ -2485,9 +2502,17 @@
                             dailyData[i].strengthMinutes += duration;
                         } else {
                             // Calculate zone minutes
-                            dailyData[i].zone1Minutes += duration * ((activity.zone1_percent || 0) / 100);
-                            dailyData[i].zone2Minutes += duration * ((activity.zone2_percent || 0) / 100);
-                            dailyData[i].zone3Minutes += duration * ((activity.zone3_percent || 0) / 100);
+                            const z1 = duration * ((activity.zone1_percent || 0) / 100);
+                            const z2 = duration * ((activity.zone2_percent || 0) / 100);
+                            const z3 = duration * ((activity.zone3_percent || 0) / 100);
+                            dailyData[i].zone1Minutes += z1;
+                            dailyData[i].zone2Minutes += z2;
+                            dailyData[i].zone3Minutes += z3;
+                            
+                            // Log activities without zone data
+                            if ((z1 + z2 + z3) === 0 && duration > 0) {
+                                console.log(`📊 Activity without zones: ${activity.name} (${duration}min) on ${activityDateStr}`);
+                            }
                         }
                         break;
                     }
@@ -2701,6 +2726,13 @@
                 });
             }
             
+            // Log the volume calculation details
+            console.log(`📊 Volume Tracking Calculation:
+                - Total minutes: ${Math.round(rollingWeekMinutes)}
+                - Polarized minutes (with zones): ${Math.round(rollingPolarizedMinutes)}
+                - Ancillary minutes (strength): ${Math.round(rollingAncillaryMinutes)}
+                - Unaccounted minutes: ${Math.round(rollingWeekMinutes - rollingPolarizedMinutes - rollingAncillaryMinutes)}`);
+            
             // Update stats - show both polarized and total time
             const polarizedText = `${Math.round(rollingPolarizedMinutes)} min`;
             const totalText = rollingAncillaryMinutes > 0 ? 
@@ -2903,7 +2935,11 @@
             const aiFilteredActivities = workoutData.activities.filter(activity => {
                 const activityDate = new Date(activity.date);
                 const last7Days = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
-                return activityDate >= last7Days;
+                // Only include activities that have zone data
+                const hasZoneData = (activity.zone1_percent || 0) > 0 || 
+                                   (activity.zone2_percent || 0) > 0 || 
+                                   (activity.zone3_percent || 0) > 0;
+                return activityDate >= last7Days && hasZoneData;
             });
             
             let totalZone1Minutes = 0, totalZone2Minutes = 0, totalZone3Minutes = 0;
