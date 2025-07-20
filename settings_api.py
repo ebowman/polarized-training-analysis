@@ -661,7 +661,7 @@ def register_settings_routes(app):
     # Config Generation Endpoint
     @app.route('/api/settings/generate-config', methods=['POST'])
     @require_auth
-    def generate_config():
+    def api_generate_config():
         """Generate sport configuration from preferences text"""
         try:
             data = request.get_json()

@@ -48,9 +48,10 @@ Based on the landmark NIH study: *"Training Intensity Distribution in Endurance 
 - Time range filtering (7 days to all time)
 - Adherence scoring (0-100) to track improvement
 
-### 🤖 **AI-Powered Workout Recommendations**
-- Uses OpenAI's advanced GPT-4o model
+### 🤖 **AI-Powered Features**
+- Uses OpenAI's GPT-4o or Claude for intelligent analysis
 - Generates personalized workouts based on your data
+- **NEW**: AI-powered configuration generation from natural language preferences
 - Considers your equipment (Peloton, rowing machine, etc.)
 - Provides detailed workout structure and scientific reasoning
 
@@ -61,6 +62,13 @@ Based on the landmark NIH study: *"Training Intensity Distribution in Endurance 
 - **NEW**: Real-time download progress with activity-by-activity updates
 - **NEW**: Automatic startup sync (downloads last 30 days if needed)
 - **NEW**: Graceful rate limit handling with visual countdown
+
+### 🎯 **Zone Distribution Management**
+- **NEW**: Visual zone distribution editor with sliders
+- **NEW**: Sport-specific zone customization
+- **NEW**: Preset training philosophies (Polarized/Pyramidal/Threshold)
+- **NEW**: Real-time zone compliance monitoring
+- **NEW**: Batch updates across multiple sports
 
 ## 🚀 Who Is This For?
 
@@ -76,6 +84,14 @@ Based on the landmark NIH study: *"Training Intensity Distribution in Endurance 
 - Don't track workouts digitally
 - Are happy with your current training and results
 - Don't have heart rate or power data
+
+## 📚 Documentation
+
+### Core Documentation
+- **[Zone Distribution User Guide](docs/ZONE_DISTRIBUTION_USER_GUIDE.md)** - Complete guide to customizing training zones
+- **[AI Configuration Guide](docs/AI_CONFIG_GENERATION_GUIDE.md)** - Generate configs from natural language
+- **[API Documentation](docs/SETTINGS_API.md)** - Complete API reference
+- **[Zone Examples](docs/ZONE_DISTRIBUTION_EXAMPLES.md)** - Sport-specific distribution examples
 
 ## 🛠️ How to Get Started
 

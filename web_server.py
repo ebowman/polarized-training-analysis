@@ -395,6 +395,9 @@ def _calculate_legacy_zones(max_hr: int, ftp: int, lthr: int) -> dict:
         'lthr': lthr,
         'training_philosophy': 'polarized',
         'zone_targets': zone_targets,
+        'zone1_target': zone_targets.get(1, 80),
+        'zone2_target': zone_targets.get(2, 10),
+        'zone3_target': zone_targets.get(3, 10),
         **hr_zones,
         **power_zones
     }
@@ -1267,6 +1270,72 @@ def save_settings():
     except Exception as e:
         logger.error(f"Error saving settings: {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/generate-config', methods=['POST'])
+def api_generate_config():
+    """Generate sport configuration from preferences using AI"""
+    try:
+        from config_generator import ConfigGenerator
+        
+        # Get preferences from request or use saved file
+        data = request.json
+        preferences_text = data.get('preferences', '')
+        
+        # Initialize config generator
+        generator = ConfigGenerator()
+        
+        # Generate configuration
+        config = generator.generate_config(preferences_text if preferences_text else None)
+        
+        # Convert to dictionary format for JSON
+        config_dict = {
+            "version": "1.0.0",
+            "user_profile": {
+                "philosophy": config.user_profile.philosophy.value,
+                "volume_levels": config.user_profile.volume_levels,
+                "thresholds": config.user_profile.thresholds,
+                "zone_distribution": getattr(config.user_profile, 'zone_distribution', {1: 80.0, 2: 10.0, 3: 10.0})
+            },
+            "sports": []
+        }
+        
+        # Add sports
+        for sport in config.sports:
+            sport_dict = {
+                "name": sport.name,
+                "enabled": sport.enabled,
+                "zone_type": sport.zone_type.value if hasattr(sport.zone_type, 'value') else sport.zone_type,
+                "thresholds": sport.thresholds,
+                "zones": [
+                    {
+                        "id": zone.id,
+                        "name": zone.name,
+                        "min": zone.min_value,
+                        "max": zone.max_value,
+                        "target_percent": zone.target_percent
+                    } for zone in sport.zones
+                ]
+            }
+            config_dict["sports"].append(sport_dict)
+        
+        # Save to file
+        with open('sport_config.json', 'w') as f:
+            json.dump(config_dict, f, indent=2)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Configuration generated successfully',
+            'config': config_dict
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating config: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.errorhandler(404)
 def not_found(error):

@@ -248,6 +248,8 @@ Converts a natural language prompt to structured JSON.
 
 ## Zone Distribution Management
 
+The Zone Distribution API allows users to customize their training zone percentages both globally and per-sport. This enables fine-tuning of training intensity distribution to match individual goals and sport-specific requirements.
+
 ### Get Zone Distribution Settings
 ```
 GET /api/settings/zone-distribution
@@ -271,18 +273,34 @@ Retrieves current zone distribution settings including user global targets and s
         "1": 85.0,
         "2": 5.0,
         "3": 10.0
+      },
+      "Running": {
+        "1": 75.0,
+        "2": 15.0,
+        "3": 10.0
       }
+    },
+    "available_philosophies": {
+      "polarized": {"1": 80.0, "2": 10.0, "3": 10.0},
+      "pyramidal": {"1": 70.0, "2": 20.0, "3": 10.0},
+      "threshold": {"1": 50.0, "2": 35.0, "3": 15.0}
     }
   }
 }
 ```
+
+**Notes:**
+- Zone 1: Easy/Recovery intensity (typically below VT1/AeT)
+- Zone 2: Moderate/Threshold intensity (between VT1 and VT2)
+- Zone 3: Hard/VO2max intensity (above VT2/AnT)
+- The `available_philosophies` field shows preset distributions for quick selection
 
 ### Update User Zone Distribution
 ```
 PUT /api/settings/zone-distribution/user
 ```
 
-Updates the user's global zone distribution targets. Requires authentication.
+Updates the user's global zone distribution targets. These targets apply to all sports unless overridden at the sport level. Requires authentication.
 
 **Request Body:**
 ```json
@@ -291,7 +309,8 @@ Updates the user's global zone distribution targets. Requires authentication.
     "1": 75.0,
     "2": 15.0,
     "3": 10.0
-  }
+  },
+  "philosophy": "custom"  // Optional: Updates training philosophy
 }
 ```
 
@@ -299,7 +318,27 @@ Updates the user's global zone distribution targets. Requires authentication.
 ```json
 {
   "success": true,
-  "message": "User zone distribution updated successfully"
+  "message": "User zone distribution updated successfully",
+  "updated": {
+    "zone_distribution": {
+      "1": 75.0,
+      "2": 15.0,
+      "3": 10.0
+    },
+    "philosophy": "custom"
+  }
+}
+```
+
+**Example: Setting Polarized Distribution**
+```json
+{
+  "zone_distribution": {
+    "1": 80.0,
+    "2": 10.0,
+    "3": 10.0
+  },
+  "philosophy": "polarized"
 }
 ```
 
@@ -308,7 +347,10 @@ Updates the user's global zone distribution targets. Requires authentication.
 PUT /api/settings/zone-distribution/sport/{sport_name}
 ```
 
-Updates zone distribution targets for a specific sport. Requires authentication.
+Updates zone distribution targets for a specific sport. Sport-specific distributions override the user's global targets. Requires authentication.
+
+**URL Parameters:**
+- `sport_name`: The name of the sport (e.g., "Cycling", "Running", "Rowing")
 
 **Request Body:**
 ```json
@@ -317,7 +359,8 @@ Updates zone distribution targets for a specific sport. Requires authentication.
     "1": 85.0,
     "2": 5.0,
     "3": 10.0
-  }
+  },
+  "reset_to_global": false  // Optional: Reset to global targets
 }
 ```
 
@@ -325,14 +368,204 @@ Updates zone distribution targets for a specific sport. Requires authentication.
 ```json
 {
   "success": true,
-  "message": "Zone distribution for Cycling updated successfully"
+  "message": "Zone distribution for Cycling updated successfully",
+  "updated": {
+    "sport": "Cycling",
+    "zone_distribution": {
+      "1": 85.0,
+      "2": 5.0,
+      "3": 10.0
+    }
+  }
+}
+```
+
+**Example: Ultra-Polarized Cycling Distribution**
+```json
+{
+  "zone_distribution": {
+    "1": 90.0,
+    "2": 5.0,
+    "3": 5.0
+  }
+}
+```
+
+**Example: Reset to Global Targets**
+```json
+{
+  "reset_to_global": true
 }
 ```
 
 **Validation:**
-- Zone distributions must sum to exactly 100%
+- Zone distributions must sum to exactly 100% (±0.1% for rounding)
 - Zone numbers must be 1, 2, or 3
+- Each zone percentage must be between 0 and 100
 - Sport name must exist in configuration
+
+## AI-Powered Configuration Generation
+
+### Generate Configuration from Preferences
+```
+POST /api/settings/generate-config
+```
+
+Generates a complete sport configuration from natural language preferences using AI. This endpoint analyzes user-written preferences and creates a structured configuration including sports, zones, equipment, and training philosophy.
+
+**Request Body:**
+```json
+{
+  "preferences": "I'm a cyclist with an FTP of 301W...\nI also row on a Concept2...",
+  "update_existing": false,  // Optional: Update vs replace config
+  "ai_provider": "auto"     // Optional: "openai", "claude", or "auto"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Configuration generated successfully",
+  "config": {
+    "version": "1.0.0",
+    "user_profile": {
+      "philosophy": "polarized",
+      "volume_levels": {
+        "low": 5,
+        "medium": 10,
+        "high": 15
+      },
+      "thresholds": {
+        "ftp": 301,
+        "lthr": 155
+      }
+    },
+    "sports": [
+      {
+        "name": "Cycling",
+        "activity_types": ["Ride", "VirtualRide"],
+        "primary_metric": {
+          "type": "power",
+          "unit": "watts",
+          "threshold_field": "ftp"
+        },
+        "zones": [...],
+        "zone_breakdown_percentage": {
+          "1": 80.0,
+          "2": 10.0,
+          "3": 10.0
+        }
+      }
+    ]
+  },
+  "detected_sports": ["Cycling", "Rowing"],
+  "detected_philosophy": "polarized",
+  "preview_mode": false  // true if config not saved
+}
+```
+
+**Example Request with Full Preferences:**
+```json
+{
+  "preferences": "# My Training Goals\n\nI'm a competitive cyclist with an FTP of 301W and LTHR of 155 bpm. I train primarily on my Peloton bike and outdoors.\n\nI follow a polarized training approach, aiming for:\n- 80% easy riding (Zone 1)\n- 10% threshold work (Zone 2)\n- 10% VO2max intervals (Zone 3)\n\nI also cross-train with rowing on my Concept2 ergometer, typically 2-3 times per week for aerobic development.\n\nMy weekly volume varies:\n- Recovery weeks: 5-6 hours\n- Normal weeks: 10-12 hours\n- Big weeks: 15-20 hours"
+}
+```
+
+**Features:**
+- Detects sports from natural language (cycling, running, rowing, swimming, etc.)
+- Extracts threshold values (FTP, LTHR, pace)
+- Identifies training philosophy and zone distributions
+- Recognizes equipment mentions (Peloton, Concept2, etc.)
+- Creates appropriate zone models for each sport
+- Generates workout templates based on preferences
+
+**Validation:**
+- Requires AI provider to be configured (OpenAI or Claude API key)
+- Preferences text must be provided
+- Generated configuration is validated before saving
+
+**Error Responses:**
+```json
+{
+  "success": false,
+  "error": "No AI provider available. Please configure OPENAI_API_KEY or ANTHROPIC_API_KEY"
+}
+```
+
+### Preview Configuration Generation
+```
+POST /api/settings/preview-config
+```
+
+Generates a configuration preview without saving it. Useful for reviewing AI-generated configurations before committing changes.
+
+**Request/Response:** Same as `/api/settings/generate-config` but with `preview_mode: true` in response.
+
+## Zone Distribution Editor Features
+
+### Batch Update Zone Distributions
+```
+PUT /api/settings/zone-distribution/batch
+```
+
+Update multiple sport zone distributions in a single request.
+
+**Request Body:**
+```json
+{
+  "updates": [
+    {
+      "sport": "Cycling",
+      "zone_distribution": {"1": 85.0, "2": 5.0, "3": 10.0}
+    },
+    {
+      "sport": "Running",
+      "zone_distribution": {"1": 75.0, "2": 15.0, "3": 10.0}
+    }
+  ],
+  "update_philosophy": "custom"  // Optional
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Updated zone distributions for 2 sports",
+  "updated": ["Cycling", "Running"],
+  "failed": []
+}
+```
+
+### Apply Philosophy Preset
+```
+POST /api/settings/zone-distribution/apply-philosophy
+```
+
+Apply a predefined training philosophy distribution to all or specific sports.
+
+**Request Body:**
+```json
+{
+  "philosophy": "polarized",  // "polarized", "pyramidal", or "threshold"
+  "apply_to": "all",          // "all" or ["Cycling", "Running"]
+  "override_custom": false     // Override existing custom distributions
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Applied polarized distribution to all sports",
+  "applied": {
+    "philosophy": "polarized",
+    "distribution": {"1": 80.0, "2": 10.0, "3": 10.0},
+    "sports_updated": ["Cycling", "Running", "Rowing"]
+  }
+}
+```
 
 ## Error Responses
 
