@@ -1,0 +1,354 @@
+# Cycling Performance Focus Template
+# Version: 1.0.0
+# Category: sport-specific
+# Description: Specialized template for cyclists targeting FTP improvement and cycling performance
+
+template:
+  id: "cycling-focus-v1"
+  name: "Cycling Performance Focus"
+  category: "sport-specific"
+  description: "Comprehensive cycling training template for FTP improvement and race performance"
+  
+  metadata:
+    version: "1.0.0"
+    last_updated: "2025-01-17"
+    author: "PolarFlow System"
+    tags: ["cycling", "FTP", "power-based", "endurance", "peloton"]
+  
+  parameters:
+    required:
+      - current_ftp: "number (watts)"
+      - target_ftp: "number (watts)"
+      - cycling_experience: "beginner|intermediate|advanced|expert"
+      - bike_type: "road|mountain|indoor|triathlon|gravel"
+    optional:
+      - power_meter_available: "yes|no"
+      - indoor_trainer_type: "smart|basic|peloton|none"
+      - race_date: "date"
+      - weekly_cycling_hours_current: "number"
+      - cross_training_activities: "array"
+  
+  sport_specific_config:
+    power_zones:
+      zone1_active_recovery: "< 55% FTP"
+      zone2_endurance: "56-75% FTP"
+      zone3_tempo: "76-90% FTP"
+      zone4_threshold: "91-105% FTP"
+      zone5_vo2max: "106-120% FTP"
+      zone6_anaerobic: "121-150% FTP"
+      zone7_neuromuscular: "> 150% FTP"
+    
+    training_zones_distribution:
+      base_phase:
+        zone1_2: "80-85%"
+        zone3: "10-12%"
+        zone4_5: "5-8%"
+        zone6_7: "0-2%"
+      
+      build_phase:
+        zone1_2: "70-75%"
+        zone3: "10-15%"
+        zone4_5: "10-15%"
+        zone6_7: "2-5%"
+      
+      peak_phase:
+        zone1_2: "60-65%"
+        zone3: "15-20%"
+        zone4_5: "15-20%"
+        zone6_7: "5-10%"
+    
+    key_workouts:
+      ftp_test_protocol: "20-minute test (FTP = 95% of average power)"
+      sweet_spot: "88-94% FTP for 20-60 minutes"
+      threshold_intervals: "95-105% FTP, 2x20min or 3x15min"
+      vo2max_intervals: "3-5min at 106-120% FTP"
+      endurance_rides: "Zone 2, 2-6 hours"
+  
+  prompt_sections:
+    athlete_assessment: |
+      Cycling Profile Analysis:
+      - Current FTP: {current_ftp} watts
+      - Target FTP: {target_ftp} watts (requires {ftp_improvement_percentage}% improvement)
+      - W/kg: {watts_per_kg} (based on athlete weight)
+      - Experience level: {cycling_experience}
+      - Primary bike/platform: {bike_type}
+      - Power meter available: {power_meter_available}
+      
+      Training capacity:
+      - Current weekly hours: {weekly_cycling_hours_current}
+      - Maximum sustainable hours: {max_weekly_hours}
+      - Cross-training activities: {cross_training_activities}
+    
+    periodization_plan: |
+      Cycling Periodization Structure:
+      
+      Base Phase (4-8 weeks):
+      - Focus: Aerobic base building
+      - Volume: Progressive increase 5-10% weekly
+      - Intensity: 80% Zone 2, 15% Zone 3, 5% Zone 4+
+      - Key sessions:
+        * Long endurance rides (2-5 hours)
+        * Tempo intervals (2x20min Zone 3)
+        * Cadence drills (high and low)
+      
+      Build Phase (4-6 weeks):
+      - Focus: Threshold and VO2max development
+      - Volume: Maintain or slight decrease
+      - Intensity: 70% Zone 1-2, 20% Zone 3-4, 10% Zone 5+
+      - Key sessions:
+        * Sweet spot intervals (2x30min @ 88-94% FTP)
+        * Threshold blocks (3x15min @ 95-100% FTP)
+        * VO2max intervals (5x5min @ 110% FTP)
+      
+      Peak/Race Phase (2-3 weeks):
+      - Focus: Race-specific intensity
+      - Volume: Reduced by 20-30%
+      - Intensity: Match race demands
+      - Key sessions:
+        * Race simulation efforts
+        * Short, high-intensity intervals
+        * Openers and technique work
+    
+    weekly_structure_cycling: |
+      Optimal Weekly Cycling Structure:
+      
+      Monday: Rest or easy spin (Zone 1, 30-45min)
+      Tuesday: Intervals (VO2max or threshold work)
+      Wednesday: Endurance ride (Zone 2, 60-90min)
+      Thursday: Sweet spot or tempo work
+      Friday: Rest or easy spin
+      Saturday: Long endurance ride (Zone 2, 2-4 hours)
+      Sunday: Moderate ride with some intensity
+      
+      Alternative for time-crunched:
+      - 3-4 key sessions per week
+      - Prioritize: 1 long ride, 1 threshold, 1 VO2max
+      - Fill with easy rides or cross-training
+    
+    indoor_outdoor_integration: |
+      Indoor vs Outdoor Training Balance:
+      
+      Indoor Training (Peloton/Trainer):
+      - Best for: Structured intervals, bad weather, time efficiency
+      - Advantages: Precise power control, no coasting, safe environment
+      - Workouts: All interval sessions, FTP tests, recovery spins
+      - ERG mode: Use for threshold and sweet spot work
+      
+      Outdoor Training:
+      - Best for: Long endurance, bike handling, race specificity
+      - Advantages: Variable terrain, mental engagement, real-world conditions
+      - Workouts: Long rides, group rides, hill repeats, race simulation
+      
+      Integration strategy:
+      - Indoor: 60-70% of sessions (all structured work)
+      - Outdoor: 30-40% of sessions (endurance and skills)
+    
+    ftp_improvement_strategies: |
+      Specific FTP Improvement Protocols:
+      
+      1. Sweet Spot Progression:
+      Week 1-2: 2x20min @ 88% FTP
+      Week 3-4: 2x25min @ 90% FTP
+      Week 5-6: 2x30min @ 92% FTP
+      Week 7-8: 3x20min @ 94% FTP
+      
+      2. Threshold Ladder:
+      Week 1-2: 3x10min @ 95% FTP
+      Week 3-4: 3x12min @ 97% FTP
+      Week 5-6: 3x15min @ 100% FTP
+      Week 7-8: 2x20min @ 102% FTP
+      
+      3. VO2max Support:
+      - 5x5min @ 106-110% FTP (3min rest)
+      - 8x3min @ 115% FTP (3min rest)
+      - 3x8min @ 105% FTP (4min rest)
+      
+      4. Polarized Approach:
+      - 2 hard days (intervals)
+      - 4-5 easy days (Zone 2)
+      - 1 rest day
+    
+    power_based_workouts: |
+      Detailed Power-Based Workout Library:
+      
+      Threshold Development:
+      1. "2x20 Classic"
+         - Warm-up: 15min gradual to Zone 3
+         - Main: 2x20min @ 95-100% FTP (5min rest)
+         - Cool-down: 10min easy
+      
+      2. "Over-Under Intervals"
+         - Warm-up: 15min
+         - Main: 3x12min (2min @ 95% FTP, 1min @ 105% FTP)
+         - Cool-down: 10min
+      
+      VO2max Development:
+      1. "Classic 5x5"
+         - Warm-up: 20min with 3x1min efforts
+         - Main: 5x5min @ 110-115% FTP (5min rest)
+         - Cool-down: 15min
+      
+      2. "Pyramid Intervals"
+         - Warm-up: 15min
+         - Main: 1-2-3-4-3-2-1min @ 120% FTP (equal rest)
+         - Cool-down: 15min
+      
+      Endurance/Base:
+      1. "Zone 2 Progression"
+         - Steady Zone 2 with 5min Zone 3 every 30min
+         - Duration: 2-4 hours
+      
+      2. "Fartlek Endurance"
+         - Base Zone 2 with random 30s-2min surges
+         - Total: 90-120min
+    
+    recovery_protocols_cycling: |
+      Cycling-Specific Recovery:
+      
+      On-Bike Recovery:
+      - Recovery rides: <55% FTP, 30-60min
+      - Cadence focus: 85-95 rpm, minimal resistance
+      - No power targets, ride by feel
+      
+      Off-Bike Recovery:
+      - Foam rolling: IT band, quads, hamstrings, glutes
+      - Stretching: Hip flexors, hamstrings, lower back
+      - Core work: Planks, bird dogs (cycling posture support)
+      - Yoga: Focus on hip opening and spine mobility
+      
+      Nutrition for FTP improvement:
+      - Carbs: 5-8g/kg body weight on hard days
+      - Protein: 1.6-2.2g/kg for recovery
+      - Hydration: Monitor sweat rate, replace accordingly
+      - Post-ride: 3:1 carb:protein within 30min
+    
+    cross_training_integration: |
+      Complementary Activities for Cyclists:
+      
+      Strength Training (2x/week):
+      - Squats and deadlifts (power development)
+      - Single-leg work (pedaling efficiency)
+      - Core stability (power transfer)
+      - Upper body maintenance (bike handling)
+      
+      Running (1x/week):
+      - Easy pace, 20-40min
+      - Maintains bone density
+      - Different movement pattern
+      - Mental break from cycling
+      
+      Swimming (optional):
+      - Upper body balance
+      - Active recovery
+      - Breathing control
+      - Low impact option
+      
+      Yoga/Pilates (2x/week):
+      - Flexibility maintenance
+      - Core strength
+      - Mental focus
+      - Injury prevention
+    
+    race_preparation: |
+      Race/Event Specific Preparation:
+      
+      4 Weeks Out:
+      - Last big volume week
+      - Include race-pace efforts
+      - Dial in nutrition strategy
+      
+      3 Weeks Out:
+      - Reduce volume 20%
+      - Maintain intensity
+      - Practice race tactics
+      
+      2 Weeks Out:
+      - Reduce volume 40%
+      - Short, sharp efforts
+      - Equipment check and prep
+      
+      1 Week Out:
+      - Reduce volume 60%
+      - Openers only
+      - Rest and mental prep
+      
+      Race Week:
+      - 2-3 easy spins
+      - 1 opener session (few short sprints)
+      - Hydration and carb loading
+  
+  output_format:
+    structure: |
+      ## Cycling Training Plan - {phase_name}
+      ### FTP Focus: {current_ftp}W → {target_ftp}W
+      
+      ### Week {week_number} Overview
+      - Total Hours: {total_hours}
+      - TSS Target: {weekly_tss}
+      - Key Sessions: {key_session_count}
+      - Focus: {weekly_focus}
+      
+      ### Power Zone Distribution
+      - Zone 1-2: {z1_2_percentage}%
+      - Zone 3: {z3_percentage}%
+      - Zone 4-5: {z4_5_percentage}%
+      - Zone 6-7: {z6_7_percentage}%
+      
+      ### Daily Workouts
+      {for each day}
+      #### {day_name} - {workout_type}
+      **Duration**: {duration}
+      **TSS**: {estimated_tss}
+      **Location**: {indoor/outdoor}
+      
+      **Workout Details**:
+      {warmup}
+      {main_set_with_power_targets}
+      {cooldown}
+      
+      **Cadence Notes**: {cadence_targets}
+      **Nutrition**: {fueling_strategy}
+      {/for}
+      
+      ### Weekly Notes
+      - Fatigue Management: {fatigue_notes}
+      - Technique Focus: {technique_points}
+      - Next Week Preview: {progression_notes}
+    
+    required_fields:
+      - power_targets
+      - duration
+      - workout_type
+      - tss_estimate
+      - cadence_guidance
+    
+    optional_fields:
+      - weather_considerations
+      - group_ride_options
+      - equipment_notes
+      - nutrition_timing
+
+variables:
+  ftp_improvement_target:
+    type: range
+    min: 5
+    max: 50
+    unit: watts
+    default: 20
+    
+  indoor_outdoor_ratio:
+    type: enum
+    values: ["mostly_indoor", "balanced", "mostly_outdoor"]
+    default: "balanced"
+    
+  time_to_peak:
+    type: range
+    min: 8
+    max: 24
+    unit: weeks
+    default: 12
+    
+  training_approach:
+    type: enum
+    values: ["traditional", "polarized", "sweet_spot", "high_volume"]
+    default: "polarized"

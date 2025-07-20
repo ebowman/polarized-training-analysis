@@ -1,19 +1,18 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "user_profile": {
     "philosophy": "polarized",
+    "default_zone_distribution": {
+      "zone1": 80,
+      "zone2": 10,
+      "zone3": 10
+    },
     "volume_levels": {
       "low": 5,
       "medium": 10,
       "high": 15
     },
-    "preferences": {
-      "zone_distribution": {
-        "1": 80.0,
-        "2": 10.0,
-        "3": 10.0
-      }
-    },
+    "preferences": {},
     "thresholds": {
       "ftp": 301,
       "lthr": 153,
@@ -23,10 +22,12 @@
   "sports": [
     {
       "name": "Cycling",
-      "activity_types": [
-        "Ride",
-        "VirtualRide"
-      ],
+      "activity_types": ["Ride", "VirtualRide"],
+      "zone_distribution": {
+        "zone1": 80,
+        "zone2": 6,
+        "zone3": 14
+      },
       "primary_metric": {
         "type": "power",
         "unit": "watts",
@@ -96,14 +97,70 @@
       "equipment": [],
       "workout_templates": [],
       "custom_fields": {},
-      "tags": [],
-      "zone_distribution": null
+      "tags": []
+    },
+    {
+      "name": "Rowing",
+      "activity_types": ["Rowing"],
+      "zone_distribution": {
+        "zone1": 86,
+        "zone2": 4,
+        "zone3": 10
+      },
+      "primary_metric": {
+        "type": "heart_rate",
+        "unit": "bpm",
+        "threshold_field": "lthr",
+        "decimal_places": 0,
+        "custom_formula": null
+      },
+      "secondary_metric": null,
+      "zone_model": "percentage",
+      "zones": [
+        {
+          "name": "UT2",
+          "lower": 0,
+          "upper": 75,
+          "description": "Long steady state",
+          "polarized_zone": 1
+        },
+        {
+          "name": "UT1",
+          "lower": 76,
+          "upper": 85,
+          "description": "Threshold steady state",
+          "polarized_zone": 1
+        },
+        {
+          "name": "AT",
+          "lower": 86,
+          "upper": 95,
+          "description": "Anaerobic threshold",
+          "polarized_zone": 2
+        },
+        {
+          "name": "TR",
+          "lower": 96,
+          "upper": 105,
+          "description": "Transport",
+          "polarized_zone": 3
+        },
+        {
+          "name": "AN",
+          "lower": 106,
+          "upper": 120,
+          "description": "Anaerobic",
+          "polarized_zone": 3
+        }
+      ],
+      "equipment": [],
+      "workout_templates": [],
+      "custom_fields": {},
+      "tags": []
     },
     {
       "name": "Running",
-      "activity_types": [
-        "Run"
-      ],
+      "activity_types": ["Run"],
       "primary_metric": {
         "type": "heart_rate",
         "unit": "bpm",
@@ -153,8 +210,7 @@
       "equipment": [],
       "workout_templates": [],
       "custom_fields": {},
-      "tags": [],
-      "zone_distribution": null
+      "tags": []
     }
   ],
   "global_settings": {}

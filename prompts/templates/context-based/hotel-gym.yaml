@@ -1,0 +1,243 @@
+# Hotel Gym Limited Equipment Template
+# Version: 1.0.0
+# Category: context-based
+# Description: Optimized for typical hotel gym limitations and travel scenarios
+
+template:
+  id: "hotel-gym-v1"
+  name: "Hotel Gym Limited Equipment"
+  category: "context-based"
+  description: "Adaptive template for training in hotel gyms with limited equipment"
+  
+  metadata:
+    version: "1.0.0"
+    last_updated: "2025-01-17"
+    author: "PolarFlow System"
+    tags: ["travel", "limited-equipment", "adaptive", "hotel"]
+  
+  parameters:
+    required:
+      - fitness_level: "beginner|intermediate|advanced"
+      - trip_duration: "number of days"
+      - training_goal_during_travel: "maintain|improve|recover"
+    optional:
+      - hotel_gym_recon: "equipment spotted"
+      - room_space_available: "yes|no"
+      - outdoor_running_safe: "yes|no"
+      - time_zone_difference: "hours"
+  
+  equipment_assumptions:
+    likely_available:
+      - treadmill: "90% probability"
+      - elliptical: "80% probability"
+      - stationary_bike: "70% probability"
+      - dumbbells: "5-50 lbs range, 85% probability"
+      - cable_machine: "60% probability"
+      - mat_space: "95% probability"
+    
+    rarely_available:
+      - barbell: "20% probability"
+      - squat_rack: "15% probability"
+      - rowing_machine: "40% probability"
+      - kettlebells: "30% probability"
+      - pull_up_bar: "40% probability"
+    
+    always_available:
+      - bodyweight: "100%"
+      - resistance_bands: "100% if packed"
+      - jump_rope: "100% if packed"
+  
+  prompt_sections:
+    context_analysis: |
+      Travel Training Context:
+      - Trip duration: {trip_duration} days
+      - Training goal: {training_goal_during_travel}
+      - Time zone adjustment: {time_zone_difference} hours
+      - Hotel gym reconnaissance: {hotel_gym_recon}
+      - Room workout possible: {room_space_available}
+      - Outdoor running option: {outdoor_running_safe}
+      
+      Adjust expectations based on travel fatigue and schedule disruption.
+    
+    equipment_adaptation: |
+      Creative Equipment Substitutions:
+      
+      Barbell Movements → Dumbbell Variations:
+      - Barbell squat → Goblet squat or DB front squat
+      - Barbell deadlift → DB Romanian deadlift or single-leg deadlift
+      - Barbell row → DB row or cable row
+      - Barbell press → DB press or cable press
+      
+      Missing Equipment Workarounds:
+      - No pull-up bar → Cable lat pulldowns or band pull-aparts
+      - No heavy weights → Increase time under tension, add pauses
+      - No rowing machine → Treadmill intervals + DB rows
+      - Limited dumbbells → Unilateral work, drop sets, circuits
+    
+    workout_strategies: |
+      Hotel Gym Optimization Tactics:
+      
+      1. Circuit Training Focus
+      - Minimize equipment hogging
+      - Maintain intensity with less rest
+      - Combine cardio and strength
+      
+      2. Time-Efficient Sessions
+      - 30-45 minute sessions
+      - Superset opposing muscle groups
+      - Use timed intervals vs rep counting
+      
+      3. Intensity Techniques
+      - Drop sets with limited weights
+      - Isometric holds
+      - Tempo manipulation (3-1-3 count)
+      - Mechanical advantage shifts
+      
+      4. Room Workout Backup Plans
+      - Bodyweight HIIT circuits
+      - Yoga/mobility flows
+      - Resistance band routines
+      - Core-focused sessions
+    
+    travel_specific_considerations: |
+      Address Travel Challenges:
+      
+      Jet Lag Management:
+      - Light cardio for first 1-2 days
+      - Avoid high intensity until adjusted
+      - Morning workouts to reset circadian rhythm
+      
+      Business Travel Schedule:
+      - Early morning sessions (pre-meetings)
+      - Quick 20-minute maintenance workouts
+      - In-room bodyweight circuits as backup
+      
+      Vacation Mode:
+      - Fun, exploratory workouts
+      - Include local activities (hiking, swimming)
+      - Focus on movement quality over intensity
+    
+    sample_workouts: |
+      Hotel Gym Workout Templates:
+      
+      1. Full Body Circuit (30 min)
+      Warm-up: 5 min treadmill or bike
+      Circuit (3 rounds, 45s work/15s rest):
+      - DB goblet squats
+      - Push-ups (feet elevated if advanced)
+      - DB Romanian deadlifts
+      - Cable/band rows
+      - DB shoulder press
+      - Plank variations
+      Cool-down: 5 min walk + stretch
+      
+      2. Cardio + Strength Combo (45 min)
+      - 10 min treadmill intervals (30s hard/90s easy)
+      - 20 min strength circuit:
+        * DB lunges
+        * DB chest press
+        * Cable pulls
+        * Core circuit
+      - 10 min bike steady state
+      - 5 min stretch
+      
+      3. In-Room Backup (25 min)
+      EMOM (Every Minute on the Minute):
+      Min 1: Burpees x 10
+      Min 2: Push-ups x 15
+      Min 3: Jump squats x 20
+      Min 4: Mountain climbers x 30
+      Min 5: Plank hold 30s
+      Repeat 5 rounds
+    
+    progression_during_travel: |
+      Maintain Fitness While Traveling:
+      
+      Short Trip (< 1 week):
+      - Maintain intensity, reduce volume
+      - Focus on movement quality
+      - 2-3 sessions sufficient
+      
+      Medium Trip (1-2 weeks):
+      - Week 1: Adaptation phase (70% normal volume)
+      - Week 2: Return to 85-90% volume
+      - Include one challenging session per week
+      
+      Long Trip (> 2 weeks):
+      - Establish routine by day 3
+      - Progress intensity weekly
+      - Find local gym for 1-2 sessions if possible
+    
+    recovery_in_hotels: |
+      Hotel Recovery Protocols:
+      
+      In-Room Recovery:
+      - Foam rolling (if travel roller packed)
+      - Stretching routine (15-20 min)
+      - Bodyweight mobility flow
+      - Bath/shower contrast therapy
+      
+      Hotel Amenities:
+      - Pool: Easy swimming or water walking
+      - Hot tub: Post-workout relaxation
+      - Sauna: If available, 10-15 min sessions
+      
+      Sleep Optimization:
+      - Dark room setup
+      - White noise app
+      - Maintain home sleep schedule when possible
+      - Avoid heavy training close to bedtime
+  
+  output_format:
+    structure: |
+      ## Hotel Gym Workout Plan - {trip_duration} Day Trip
+      
+      ### Quick Assessment
+      - Equipment Available: {confirmed_equipment}
+      - Backup Options: {backup_plans}
+      - Daily Time Available: {workout_window}
+      
+      ### Workout Schedule
+      {for each day}
+      #### Day {day_number} - {workout_focus}
+      **Duration**: {duration} min
+      **Location**: {hotel_gym|room|outdoor}
+      **Equipment Needed**: {equipment_list}
+      
+      **Workout**:
+      {detailed_exercises_with_modifications}
+      
+      **Travel Tips**: {specific_travel_considerations}
+      {/for}
+      
+      ### Backup Plans
+      {room_workout_option}
+      {outdoor_option}
+      {minimal_time_option}
+    
+    required_fields:
+      - daily_workouts
+      - equipment_needed
+      - backup_options
+      - duration
+    
+    optional_fields:
+      - local_activity_suggestions
+      - nutrition_while_traveling
+      - recovery_protocols
+
+variables:
+  session_duration:
+    type: enum
+    values: ["20min", "30min", "45min", "60min"]
+    default: "30min"
+    
+  equipment_confidence:
+    type: enum
+    values: ["minimal", "standard_hotel", "well_equipped"]
+    default: "standard_hotel"
+    
+  travel_fatigue_level:
+    type: enum
+    values: ["low", "moderate", "high"]
+    default: "moderate"

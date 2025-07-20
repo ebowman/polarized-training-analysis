@@ -954,6 +954,10 @@
         let aiPollingInterval = null;
         let globalSummaryTotalMinutes = null; // Store total minutes from displaySummary
         
+        // Global variables for zone configuration
+        let zoneTargets = {1: 80.0, 2: 10.0, 3: 10.0}; // Default polarized values
+        let trainingPhilosophy = 'polarized';
+        
         // Cookie functions
         function setCookie(name, value, days) {
             const expires = new Date();
@@ -1149,6 +1153,18 @@
                 workoutData = await response.json();
                 window.workoutData = workoutData;  // Also set on window for global access
                 
+                // Extract zone configuration if present
+                if (workoutData.zone_config) {
+                    if (workoutData.zone_config.zone_targets) {
+                        zoneTargets = workoutData.zone_config.zone_targets;
+                        // Update all zone target displays
+                        updateZoneTargetDisplays();
+                    }
+                    if (workoutData.zone_config.training_philosophy) {
+                        trainingPhilosophy = workoutData.zone_config.training_philosophy;
+                    }
+                }
+                
                 // Check if data is still downloading
                 if (workoutData.downloading) {
                     loadingDiv.style.display = 'none';
@@ -1276,9 +1292,9 @@
             const zone3Percent = totalMinutes > 0 ? (totalZone3Minutes / totalMinutes) * 100 : 0;
             
             // Calculate adherence score
-            const zone1Target = 80;
-            const zone2Target = 10;
-            const zone3Target = 10;
+            const zone1Target = zoneTargets[1] || 80;
+            const zone2Target = zoneTargets[2] || 10;
+            const zone3Target = zoneTargets[3] || 10;
             
             const zone1Deviation = Math.abs(zone1Percent - zone1Target);
             const zone2Deviation = Math.abs(zone2Percent - zone2Target);
@@ -1367,9 +1383,9 @@
             
             // Update the adherence popup with current distribution
             document.getElementById('adherence-current-dist').innerHTML = `
-                Zone 1: ${Math.round(zone1Percent)}% (target: 80%)<br>
-                Zone 2: ${Math.round(zone2Percent)}% (target: 10%)<br>
-                Zone 3: ${Math.round(zone3Percent)}% (target: 10%)
+                Zone 1: ${Math.round(zone1Percent)}% (target: ${zone1Target}%)<br>
+                Zone 2: ${Math.round(zone2Percent)}% (target: ${zone2Target}%)<br>
+                Zone 3: ${Math.round(zone3Percent)}% (target: ${zone3Target}%)
             `;
             summaryDiv.style.display = 'grid';
         }
@@ -1469,9 +1485,9 @@
                     const zone3Percent = (zone3Minutes / totalMinutes) * 100;
                     
                     // Calculate adherence score
-                    const zone1Deviation = Math.abs(zone1Percent - 80);
-                    const zone2Deviation = Math.abs(zone2Percent - 10);
-                    const zone3Deviation = Math.abs(zone3Percent - 10);
+                    const zone1Deviation = Math.abs(zone1Percent - (zoneTargets[1] || 80));
+                    const zone2Deviation = Math.abs(zone2Percent - (zoneTargets[2] || 10));
+                    const zone3Deviation = Math.abs(zone3Percent - (zoneTargets[3] || 10));
                     
                     const totalDeviation = (zone1Deviation * 0.5) + (zone2Deviation * 0.25) + (zone3Deviation * 0.25);
                     const adherenceScore = Math.max(0, 100 - totalDeviation);
@@ -1767,10 +1783,10 @@
             const generalHealthMinutes = Math.round(150 * timeRange / 7); // NIH general health recommendation scaled
             const maxHealthyWeeklyMinutes = Math.round(600 * timeRange / 7); // 10 hours/week overtraining threshold scaled
             
-            // Calculate zone deficits based on polarized training targets (80/10/10)
-            const targetZone1Minutes = targetMinutes * 0.80;
-            const targetZone2Minutes = targetMinutes * 0.10;
-            const targetZone3Minutes = targetMinutes * 0.10;
+            // Calculate zone deficits based on configured training targets
+            const targetZone1Minutes = targetMinutes * ((zoneTargets[1] || 80) / 100);
+            const targetZone2Minutes = targetMinutes * ((zoneTargets[2] || 10) / 100);
+            const targetZone3Minutes = targetMinutes * ((zoneTargets[3] || 10) / 100);
             
             const zone1Deficit = Math.max(0, Math.round(targetZone1Minutes - totalZone1Minutes));
             const zone2Deficit = Math.max(0, Math.round(targetZone2Minutes - totalZone2Minutes));
@@ -1901,7 +1917,7 @@
                         borderWidth: 2,
                         yAxisID: 'y'
                     }, {
-                        label: 'Zone 1 (Target 80%)',
+                        label: `Zone 1 (Target ${zoneTargets[1] || 80}%)`,
                         data: [80, null, null, null, null],
                         backgroundColor: 'rgba(76, 175, 80, 0.3)',
                         borderColor: '#388E3C',
@@ -1909,7 +1925,7 @@
                         borderDash: [5, 5],
                         yAxisID: 'y'
                     }, {
-                        label: 'Zone 2 (Target 10%)',
+                        label: `Zone 2 (Target ${zoneTargets[2] || 10}%)`,
                         data: [null, 10, null, null, null],
                         backgroundColor: 'rgba(255, 152, 0, 0.3)',
                         borderColor: '#F57C00',
@@ -1917,7 +1933,7 @@
                         borderDash: [5, 5],
                         yAxisID: 'y'
                     }, {
-                        label: 'Zone 3 (Target 10%)',
+                        label: `Zone 3 (Target ${zoneTargets[3] || 10}%)`,
                         data: [null, null, 10, null, null],
                         backgroundColor: 'rgba(244, 67, 54, 0.3)',
                         borderColor: '#D32F2F',
@@ -2565,10 +2581,10 @@
                 }
             }
             
-            // Calculate zone deficits based on polarized training targets (80/10/10)
-            const targetZone1Minutes = targetMinutes * 0.80;
-            const targetZone2Minutes = targetMinutes * 0.10;
-            const targetZone3Minutes = targetMinutes * 0.10;
+            // Calculate zone deficits based on configured training targets
+            const targetZone1Minutes = targetMinutes * ((zoneTargets[1] || 80) / 100);
+            const targetZone2Minutes = targetMinutes * ((zoneTargets[2] || 10) / 100);
+            const targetZone3Minutes = targetMinutes * ((zoneTargets[3] || 10) / 100);
             
             const zone1Deficit = Math.max(0, Math.round(targetZone1Minutes - rollingZone1Minutes));
             const zone2Deficit = Math.max(0, Math.round(targetZone2Minutes - rollingZone2Minutes));
@@ -2747,9 +2763,9 @@
             // What you need to do daily to maintain 360 minutes per week consistently
             // This is the target rate for sustainable polarized training
             const dailyTargetTotal = Math.round(360 / 7); // 51 minutes per day
-            const dailyTargetZ1 = Math.round(dailyTargetTotal * 0.80); // 41 minutes Z1
-            const dailyTargetZ2 = Math.round(dailyTargetTotal * 0.10); // 5 minutes Z2  
-            const dailyTargetZ3 = Math.round(dailyTargetTotal * 0.10); // 5 minutes Z3
+            const dailyTargetZ1 = Math.round(dailyTargetTotal * ((zoneTargets[1] || 80) / 100));
+            const dailyTargetZ2 = Math.round(dailyTargetTotal * ((zoneTargets[2] || 10) / 100));
+            const dailyTargetZ3 = Math.round(dailyTargetTotal * ((zoneTargets[3] || 10) / 100));
             
             const avgDailyZ1Needed = dailyTargetZ1;
             const avgDailyZ2Needed = dailyTargetZ2;
@@ -3939,6 +3955,29 @@
             cardsDiv.innerHTML = errorHtml;
             
             aiRecommendationsDiv.style.display = 'block';
+        }
+        
+        // Function to update all zone target displays
+        function updateZoneTargetDisplays() {
+            // Update all elements with zone target classes
+            document.querySelectorAll('.zone1-target').forEach(el => {
+                el.textContent = zoneTargets[1] || 80;
+            });
+            document.querySelectorAll('.zone2-target').forEach(el => {
+                el.textContent = zoneTargets[2] || 10;
+            });
+            document.querySelectorAll('.zone3-target').forEach(el => {
+                el.textContent = zoneTargets[3] || 10;
+            });
+            
+            // Update adherence description based on training philosophy
+            const adherenceDesc = document.getElementById('adherence-description');
+            if (adherenceDesc) {
+                const philosophyText = trainingPhilosophy === 'pyramidal' ? 'pyramidal' : 
+                                     trainingPhilosophy === 'threshold' ? 'threshold-focused' : 
+                                     'polarized';
+                adherenceDesc.textContent = `The adherence score measures how closely your training matches your ${philosophyText} distribution targets.`;
+            }
         }
         
         // Load data when page loads

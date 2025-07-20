@@ -1,0 +1,424 @@
+# Running Performance Focus Template
+# Version: 1.0.0
+# Category: sport-specific
+# Description: Specialized template for runners targeting race performance and injury-free progression
+
+template:
+  id: "running-focus-v1"
+  name: "Running Performance Focus"
+  category: "sport-specific"
+  description: "Comprehensive running template for race preparation and performance improvement"
+  
+  metadata:
+    version: "1.0.0"
+    last_updated: "2025-01-17"
+    author: "PolarFlow System"
+    tags: ["running", "endurance", "race-prep", "injury-prevention"]
+  
+  parameters:
+    required:
+      - current_pace_per_mile: "time (mm:ss)"
+      - target_race_distance: "5k|10k|half|marathon|ultra"
+      - running_experience: "beginner|intermediate|advanced|elite"
+      - current_weekly_mileage: "number"
+    optional:
+      - target_race_time: "time"
+      - injury_history: "array of injuries"
+      - preferred_running_surface: "road|trail|track|treadmill|mixed"
+      - running_days_per_week: "number (3-7)"
+      - cross_training_available: "yes|no"
+  
+  sport_specific_config:
+    pace_zones:
+      recovery: "60-70% max HR, conversational pace"
+      easy: "70-80% max HR, 60-90s slower than race pace"
+      marathon_pace: "80-85% max HR, target marathon pace"
+      threshold: "85-90% max HR, 15-20s faster than MP"
+      interval: "90-95% max HR, 5k-10k race pace"
+      repetition: "95-100% max HR, mile race pace or faster"
+    
+    training_distribution:
+      base_building:
+        easy_recovery: "80-85%"
+        threshold: "10-12%"
+        interval_repetition: "5-8%"
+      
+      race_specific:
+        easy_recovery: "70-75%"
+        race_pace: "15-20%"
+        faster_than_race: "5-10%"
+      
+      taper:
+        easy_recovery: "85-90%"
+        race_pace: "5-10%"
+        strides: "5%"
+    
+    key_workouts_by_distance:
+      "5k":
+        track_intervals: "12x400m @ 5k pace"
+        tempo: "20min @ threshold"
+        long_run: "10-12 miles easy"
+      
+      "10k":
+        track_intervals: "6x1000m @ 10k pace"
+        tempo: "2x15min @ threshold"
+        long_run: "12-14 miles easy"
+      
+      "half_marathon":
+        tempo: "5-7 miles @ HM pace"
+        progression: "10 miles, last 3 @ HM pace"
+        long_run: "14-16 miles easy"
+      
+      "marathon":
+        marathon_pace: "10-16 miles @ MP"
+        long_run: "18-22 miles easy"
+        yasso_800s: "10x800m (time predicts marathon)"
+  
+  prompt_sections:
+    runner_assessment: |
+      Running Profile Analysis:
+      - Current pace: {current_pace_per_mile} per mile
+      - Target race: {target_race_distance}
+      - Goal time: {target_race_time}
+      - Experience: {running_experience}
+      - Weekly mileage: {current_weekly_mileage} miles
+      - Injury history: {injury_history}
+      
+      Calculate training paces:
+      - Easy pace: {easy_pace_range}
+      - Marathon pace: {marathon_pace}
+      - Threshold pace: {threshold_pace}
+      - Interval pace: {interval_pace}
+      - Recovery pace: {recovery_pace}
+    
+    mileage_progression: |
+      Safe Mileage Build-Up Strategy:
+      
+      10% Rule Application:
+      - Current: {current_weekly_mileage} miles/week
+      - Week 1-3: Maintain current
+      - Week 4: +10% ({new_mileage} miles)
+      - Week 5-6: Maintain new level
+      - Week 7: +10% again
+      - Week 8: Recovery week (-20%)
+      
+      Distribution Across Week:
+      - Long run: 25-30% of weekly mileage
+      - Medium runs: 15-20% each
+      - Easy runs: 10-15% each
+      - Recovery runs: 5-10% each
+      
+      Surface Variation:
+      - Roads: {road_percentage}%
+      - Trails: {trail_percentage}%
+      - Track: {track_percentage}%
+      - Treadmill: {treadmill_percentage}%
+    
+    injury_prevention_focus: |
+      Running Injury Prevention Protocol:
+      
+      Pre-Run Routine (10-15min):
+      1. Dynamic warm-up
+         - Leg swings (front/back, side/side)
+         - Walking lunges with twist
+         - High knees and butt kicks
+         - Calf raises and ankle circles
+      
+      2. Activation drills
+         - Single-leg glute bridges
+         - Monster walks with band
+         - Clamshells
+         - Running form drills (A-skip, B-skip)
+      
+      Post-Run Routine (15-20min):
+      1. Cool-down walk (5min)
+      2. Static stretching
+         - Calf stretch (30s each)
+         - Hamstring stretch
+         - Quad stretch
+         - IT band stretch
+         - Hip flexor stretch
+      
+      3. Foam rolling
+         - Calves
+         - IT band (gentle)
+         - Quads and hamstrings
+         - Glutes
+      
+      Weekly Maintenance:
+      - Strength training: 2x/week
+      - Yoga or mobility: 1-2x/week
+      - Sports massage: Monthly
+      - Rest days: Minimum 1-2/week
+    
+    race_specific_training: |
+      Race Distance Specific Preparation:
+      
+      {if target_race_distance == "5k"}
+      5K Training Focus:
+      - Speed development priority
+      - Weekly track session mandatory
+      - VO2max intervals key
+      - Race pace feels "comfortably hard"
+      - Sample key workout: 6x800m @ 5k pace (90s rest)
+      
+      {if target_race_distance == "10k"}
+      10K Training Focus:
+      - Blend of speed and endurance
+      - Threshold runs crucial
+      - Longer intervals (1000m-1600m)
+      - Race pace sustained for 35-60min
+      - Sample key workout: 3x2 miles @ 10k pace (2min rest)
+      
+      {if target_race_distance == "half_marathon"}
+      Half Marathon Focus:
+      - Tempo runs are king
+      - Marathon pace runs for strength
+      - Less track work, more roads
+      - Race pace for 1:30-2:30
+      - Sample key workout: 8 miles with 5 @ HM pace
+      
+      {if target_race_distance == "marathon"}
+      Marathon Training Focus:
+      - Long runs with MP segments
+      - Weekly MP runs (10-16 miles)
+      - Glycogen depletion training
+      - Race pace for 3-5 hours
+      - Sample key workout: 20 miles with 14 @ MP
+    
+    weekly_running_structure: |
+      Optimal Weekly Running Schedule:
+      
+      {if running_days_per_week == 5}
+      5-Day Running Week:
+      Monday: Easy recovery (5-7 miles)
+      Tuesday: Track intervals or tempo
+      Wednesday: Rest or cross-train
+      Thursday: Medium run (7-10 miles)
+      Friday: Rest
+      Saturday: Long run
+      Sunday: Easy recovery (5-8 miles)
+      
+      {if running_days_per_week == 6}
+      6-Day Running Week:
+      Monday: Easy recovery (5-6 miles)
+      Tuesday: Track/speed work
+      Wednesday: Medium easy (7-9 miles)
+      Thursday: Tempo or threshold
+      Friday: Easy recovery (4-5 miles)
+      Saturday: Long run
+      Sunday: Medium easy (8-10 miles)
+      
+      Double Run Days (advanced):
+      - Morning: Easy 3-5 miles
+      - Evening: Main workout
+      - Benefits: Increased mileage, better recovery
+      - Only after consistent 50+ mile weeks
+    
+    workout_details_running: |
+      Detailed Running Workout Library:
+      
+      Speed Development:
+      1. "Classic 400s"
+         - Warm-up: 2 miles easy + drills
+         - Main: 12x400m @ mile pace (90s rest)
+         - Cool-down: 2 miles easy
+      
+      2. "Ladder Workout"
+         - Warm-up: 15-20min easy
+         - Main: 400-800-1200-1600-1200-800-400m
+         - Rest: Half the interval time
+         - Cool-down: 10-15min easy
+      
+      Threshold Development:
+      1. "Tempo Run"
+         - Warm-up: 2 miles easy
+         - Main: 4-6 miles @ threshold pace
+         - Cool-down: 1-2 miles easy
+      
+      2. "Cruise Intervals"
+         - Warm-up: 15min easy
+         - Main: 3x2 miles @ threshold (60s rest)
+         - Cool-down: 10min easy
+      
+      Long Run Variations:
+      1. "Progressive Long Run"
+         - First 1/3: Easy pace
+         - Middle 1/3: Steady pace
+         - Final 1/3: Marathon pace
+      
+      2. "Long Run with Surges"
+         - Easy pace with 1min surges every 10min
+         - Total: 90-150min depending on fitness
+    
+    cross_training_for_runners: |
+      Complementary Activities for Runners:
+      
+      Low-Impact Cardio:
+      1. Pool Running (injury replacement)
+         - Maintains fitness during injury
+         - Weekly session for injury prevention
+         - 45-60min sessions
+      
+      2. Cycling (active recovery)
+         - Easy spin days between hard runs
+         - 60-90min at conversational pace
+         - Builds aerobic base without impact
+      
+      3. Elliptical (bad weather option)
+         - Mimics running motion
+         - Good for easy/recovery days
+         - 30-60min sessions
+      
+      Strength Training (2x/week):
+      Lower Body:
+      - Squats (bodyweight → weighted)
+      - Single-leg deadlifts
+      - Step-ups
+      - Calf raises
+      - Bulgarian split squats
+      
+      Core (every run day):
+      - Planks (front and side)
+      - Dead bugs
+      - Bird dogs
+      - Russian twists
+      - Mountain climbers
+      
+      Upper Body (maintain balance):
+      - Push-ups
+      - Rows
+      - Shoulder exercises
+      - Arm swings for running form
+    
+    nutrition_for_runners: |
+      Running-Specific Nutrition:
+      
+      Daily Nutrition:
+      - Carbs: 5-7g/kg for moderate training
+      - Carbs: 7-10g/kg for high mileage
+      - Protein: 1.2-1.7g/kg
+      - Fats: 20-35% of calories
+      - Hydration: Half body weight in ounces + sweat losses
+      
+      Pre-Run Fueling:
+      Easy runs: No fuel needed if under 60min
+      Hard sessions: 200-300 cal 2-3hrs before
+      Long runs: 400-600 cal 2-3hrs before
+      
+      During-Run Fueling:
+      < 60min: Water only
+      60-90min: 100-150 cal if hard effort
+      > 90min: 200-300 cal/hour
+      Options: Gels, dates, sports drink
+      
+      Post-Run Recovery:
+      Within 30min: 3:1 carb:protein ratio
+      Examples:
+      - Chocolate milk
+      - Banana + peanut butter
+      - Recovery smoothie
+      - Bagel with turkey
+      
+      Race Week Nutrition:
+      - 3 days out: Increase carbs to 8-10g/kg
+      - Hydrate well (clear urine)
+      - Avoid new foods
+      - Reduce fiber 24-48hrs before
+    
+    tapering_strategy: |
+      Race Taper Protocol:
+      
+      5K Taper (1 week):
+      - Reduce mileage 40-50%
+      - Maintain intensity
+      - 3-4 easy runs + strides
+      - Race pace preview 4 days out
+      
+      10K-Half Marathon Taper (10-14 days):
+      Week 1: 70% of peak mileage
+      - Maintain workout intensity
+      - Reduce workout volume
+      Week 2: 50% of peak mileage
+      - Short race pace efforts
+      - Focus on feeling fresh
+      
+      Marathon Taper (3 weeks):
+      Week 1: 75% of peak mileage
+      - Last long run (12-13 miles)
+      - Reduced interval volume
+      Week 2: 50% of peak mileage
+      - 8-10 mile medium long run
+      - Short tempo segments
+      Week 3: 30% of peak mileage
+      - All easy running
+      - 3-4 short runs with strides
+  
+  output_format:
+    structure: |
+      ## Running Training Plan - Week {week_number}
+      ### Target Race: {target_race_distance} in {weeks_to_race} weeks
+      
+      ### Week Overview
+      - Total Mileage: {weekly_mileage} miles
+      - Long Run: {long_run_distance} miles
+      - Key Workouts: {key_workout_count}
+      - Recovery Days: {recovery_days}
+      
+      ### Training Schedule
+      {for each day}
+      #### {day_name} - {workout_type}
+      **Distance**: {distance} miles
+      **Duration**: {estimated_time}
+      **Pace**: {pace_description}
+      
+      **Workout**:
+      Warm-up: {warmup_details}
+      Main Set: {main_workout_with_paces}
+      Cool-down: {cooldown_details}
+      
+      **Route Notes**: {surface_terrain_notes}
+      **Focus Points**: {form_or_mental_cues}
+      {/for}
+      
+      ### Weekly Targets
+      - Elevation Gain: {weekly_elevation} ft
+      - Quality Miles: {quality_miles} ({quality_percentage}%)
+      - Easy Miles: {easy_miles} ({easy_percentage}%)
+      
+      ### Injury Prevention Reminders
+      {injury_prevention_focus_for_week}
+    
+    required_fields:
+      - distance
+      - pace_zones
+      - workout_type
+      - warmup_cooldown
+      - weekly_mileage
+    
+    optional_fields:
+      - weather_adjustments
+      - route_suggestions
+      - heart_rate_targets
+      - mental_strategies
+
+variables:
+  mileage_build_rate:
+    type: enum
+    values: ["conservative_5%", "standard_10%", "aggressive_15%"]
+    default: "standard_10%"
+    
+  workout_intensity:
+    type: enum
+    values: ["low", "moderate", "high", "race_specific"]
+    default: "moderate"
+    
+  injury_risk_tolerance:
+    type: enum
+    values: ["very_cautious", "cautious", "moderate", "aggressive"]
+    default: "cautious"
+    
+  race_goal_ambition:
+    type: enum
+    values: ["finish", "PR", "BQ", "age_group_win"]
+    default: "PR"

@@ -308,6 +308,9 @@ def _calculate_zones_with_sport_config(max_hr: int, ftp: int, lthr: int) -> dict
         'lthr': lthr,
         'training_philosophy': philosophy.value if hasattr(philosophy, 'value') else str(philosophy),
         'zone_targets': zone_targets,
+        'zone1_target': zone_targets.get(1, 80),
+        'zone2_target': zone_targets.get(2, 10),
+        'zone3_target': zone_targets.get(3, 10),
         **hr_zones,
         **power_zones
     }
@@ -383,12 +386,15 @@ def _calculate_legacy_zones(max_hr: int, ftp: int, lthr: int) -> dict:
     hr_zones = _calculate_legacy_hr_zones(max_hr)
     power_zones = _calculate_legacy_power_zones(ftp)
     
+    # Default zone targets for legacy mode
+    zone_targets = {1: 80.0, 2: 10.0, 3: 10.0}
+    
     return {
         'max_hr': max_hr,
         'ftp': ftp,
         'lthr': lthr,
         'training_philosophy': 'polarized',
-        'zone_targets': {1: 80.0, 2: 10.0, 3: 10.0},
+        'zone_targets': zone_targets,
         **hr_zones,
         **power_zones
     }

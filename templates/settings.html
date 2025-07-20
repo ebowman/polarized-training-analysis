@@ -399,10 +399,68 @@
                             <option value="false">Disabled</option>
                         </select>
                     </div>
+                    
+                    <!-- Zone Distribution Editor -->
+                    <div class="settings-section" style="background-color: #e8f5e8; border-color: #27ae60;">
+                        <h3>Zone Distribution Settings</h3>
+                        <p class="help-text">Define how much time you want to spend in each training zone (must sum to 100%)</p>
+                        
+                        <div class="zone-editor">
+                            <div class="form-group">
+                                <label for="zone1_percentage">Zone 1 (Easy/Recovery):</label>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="range" id="zone1_slider" min="0" max="100" value="80" 
+                                           oninput="updateZoneInput('zone1', this.value)" style="flex: 1;">
+                                    <input type="number" id="zone1_percentage" min="0" max="100" value="80" 
+                                           oninput="updateZoneSlider('zone1', this.value)" style="width: 80px;">
+                                    <span>%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="zone2_percentage">Zone 2 (Moderate/Threshold):</label>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="range" id="zone2_slider" min="0" max="100" value="10" 
+                                           oninput="updateZoneInput('zone2', this.value)" style="flex: 1;">
+                                    <input type="number" id="zone2_percentage" min="0" max="100" value="10" 
+                                           oninput="updateZoneSlider('zone2', this.value)" style="width: 80px;">
+                                    <span>%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="zone3_percentage">Zone 3 (Hard/VO2 Max):</label>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="range" id="zone3_slider" min="0" max="100" value="10" 
+                                           oninput="updateZoneInput('zone3', this.value)" style="flex: 1;">
+                                    <input type="number" id="zone3_percentage" min="0" max="100" value="10" 
+                                           oninput="updateZoneSlider('zone3', this.value)" style="width: 80px;">
+                                    <span>%</span>
+                                </div>
+                            </div>
+                            
+                            <div id="zone-total" style="margin-top: 15px; padding: 10px; background-color: #fff; border-radius: 5px;">
+                                <strong>Total: <span id="zone-sum">100</span>%</strong>
+                                <span id="zone-error" style="color: #e74c3c; margin-left: 10px; display: none;">
+                                    Must equal 100%
+                                </span>
+                            </div>
+                            
+                            <button type="button" class="btn-secondary" onclick="updateZoneDistribution()" 
+                                    style="margin-top: 10px;">Apply Zone Distribution</button>
+                        </div>
+                    </div>
+                    
                     <div class="form-group">
                         <label for="sport_config_json">Sport Configuration (JSON):</label>
                         <textarea id="sport_config_json" name="SPORT_CONFIG_JSON" class="prompt-editor" rows="20"></textarea>
                         <div class="help-text">Define training zones for different sports (running, cycling, swimming)</div>
+                        
+                        <!-- Generate from Preferences Button -->
+                        <button type="button" class="btn-primary" onclick="generateConfigFromPreferences()" 
+                                style="margin-top: 10px;">
+                            🤖 Generate Config from Preferences
+                        </button>
                     </div>
                 </div>
             </div>
@@ -584,9 +642,126 @@
             }
         }
         
+        // Zone Distribution Functions
+        function updateZoneInput(zone, value) {
+            document.getElementById(zone + '_percentage').value = value;
+            updateZoneTotal();
+        }
+        
+        function updateZoneSlider(zone, value) {
+            document.getElementById(zone + '_slider').value = value;
+            updateZoneTotal();
+        }
+        
+        function updateZoneTotal() {
+            const zone1 = parseInt(document.getElementById('zone1_percentage').value) || 0;
+            const zone2 = parseInt(document.getElementById('zone2_percentage').value) || 0;
+            const zone3 = parseInt(document.getElementById('zone3_percentage').value) || 0;
+            const total = zone1 + zone2 + zone3;
+            
+            document.getElementById('zone-sum').textContent = total;
+            
+            if (total !== 100) {
+                document.getElementById('zone-error').style.display = 'inline';
+                document.getElementById('zone-total').style.backgroundColor = '#f8d7da';
+            } else {
+                document.getElementById('zone-error').style.display = 'none';
+                document.getElementById('zone-total').style.backgroundColor = '#d4edda';
+            }
+        }
+        
+        async function updateZoneDistribution() {
+            const zone1 = parseInt(document.getElementById('zone1_percentage').value) || 0;
+            const zone2 = parseInt(document.getElementById('zone2_percentage').value) || 0;
+            const zone3 = parseInt(document.getElementById('zone3_percentage').value) || 0;
+            
+            if (zone1 + zone2 + zone3 !== 100) {
+                showAlert('Zone distribution must sum to 100%', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/settings/zone-distribution/user', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        zone_distribution: {
+                            1: zone1,
+                            2: zone2,
+                            3: zone3
+                        }
+                    })
+                });
+                
+                if (response.ok) {
+                    showAlert('Zone distribution updated successfully!', 'success');
+                    // Reload settings to update the JSON
+                    loadSettings();
+                } else {
+                    const error = await response.json();
+                    showAlert(`Error updating zone distribution: ${error.error}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Error updating zone distribution: ${error.message}`, 'error');
+            }
+        }
+        
+        async function generateConfigFromPreferences() {
+            try {
+                showAlert('Generating configuration from preferences...', 'info');
+                
+                const response = await fetch('/api/generate-config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        preferences: '' // Will use the saved preferences file
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    showAlert('Configuration generated successfully!', 'success');
+                    // Reload settings to get the new configuration
+                    loadSettings();
+                } else {
+                    const error = await response.json();
+                    showAlert(`Error generating configuration: ${error.error}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Error generating configuration: ${error.message}`, 'error');
+            }
+        }
+        
+        // Load zone distribution when loading settings
+        async function loadZoneDistribution() {
+            try {
+                const response = await fetch('/api/settings/zone-distribution');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.data.user_targets) {
+                        const targets = data.data.user_targets;
+                        document.getElementById('zone1_percentage').value = targets[1] || 80;
+                        document.getElementById('zone1_slider').value = targets[1] || 80;
+                        document.getElementById('zone2_percentage').value = targets[2] || 10;
+                        document.getElementById('zone2_slider').value = targets[2] || 10;
+                        document.getElementById('zone3_percentage').value = targets[3] || 10;
+                        document.getElementById('zone3_slider').value = targets[3] || 10;
+                        updateZoneTotal();
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading zone distribution:', error);
+            }
+        }
+        
         // Initialize on page load
         window.addEventListener('DOMContentLoaded', () => {
             loadSettings();
+            loadZoneDistribution();
         });
     </script>
 </body>

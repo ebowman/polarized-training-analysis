@@ -1,0 +1,208 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Extended Sport Configuration Schema",
+  "description": "Enhanced schema with configurable zone distribution percentages per sport",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version for future compatibility",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "user_profile": {
+      "type": "object",
+      "properties": {
+        "philosophy": {
+          "type": "string",
+          "enum": ["polarized", "pyramidal", "threshold", "custom"],
+          "description": "Default training philosophy"
+        },
+        "default_zone_distribution": {
+          "type": "object",
+          "description": "Default zone distribution percentages (can be overridden per sport)",
+          "properties": {
+            "zone1": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Zone 1 (Easy/Aerobic) percentage"
+            },
+            "zone2": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Zone 2 (Moderate/Threshold) percentage"
+            },
+            "zone3": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Zone 3 (Hard/VO2max) percentage"
+            }
+          },
+          "required": ["zone1", "zone2", "zone3"],
+          "additionalProperties": false
+        },
+        "volume_levels": {
+          "type": "object",
+          "properties": {
+            "low": { "type": "number", "description": "Low volume hours per week" },
+            "medium": { "type": "number", "description": "Medium volume hours per week" },
+            "high": { "type": "number", "description": "High volume hours per week" }
+          }
+        },
+        "preferences": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "thresholds": {
+          "type": "object",
+          "properties": {
+            "ftp": { "type": "integer", "description": "Functional Threshold Power (watts)" },
+            "lthr": { "type": "integer", "description": "Lactate Threshold Heart Rate (bpm)" },
+            "max_hr": { "type": "integer", "description": "Maximum Heart Rate (bpm)" }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "sports": {
+      "type": "array",
+      "description": "List of configured sports/activities",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Display name for the sport"
+          },
+          "activity_types": {
+            "type": "array",
+            "description": "List of activity types that map to this sport",
+            "items": { "type": "string" }
+          },
+          "zone_distribution": {
+            "type": "object",
+            "description": "Sport-specific zone distribution percentages (overrides default)",
+            "properties": {
+              "zone1": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Zone 1 percentage for this sport"
+              },
+              "zone2": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Zone 2 percentage for this sport"
+              },
+              "zone3": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Zone 3 percentage for this sport"
+              }
+            },
+            "required": ["zone1", "zone2", "zone3"],
+            "additionalProperties": false
+          },
+          "primary_metric": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["power", "heart_rate", "pace", "speed", "custom"]
+              },
+              "unit": { "type": "string" },
+              "threshold_field": { "type": "string" },
+              "decimal_places": { "type": "integer" },
+              "custom_formula": { "type": ["string", "null"] }
+            },
+            "required": ["type"]
+          },
+          "secondary_metric": {
+            "type": ["object", "null"],
+            "properties": {
+              "type": { "type": "string" },
+              "unit": { "type": "string" },
+              "threshold_field": { "type": "string" },
+              "decimal_places": { "type": "integer" },
+              "custom_formula": { "type": ["string", "null"] }
+            }
+          },
+          "zone_model": {
+            "type": "string",
+            "enum": ["percentage", "absolute", "formula", "custom"],
+            "description": "How zones are calculated"
+          },
+          "zones": {
+            "type": "array",
+            "description": "Detailed zone definitions",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "lower": { "type": "number" },
+                "upper": { "type": "number" },
+                "description": { "type": "string" },
+                "polarized_zone": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3,
+                  "description": "Which polarized zone (1, 2, or 3) this maps to"
+                }
+              },
+              "required": ["name", "lower", "upper", "polarized_zone"]
+            }
+          },
+          "equipment": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "brand": { "type": "string" },
+                "model": { "type": "string" },
+                "capabilities": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          },
+          "workout_templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "polarized_zone": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3
+                },
+                "duration_minutes": { "type": "integer" },
+                "description": { "type": "string" }
+              }
+            }
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["name", "activity_types", "primary_metric", "zones"]
+      }
+    },
+    "global_settings": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "required": ["version", "sports"]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "default_workout_generator",
+  "name": "Default Workout Generator",
+  "description": "General purpose workout generation template for various sports and intensities",
+  "prompt": "Generate a {sport} workout for a {fitness_level} athlete.\n\nWorkout Parameters:\n- Duration: {duration} minutes\n- Primary focus: {focus_area}\n- Intensity zone: {target_zone}\n- Equipment available: {equipment}\n\nThe workout should include:\n1. Proper warm-up (10-15 minutes)\n2. Main set with clear intervals/segments\n3. Cool-down (5-10 minutes)\n\nProvide specific power/pace/heart rate targets based on the athlete's FTP of {ftp}W and max heart rate of {max_hr} bpm.\n\nFormat the workout in a clear, time-based structure.",
+  "variables": {
+    "sport": "Sport type (cycling, running, rowing, etc.)",
+    "fitness_level": "Athlete fitness level (beginner, intermediate, advanced)",
+    "duration": "Total workout duration in minutes",
+    "focus_area": "Primary training focus (endurance, tempo, intervals, recovery)",
+    "target_zone": "Primary training zone (1-5)",
+    "equipment": "Available equipment (indoor trainer, track, gym, etc.)",
+    "ftp": "Functional Threshold Power in watts",
+    "max_hr": "Maximum heart rate in bpm"
+  },
+  "is_default": false,
+  "created_at": "2025-01-17T10:00:00",
+  "updated_at": "2025-01-17T10:00:00"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "recovery_workout",
+  "name": "Recovery Workout Template",
+  "description": "Template for generating active recovery workouts",
+  "prompt": "Design an active recovery {sport} workout for an athlete who completed {previous_workout} yesterday.\n\nRecovery Goals:\n- Duration: {duration} minutes\n- Keep heart rate below {recovery_hr_max} bpm\n- Include mobility work for {problem_areas}\n\nThe workout should:\n1. Start very easy (Zone 1)\n2. Include dynamic movements\n3. Avoid any high-intensity efforts\n4. Incorporate breathing exercises\n5. End with stretching routine\n\nConsider the athlete's fatigue level: {fatigue_level}/10",
+  "variables": {
+    "sport": "Primary sport (cycling, running, swimming, etc.)",
+    "previous_workout": "Description of yesterday's workout",
+    "duration": "Recovery session duration (20-60 minutes)",
+    "recovery_hr_max": "Maximum heart rate for recovery (usually 65-70% of max)",
+    "problem_areas": "Areas needing extra attention (hips, calves, shoulders, etc.)",
+    "fatigue_level": "Current fatigue level (1-10 scale)"
+  },
+  "is_default": false,
+  "created_at": "2025-01-17T10:00:00",
+  "updated_at": "2025-01-17T10:00:00"
+}

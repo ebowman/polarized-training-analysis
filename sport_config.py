@@ -93,6 +93,7 @@ class SportConfig:
     workout_templates: List[WorkoutTemplate] = field(default_factory=list)
     custom_fields: Dict[str, Any] = field(default_factory=dict)
     tags: List[str] = field(default_factory=list)  # Support for tagging (e.g., 'ancillary')
+    zone_distribution: Optional[Dict[int, float]] = None  # Override zone distribution for this sport
 
 
 @dataclass
@@ -181,7 +182,8 @@ class ConfigValidator:
             "equipment": [self._equipment_to_dict(eq) for eq in sport.equipment],
             "workout_templates": [self._template_to_dict(tmpl) for tmpl in sport.workout_templates],
             "custom_fields": sport.custom_fields,
-            "tags": sport.tags
+            "tags": sport.tags,
+            "zone_distribution": sport.zone_distribution if sport.zone_distribution else None
         }
     
     def _metric_to_dict(self, metric: Metric) -> Dict[str, Any]:
@@ -293,7 +295,8 @@ class ConfigLoader:
             secondary_metric=secondary_metric,
             zone_model=sport_dict.get("zone_model", "percentage"),
             custom_fields=sport_dict.get("custom_fields", {}),
-            tags=sport_dict.get("tags", [])
+            tags=sport_dict.get("tags", []),
+            zone_distribution=sport_dict.get("zone_distribution")
         )
         
         # Load zones
@@ -341,7 +344,8 @@ def create_default_config() -> TrainingConfig:
     config.user_profile = UserProfile(
         philosophy=TrainingPhilosophy.POLARIZED,
         volume_levels={"low": 5, "medium": 10, "high": 15},
-        thresholds={"ftp": 250, "lthr": 165}
+        thresholds={"ftp": 250, "lthr": 165},
+        preferences={"zone_distribution": {1: 80.0, 2: 10.0, 3: 10.0}}
     )
     
     # Default cycling configuration

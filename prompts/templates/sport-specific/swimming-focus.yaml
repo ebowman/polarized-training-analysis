@@ -1,0 +1,448 @@
+# Swimming Performance Focus Template
+# Version: 1.0.0
+# Category: sport-specific
+# Description: Specialized template for swimmers focusing on technique, endurance, and speed
+
+template:
+  id: "swimming-focus-v1"
+  name: "Swimming Performance Focus"
+  category: "sport-specific"
+  description: "Comprehensive swimming template for technique improvement and performance gains"
+  
+  metadata:
+    version: "1.0.0"
+    last_updated: "2025-01-17"
+    author: "PolarFlow System"
+    tags: ["swimming", "aquatic", "technique", "endurance", "masters"]
+  
+  parameters:
+    required:
+      - swimming_level: "beginner|intermediate|advanced|masters"
+      - primary_stroke: "freestyle|backstroke|breaststroke|butterfly|IM"
+      - pool_access: "25y|25m|50m|open_water"
+      - current_100m_pace: "time (mm:ss)"
+    optional:
+      - weekly_swim_sessions: "number (1-6)"
+      - technique_limiters: "array"
+      - competition_goals: "fitness|masters_meets|triathlon|open_water"
+      - equipment_available: "array"
+  
+  sport_specific_config:
+    training_zones:
+      recovery: "RPE 1-2, can easily hold conversation"
+      aerobic: "RPE 3-4, comfortable, sustainable"
+      threshold: "RPE 5-6, comfortably hard"
+      vo2max: "RPE 7-8, hard, heavy breathing"
+      anaerobic: "RPE 9, very hard, unsustainable"
+      sprint: "RPE 10, maximum effort"
+    
+    stroke_focus_distribution:
+      technique_phase:
+        drill_work: "40%"
+        aerobic_swimming: "40%"
+        speed_work: "20%"
+      
+      endurance_phase:
+        aerobic_sets: "60%"
+        threshold_work: "25%"
+        technique: "15%"
+      
+      speed_phase:
+        race_pace: "35%"
+        speed_work: "30%"
+        aerobic_recovery: "35%"
+    
+    essential_drills:
+      freestyle:
+        - "Catch-up drill"
+        - "Fist drill"
+        - "Single arm"
+        - "6-kick switch"
+        - "Fingertip drag"
+      
+      backstroke:
+        - "Double arm"
+        - "Single arm"
+        - "3-3-3 drill"
+        - "Cup drill"
+      
+      breaststroke:
+        - "2 kicks 1 pull"
+        - "Breaststroke with dolphin kick"
+        - "Arms only"
+        - "Streamline kicks"
+      
+      butterfly:
+        - "Single arm fly"
+        - "3-3-3 drill"
+        - "Kick on back"
+        - "2-2-2 breathing pattern"
+  
+  prompt_sections:
+    swimmer_assessment: |
+      Swimming Profile Analysis:
+      - Level: {swimming_level}
+      - Primary stroke: {primary_stroke}
+      - Current 100m pace: {current_100m_pace}
+      - Pool type: {pool_access}
+      - Weekly sessions available: {weekly_swim_sessions}
+      - Technique limiters: {technique_limiters}
+      
+      Calculate training paces:
+      - Easy pace (Z1-2): +15-20s/100m from threshold
+      - Threshold pace (Z3): {current_100m_pace}
+      - VO2max pace (Z4): -5-10s/100m from threshold
+      - Sprint pace (Z5): Maximum effort
+    
+    technique_development: |
+      Technique Improvement Strategy:
+      
+      Common Limiters and Fixes:
+      
+      Freestyle Issues:
+      1. Poor catch
+         - Drill: Fist drill → feel water with forearm
+         - Focus: High elbow catch
+         - Sets: 8x25 drill, 25 swim
+      
+      2. Low body position
+         - Drill: Kick with board at 45°
+         - Focus: Press chest down, hips up
+         - Core work on deck
+      
+      3. Crossing over
+         - Drill: Single arm with board
+         - Focus: Wide hand entry
+         - Visualize swimming on rails
+      
+      4. Inefficient breathing
+         - Drill: 3-5-7 breathing pattern
+         - Focus: Exhale underwater
+         - Practice bilateral breathing
+      
+      Video Analysis Protocol:
+      - Above water: Side view for body position
+      - Below water: Front view for catch
+      - Review monthly for progress
+    
+    workout_structure_swimming: |
+      Standard Swimming Workout Format:
+      
+      1. Warm-up (15-20% of total):
+      - 200-400 easy swim
+      - 4x50 build (easy to fast)
+      - 4x25 drill of choice
+      - 100 easy choice
+      
+      2. Pre-set (10-15%):
+      - Technique focus
+      - Drill sets specific to main set
+      - Activation swims
+      
+      3. Main Set (50-60%):
+      - Primary workout focus
+      - Could be intervals, distance, or technique
+      
+      4. Cool-down (10-15%):
+      - 200-400 easy choice
+      - Include different strokes
+      - Focus on relaxation
+      
+      Total workout: 2000-4000m depending on level
+    
+    endurance_sets: |
+      Swimming Endurance Development:
+      
+      Aerobic Base Sets:
+      1. "Ladder Set"
+         - 100-200-300-400-300-200-100
+         - Rest: 15-20s between
+         - Pace: Steady aerobic (Z2)
+      
+      2. "Broken Mile"
+         - 4x400 @ aerobic pace
+         - Rest: 30s between
+         - Focus: Consistent splits
+      
+      3. "Pyramid Distance"
+         - 500-400-300-200-100
+         - Rest: 20s per 100m swum
+         - Descend 1-5 (get faster)
+      
+      Threshold Development:
+      1. "Classic 100s"
+         - 10-20x100 @ threshold
+         - Rest: 10-15s
+         - Hold consistent pace
+      
+      2. "Descending 200s"
+         - 6x200
+         - #1-2 easy, #3-4 moderate, #5-6 fast
+         - Rest: 30s
+      
+      Pull Sets (with buoy):
+      - Removes kick, isolates upper body
+      - Add paddles for strength
+      - 20-30% of total volume
+    
+    speed_development: |
+      Swimming Speed Work:
+      
+      Sprint Sets:
+      1. "Fast 25s"
+         - 8-12x25 ALL OUT
+         - Rest: 30-45s (full recovery)
+         - Focus: Perfect technique at speed
+      
+      2. "Broken 100s"
+         - 4x(4x25) @ sprint
+         - 10s rest between 25s, 2min between rounds
+         - Maintain speed across all
+      
+      Race Pace Training:
+      1. "Race Pace 50s"
+         - 10x50 @ goal 100 pace
+         - Rest: 15-20s
+         - Must hit target time
+      
+      2. "Descending 100s"
+         - 5x100
+         - Start @ threshold, finish @ race pace
+         - Rest: 30s
+      
+      USRPT (Ultra Short Race Pace Training):
+      - Short intervals @ exact race pace
+      - Short rest (10-20s)
+      - Stop when can't hold pace
+      - Example: 30x25 @ 50 race pace
+    
+    drill_progressions: |
+      Drill Integration Strategy:
+      
+      Beginner Drill Focus (50% of workout):
+      - Master basic drills first
+      - 25s drill → 25s swim applying focus
+      - Use fins for body position drills
+      - Video feedback essential
+      
+      Intermediate Drill Work (30%):
+      - Complex drill combinations
+      - 50s drill → 50s swim
+      - Remove equipment gradually
+      - Focus on rhythm and timing
+      
+      Advanced Drill Sets (20%):
+      - High-speed drill work
+      - Race pace applications
+      - Drill → sprint transitions
+      - Power development drills
+      
+      Equipment Progression:
+      1. Fins: Body position, kick development
+      2. Pull buoy: Isolation, upper body
+      3. Paddles: Strength, catch development
+      4. Snorkel: Head position, symmetry
+      5. Resistance: Parachute, drag suit
+    
+    open_water_adaptation: |
+      Open Water Swimming Preparation:
+      
+      Pool Training for Open Water:
+      1. Sighting practice
+         - Every 4th stroke, lift head
+         - Maintain rhythm
+         - Practice in main sets
+      
+      2. No-wall turns
+         - Swim continuous without pushing off
+         - Practice 180° turns
+         - Maintain momentum
+      
+      3. Contact preparation
+         - Swim 3-wide in lane
+         - Practice passing
+         - Defensive swimming
+      
+      Open Water Specific:
+      - Water temperature adaptation
+      - Wetsuit practice sessions
+      - Navigation skills
+      - Different breathing patterns
+      - Drafting techniques
+      - Mass start practice
+      
+      Safety Protocols:
+      - Never swim alone
+      - Bright cap/buoy
+      - Know conditions
+      - Have exit strategy
+    
+    masters_swimming: |
+      Masters Swimming Optimization:
+      
+      Age-Adjusted Training:
+      - Longer warm-ups (20-25%)
+      - More technique focus
+      - Quality over quantity
+      - Extra recovery between hard sets
+      
+      Common Masters Events:
+      - 50s of each stroke
+      - 100/200 IM
+      - 500/1000/1650 free
+      - Relays
+      
+      Meet Preparation:
+      - Practice starts/turns
+      - Race pace rehearsal
+      - Taper 5-7 days
+      - Multiple events strategy
+      
+      Social Component:
+      - Group workouts
+      - Lane etiquette
+      - Workout modifications
+      - Team building
+    
+    injury_prevention_swimming: |
+      Swimming Injury Prevention:
+      
+      Common Issues:
+      1. Shoulder impingement
+         - Strengthen rotator cuff
+         - Improve catch technique
+         - Limit paddles volume
+         - Mix strokes
+      
+      2. Lower back (fly/breast)
+         - Core strengthening
+         - Improve flexibility
+         - Technique focus
+         - Reduce volume when sore
+      
+      Dryland for Swimmers (2-3x/week):
+      Shoulder Health:
+      - Band exercises (I,Y,T,W)
+      - External rotation
+      - Scapular stability
+      
+      Core Strength:
+      - Planks (all variations)
+      - Dead bugs
+      - Bird dogs
+      - Medicine ball work
+      
+      Flexibility:
+      - Shoulder stretches
+      - Lat stretches
+      - Ankle flexibility
+      - Hip flexor stretches
+      
+      General Strength:
+      - Pull-ups/lat pulls
+      - Squats/lunges
+      - Push-ups
+      - TRX work
+    
+    nutrition_hydration: |
+      Swimming Nutrition Considerations:
+      
+      Pre-Swim (1-2 hours before):
+      - Light carbs: Banana, toast, oatmeal
+      - Avoid high fiber
+      - Hydrate well
+      - Coffee if morning swim
+      
+      During Swim:
+      - Water bottle on deck
+      - Sports drink for 90min+
+      - Small snacks for long sessions
+      - Maintain energy levels
+      
+      Post-Swim:
+      - Immediate: Quick carbs + protein
+      - Chocolate milk ideal
+      - Full meal within 2 hours
+      - Rehydrate fully
+      
+      Special Considerations:
+      - Early morning: Lighter pre-swim fuel
+      - Double sessions: Fuel between
+      - Competition: Tested foods only
+      - Cold water: Extra calories needed
+  
+  output_format:
+    structure: |
+      ## Swimming Training Plan - Week {week_number}
+      ### Focus: {weekly_focus}
+      
+      ### Week Overview
+      - Total Volume: {weekly_meters}m
+      - Sessions: {session_count}
+      - Technique Focus: {technique_emphasis}
+      - Intensity Distribution: Easy {easy_pct}% / Moderate {mod_pct}% / Hard {hard_pct}%
+      
+      ### Training Sessions
+      {for each session}
+      #### {day_name} - Session {session_number}
+      **Total Distance**: {total_meters}m
+      **Duration**: {estimated_time}
+      **Equipment**: {equipment_needed}
+      
+      **Warm-up** ({warmup_meters}m):
+      {warmup_details}
+      
+      **Pre-set** ({preset_meters}m):
+      {preset_with_drills}
+      
+      **Main Set** ({main_meters}m):
+      {main_set_with_intervals}
+      
+      **Cool-down** ({cooldown_meters}m):
+      {cooldown_details}
+      
+      **Technique Points**: {technique_cues}
+      **Target Times**: {pace_targets}
+      {/for}
+      
+      ### Weekly Technique Focus
+      {technique_progression_notes}
+      
+      ### Dryland Recommendations
+      {complementary_exercises}
+    
+    required_fields:
+      - session_distance
+      - intensity_zones
+      - rest_intervals
+      - technique_focus
+      - equipment_needed
+    
+    optional_fields:
+      - stroke_counts
+      - heart_rate_zones
+      - video_analysis_notes
+      - competition_prep
+
+variables:
+  volume_progression:
+    type: enum
+    values: ["conservative_5%", "standard_10%", "aggressive_15%"]
+    default: "standard_10%"
+    
+  technique_emphasis:
+    type: range
+    min: 20
+    max: 50
+    unit: percentage
+    default: 30
+    
+  equipment_usage:
+    type: enum
+    values: ["minimal", "moderate", "full_toys"]
+    default: "moderate"
+    
+  session_duration:
+    type: enum
+    values: ["45min", "60min", "75min", "90min"]
+    default: "60min"

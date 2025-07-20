@@ -286,10 +286,28 @@ class SportConfigService:
             print(f"Error importing configuration: {e}")
             return False
     
-    def get_zone_distribution_target(self) -> Dict[int, float]:
-        """Get target zone distribution based on training philosophy"""
+    def get_zone_distribution_target(self, sport_name: Optional[str] = None) -> Dict[int, float]:
+        """Get target zone distribution based on training philosophy
+        
+        Args:
+            sport_name: Optional sport name to get sport-specific distribution
+            
+        Returns:
+            Dictionary mapping zone numbers (1, 2, 3) to target percentages
+        """
+        # First check if a specific sport has a zone distribution override
+        if sport_name:
+            sport = self.get_sport_by_name(sport_name)
+            if sport and sport.zone_distribution:
+                return sport.zone_distribution
+        
         philosophy = self.get_training_philosophy()
         
+        # Check if user has custom zone distribution in preferences
+        if self.config.user_profile and "zone_distribution" in self.config.user_profile.preferences:
+            return self.config.user_profile.preferences["zone_distribution"]
+        
+        # Use philosophy-based defaults
         if philosophy == TrainingPhilosophy.POLARIZED:
             return {1: 80.0, 2: 10.0, 3: 10.0}
         elif philosophy == TrainingPhilosophy.PYRAMIDAL:
@@ -297,10 +315,8 @@ class SportConfigService:
         elif philosophy == TrainingPhilosophy.THRESHOLD:
             return {1: 60.0, 2: 30.0, 3: 10.0}
         else:
-            # Custom - get from user preferences
-            if self.config.user_profile and "zone_distribution" in self.config.user_profile.preferences:
-                return self.config.user_profile.preferences["zone_distribution"]
-            return {1: 80.0, 2: 10.0, 3: 10.0}  # Default to polarized
+            # Default to polarized if no philosophy is set
+            return {1: 80.0, 2: 10.0, 3: 10.0}
     
     def update_sport_zones(self, sport_name: str, zones: List[ZoneDefinition]):
         """Update zones for a sport"""
@@ -318,3 +334,51 @@ class SportConfigService:
             for activity_type in sport.activity_types:
                 mapping[activity_type] = sport.name
         return mapping
+    
+    def update_user_zone_distribution(self, zone_distribution: Dict[int, float]) -> bool:
+        """Update user's global zone distribution preferences
+        
+        Args:
+            zone_distribution: Dictionary mapping zone numbers to target percentages
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        # Validate zone distribution
+        total = sum(zone_distribution.values())
+        if abs(total - 100.0) > 0.1:  # Allow small floating point errors
+            logger.error(f"Zone distribution must sum to 100%, got {total}%")
+            return False
+        
+        if not self.config.user_profile:
+            self.config.user_profile = UserProfile(
+                philosophy=TrainingPhilosophy.CUSTOM,
+                volume_levels={"low": 5, "medium": 10, "high": 15}
+            )
+        
+        self.config.user_profile.preferences["zone_distribution"] = zone_distribution
+        self.save_config()
+        return True
+    
+    def update_sport_zone_distribution(self, sport_name: str, zone_distribution: Dict[int, float]) -> bool:
+        """Update zone distribution for a specific sport
+        
+        Args:
+            sport_name: Name of the sport to update
+            zone_distribution: Dictionary mapping zone numbers to target percentages
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        sport = self.get_sport_by_name(sport_name)
+        if sport:
+            # Validate zone distribution
+            total = sum(zone_distribution.values())
+            if abs(total - 100.0) > 0.1:  # Allow small floating point errors
+                logger.error(f"Zone distribution must sum to 100%, got {total}%")
+                return False
+            
+            sport.zone_distribution = zone_distribution
+            self.save_config()
+            return True
+        return False

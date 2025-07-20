@@ -77,8 +77,9 @@ generate a complete sport configuration in JSON format that follows this structu
         "philosophy": "polarized|pyramidal|threshold|custom",
         "volume_levels": {{"low": hours_per_week, "medium": hours_per_week, "high": hours_per_week}},
         "thresholds": {{"ftp": value, "lthr": value, ...}},
-        "preferences": {{...}}
-    }},
+        "preferences": {{
+            "zone_distribution": {{"1": 80, "2": 10, "3": 10}}  // Zone percentages
+        }}
     "sports": [
         {{
             "name": "Sport Name",
@@ -132,6 +133,10 @@ Important guidelines:
 6. Extract threshold values if mentioned (FTP, LTHR, etc.)
 7. Detect training philosophy from the preferences
 8. For zones, use percentage model by default unless specific values are given
+9. Extract zone distribution preferences if mentioned (e.g., "80/10/10", "polarized distribution", "Zone 1: 80%", etc.)
+   - Default to 80/10/10 for polarized, 70/20/10 for pyramidal, 50/35/15 for threshold
+   - Look for phrases like "zone distribution", "training distribution", "zone percentages"
+   - Parse formats like "80/10/10", "Zone 1: 80%, Zone 2: 10%, Zone 3: 10%", etc.
 
 User's workout preferences:
 {preferences_text}
@@ -277,7 +282,48 @@ Generate the complete JSON configuration:
         if lthr_match:
             config.user_profile.thresholds["lthr"] = float(lthr_match.group(1))
         
+        # Try to extract zone distribution
+        zone_dist = self._extract_zone_distribution(preferences_text)
+        if zone_dist:
+            config.user_profile.preferences["zone_distribution"] = zone_dist
+        
         return config
+    
+    def _extract_zone_distribution(self, text: str) -> Optional[Dict[str, float]]:
+        """Extract zone distribution from preferences text"""
+        # Check for explicit 80/10/10 format
+        pattern1 = re.search(r'(\d+)[/\-](\d+)[/\-](\d+)', text)
+        if pattern1:
+            z1, z2, z3 = map(float, pattern1.groups())
+            if z1 + z2 + z3 == 100:  # Validate percentages
+                return {"1": z1, "2": z2, "3": z3}
+        
+        # Check for zone percentage mentions
+        zone_patterns = [
+            r'zone\s*1[:\s]+(\d+)%',
+            r'zone\s*2[:\s]+(\d+)%',
+            r'zone\s*3[:\s]+(\d+)%'
+        ]
+        zones = {}
+        for i, pattern in enumerate(zone_patterns, 1):
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                zones[str(i)] = float(match.group(1))
+        
+        if len(zones) == 3 and sum(zones.values()) == 100:
+            return zones
+        
+        # Check for training philosophy to set defaults
+        text_lower = text.lower()
+        if 'polarized' in text_lower:
+            return {"1": 80.0, "2": 10.0, "3": 10.0}
+        elif 'pyramidal' in text_lower:
+            return {"1": 70.0, "2": 20.0, "3": 10.0}
+        elif 'threshold' in text_lower:
+            return {"1": 50.0, "2": 35.0, "3": 15.0}
+        
+        # Default to polarized if no specific distribution found
+        return {"1": 80.0, "2": 10.0, "3": 10.0}
     
     def _create_default_cycling(self) -> SportConfig:
         """Create default cycling configuration"""

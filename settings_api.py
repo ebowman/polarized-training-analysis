@@ -657,3 +657,428 @@ def register_settings_routes(app):
         
         result = SettingsAPI.convert_prompt_to_json(data['prompt'])
         return jsonify(result), 200 if result['success'] else 400
+    
+    # Config Generation Endpoint
+    @app.route('/api/settings/generate-config', methods=['POST'])
+    @require_auth
+    def generate_config():
+        """Generate sport configuration from preferences text"""
+        try:
+            data = request.get_json()
+            if not data or 'preferences' not in data:
+                return jsonify({
+                    'success': False,
+                    'error': 'Missing preferences in request body'
+                }), 400
+            
+            preferences_text = data['preferences']
+            zone_distribution = data.get('zone_distribution')
+            
+            # Import config generator
+            from config_generator import ConfigGenerator
+            from ai_providers import OpenAIProvider, ClaudeProvider
+            
+            # Try to get AI provider based on settings
+            ai_provider = None
+            provider_type = os.getenv('AI_PROVIDER', 'auto')
+            
+            if provider_type == 'auto':
+                # Try primary provider first
+                primary = os.getenv('AI_PRIMARY_PROVIDER', 'claude')
+                if primary == 'openai':
+                    provider = OpenAIProvider()
+                    if provider.is_available():
+                        ai_provider = provider
+                else:
+                    provider = ClaudeProvider()
+                    if provider.is_available():
+                        ai_provider = provider
+                        
+                # Fall back to secondary if needed
+                if not ai_provider:
+                    fallback = os.getenv('AI_FALLBACK_PROVIDER', 'openai')
+                    if fallback == 'openai':
+                        provider = OpenAIProvider()
+                        if provider.is_available():
+                            ai_provider = provider
+                    else:
+                        provider = ClaudeProvider()
+                        if provider.is_available():
+                            ai_provider = provider
+            elif provider_type == 'openai':
+                provider = OpenAIProvider()
+                if provider.is_available():
+                    ai_provider = provider
+            elif provider_type == 'claude':
+                provider = ClaudeProvider()
+                if provider.is_available():
+                    ai_provider = provider
+            
+            if not ai_provider:
+                return jsonify({
+                    'success': False,
+                    'error': 'No AI provider available. Please configure API keys.'
+                }), 503
+            
+            # Generate configuration
+            generator = ConfigGenerator(ai_provider=ai_provider)
+            
+            # If zone distribution provided, append it to preferences
+            if zone_distribution:
+                zone_text = "\n\nZone Distribution Targets:\n"
+                for zone, percentage in zone_distribution.items():
+                    zone_text += f"- Zone {zone}: {percentage}%\n"
+                preferences_text += zone_text
+            
+            try:
+                config = generator.generate_config(preferences_text)
+                
+                # Convert to dict for JSON response
+                config_dict = {
+                    'version': config.version,
+                    'user_profile': {
+                        'philosophy': config.user_profile.philosophy.value,
+                        'volume_levels': config.user_profile.volume_levels,
+                        'thresholds': config.user_profile.thresholds,
+                        'preferences': config.user_profile.preferences
+                    },
+                    'sports': []
+                }
+                
+                for sport in config.sports:
+                    sport_dict = {
+                        'name': sport.name,
+                        'activity_types': sport.activity_types,
+                        'primary_metric': {
+                            'type': sport.primary_metric.type.value,
+                            'unit': sport.primary_metric.unit,
+                            'threshold_field': sport.primary_metric.threshold_field,
+                            'decimal_places': sport.primary_metric.decimal_places
+                        } if sport.primary_metric else None,
+                        'secondary_metric': {
+                            'type': sport.secondary_metric.type.value,
+                            'unit': sport.secondary_metric.unit,
+                            'threshold_field': sport.secondary_metric.threshold_field,
+                            'decimal_places': sport.secondary_metric.decimal_places
+                        } if sport.secondary_metric else None,
+                        'zone_model': sport.zone_model.value,
+                        'zones': [],
+                        'equipment': [{'name': e.name, 'notes': e.notes} for e in sport.equipment],
+                        'workout_templates': [],
+                        'notes': sport.notes,
+                        'zone_distribution': sport.zone_distribution
+                    }
+                    
+                    for zone in sport.zones:
+                        zone_dict = {
+                            'name': zone.name,
+                            'lower': zone.lower,
+                            'upper': zone.upper,
+                            'description': zone.description,
+                            'primary_range': zone.primary_range,
+                            'secondary_range': zone.secondary_range
+                        }
+                        sport_dict['zones'].append(zone_dict)
+                    
+                    for template in sport.workout_templates:
+                        template_dict = {
+                            'name': template.name,
+                            'description': template.description,
+                            'structure': template.structure,
+                            'target_zones': template.target_zones,
+                            'duration_minutes': template.duration_minutes,
+                            'frequency_per_week': template.frequency_per_week
+                        }
+                        sport_dict['workout_templates'].append(template_dict)
+                    
+                    config_dict['sports'].append(sport_dict)
+                
+                return jsonify({
+                    'success': True,
+                    'config': config_dict,
+                    'provider_used': type(ai_provider).__name__
+                })
+                
+            except Exception as e:
+                logger.error(f"Error generating config: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': f'Failed to generate configuration: {str(e)}'
+                }), 500
+                
+        except Exception as e:
+            logger.error(f"Error in generate-config endpoint: {e}")
+            return jsonify({
+                'success': False,
+                'error': 'An unexpected error occurred'
+            }), 500
+    
+    # Sport Config Zone Distribution Endpoints
+    @app.route('/api/settings/zone-distribution', methods=['GET'])
+    def get_zone_distribution():
+        """Get current zone distribution settings"""
+        try:
+            from sport_config_service import SportConfigService
+            service = SportConfigService()
+            
+            # Get global user zone distribution
+            user_targets = service.get_zone_distribution_target()
+            philosophy = service.get_training_philosophy()
+            
+            # Get sport-specific distributions
+            sport_distributions = {}
+            for sport in service.get_all_sports():
+                if sport.zone_distribution:
+                    sport_distributions[sport.name] = sport.zone_distribution
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'philosophy': philosophy.value,
+                    'user_targets': user_targets,
+                    'sport_distributions': sport_distributions
+                }
+            })
+        except Exception as e:
+            logger.error(f"Error getting zone distribution: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+    
+    @app.route('/api/settings/zone-distribution/user', methods=['PUT'])
+    @require_auth
+    def update_user_zone_distribution():
+        """Update user's global zone distribution"""
+        try:
+            data = request.get_json()
+            if not data or 'zone_distribution' not in data:
+                return jsonify({
+                    'success': False,
+                    'error': 'Missing zone_distribution in request body'
+                }), 400
+            
+            from sport_config_service import SportConfigService
+            service = SportConfigService()
+            
+            zone_dist = data['zone_distribution']
+            # Convert string keys to integers if needed
+            zone_dist = {int(k): v for k, v in zone_dist.items()}
+            
+            success = service.update_user_zone_distribution(zone_dist)
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': 'User zone distribution updated successfully'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Zone distribution must sum to 100%'
+                }), 400
+                
+        except Exception as e:
+            logger.error(f"Error updating user zone distribution: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+    
+    @app.route('/api/settings/zone-distribution/sport/<sport_name>', methods=['PUT'])
+    @require_auth
+    def update_sport_zone_distribution(sport_name):
+        """Update sport-specific zone distribution"""
+        try:
+            data = request.get_json()
+            if not data or 'zone_distribution' not in data:
+                return jsonify({
+                    'success': False,
+                    'error': 'Missing zone_distribution in request body'
+                }), 400
+            
+            from sport_config_service import SportConfigService
+            service = SportConfigService()
+            
+            zone_dist = data['zone_distribution']
+            # Convert string keys to integers if needed
+            zone_dist = {int(k): v for k, v in zone_dist.items()}
+            
+            success = service.update_sport_zone_distribution(sport_name, zone_dist)
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': f'Zone distribution for {sport_name} updated successfully'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Sport not found or zone distribution must sum to 100%'
+                }), 400
+                
+        except Exception as e:
+            logger.error(f"Error updating sport zone distribution: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+    
+    @app.route('/api/settings/generate-config', methods=['POST'])
+    @require_auth
+    def generate_config():
+        """Generate sport configuration from workout preferences using AI"""
+        try:
+            data = request.get_json()
+            preferences_text = data.get('preferences_text') if data else None
+            
+            # Import the config generator
+            from config_generator import ConfigGenerator
+            from ai_providers import OpenAIProvider, ClaudeProvider
+            import traceback
+            
+            # Determine which AI provider to use based on configured API keys
+            ai_provider = None
+            
+            # Try OpenAI first
+            openai_key = os.environ.get('OPENAI_API_KEY')
+            if openai_key and openai_key.strip():
+                try:
+                    provider = OpenAIProvider()
+                    if provider.is_available():
+                        ai_provider = provider
+                        logger.info("Using OpenAI provider for config generation")
+                except Exception as e:
+                    logger.warning(f"OpenAI provider not available: {e}")
+            
+            # Fall back to Claude if OpenAI not available
+            if not ai_provider:
+                anthropic_key = os.environ.get('ANTHROPIC_API_KEY') or os.environ.get('CLAUDE_API_KEY')
+                if anthropic_key and anthropic_key.strip():
+                    try:
+                        provider = ClaudeProvider()
+                        if provider.is_available():
+                            ai_provider = provider
+                            logger.info("Using Claude provider for config generation")
+                    except Exception as e:
+                        logger.warning(f"Claude provider not available: {e}")
+            
+            if not ai_provider:
+                return jsonify({
+                    'success': False,
+                    'error': 'No AI provider configured. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY in settings.'
+                }), 400
+            
+            # Initialize the config generator
+            generator = ConfigGenerator(ai_provider=ai_provider)
+            
+            # If no preferences text provided, try to load from file
+            if not preferences_text:
+                if generator.preferences_file:
+                    with open(generator.preferences_file, 'r') as f:
+                        preferences_text = f.read()
+                    logger.info(f"Loaded preferences from {generator.preferences_file}")
+                else:
+                    return jsonify({
+                        'success': False,
+                        'error': 'No preferences text provided and no preferences file found. Please create workout_preferences.md or provide preferences_text.'
+                    }), 400
+            
+            # Generate the configuration
+            logger.info("Generating sport configuration from preferences...")
+            config = generator.generate_config(preferences_text)
+            
+            # Convert to dictionary format for JSON response
+            config_dict = {
+                "version": "1.0.0",
+                "user_profile": {
+                    "philosophy": config.user_profile.philosophy.value,
+                    "volume_levels": config.user_profile.volume_levels,
+                    "preferences": config.user_profile.preferences,
+                    "thresholds": config.user_profile.thresholds
+                },
+                "sports": [],
+                "global_settings": config.global_settings
+            }
+            
+            # Convert sports
+            for sport in config.sports:
+                sport_dict = {
+                    "id": sport.name.lower().replace(" ", "_"),
+                    "name": sport.name,
+                    "activity_types": sport.activity_types,
+                    "primary_metric": {
+                        "type": sport.primary_metric.type.value,
+                        "unit": sport.primary_metric.unit,
+                        "threshold_field": sport.primary_metric.threshold_field,
+                        "decimal_places": sport.primary_metric.decimal_places,
+                        "custom_formula": sport.primary_metric.custom_formula
+                    },
+                    "secondary_metric": None,
+                    "zone_model": sport.zone_model,
+                    "zones": [],
+                    "equipment": [],
+                    "workout_templates": [],
+                    "custom_fields": sport.custom_fields,
+                    "tags": []
+                }
+                
+                # Add secondary metric if exists
+                if sport.secondary_metric:
+                    sport_dict["secondary_metric"] = {
+                        "type": sport.secondary_metric.type.value,
+                        "unit": sport.secondary_metric.unit,
+                        "threshold_field": sport.secondary_metric.threshold_field,
+                        "decimal_places": sport.secondary_metric.decimal_places,
+                        "custom_formula": sport.secondary_metric.custom_formula
+                    }
+                
+                # Convert zones
+                for zone in sport.zones:
+                    sport_dict["zones"].append({
+                        "name": zone.name,
+                        "lower": zone.lower,
+                        "upper": zone.upper,
+                        "description": zone.description,
+                        "polarized_zone": zone.polarized_zone
+                    })
+                
+                # Convert equipment
+                for eq in sport.equipment:
+                    sport_dict["equipment"].append({
+                        "name": eq.name,
+                        "description": eq.description,
+                        "capabilities": eq.capabilities,
+                        "default_duration_minutes": eq.default_duration_minutes,
+                        "supports_metrics": [m.value for m in eq.supports_metrics]
+                    })
+                
+                # Convert workout templates
+                for tmpl in sport.workout_templates:
+                    sport_dict["workout_templates"].append({
+                        "name": tmpl.name,
+                        "description": tmpl.description,
+                        "zones": tmpl.zones,
+                        "structure": tmpl.structure,
+                        "duration_minutes": tmpl.duration_minutes,
+                        "required_equipment": tmpl.required_equipment
+                    })
+                
+                config_dict["sports"].append(sport_dict)
+            
+            logger.info(f"Successfully generated configuration with {len(config_dict['sports'])} sports")
+            
+            return jsonify({
+                'success': True,
+                'config': config_dict,
+                'detected_sports': [sport['name'] for sport in config_dict['sports']],
+                'message': 'Successfully generated sport configuration from preferences'
+            })
+            
+        except Exception as e:
+            logger.error(f"Error generating config: {e}")
+            logger.error(traceback.format_exc())
+            return jsonify({
+                'success': False,
+                'error': f'Failed to generate configuration: {str(e)}'
+            }), 500

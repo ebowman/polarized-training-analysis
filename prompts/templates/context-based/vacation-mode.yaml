@@ -1,0 +1,281 @@
+# Vacation Mode Training Template
+# Version: 1.0.0
+# Category: context-based
+# Description: Flexible template for maintaining fitness while enjoying vacation
+
+template:
+  id: "vacation-mode-v1"
+  name: "Vacation Mode Training"
+  category: "context-based"
+  description: "Balanced approach to staying active on vacation without sacrificing relaxation"
+  
+  metadata:
+    version: "1.0.0"
+    last_updated: "2025-01-17"
+    author: "PolarFlow System"
+    tags: ["vacation", "travel", "flexible", "maintenance", "fun"]
+  
+  parameters:
+    required:
+      - vacation_duration: "number of days"
+      - vacation_type: "beach|mountain|city|cruise|resort|adventure"
+      - fitness_maintenance_goal: "maintain|light_activity|explore|recover"
+    optional:
+      - planned_activities: "array (hiking, swimming, tours, etc)"
+      - equipment_access: "none|hotel_gym|local_gym|outdoor"
+      - family_travel: "yes|no"
+      - time_availability: "minimal|moderate|flexible"
+  
+  vacation_philosophy:
+    primary_goals:
+      - "Maintain fitness without stress"
+      - "Explore new activities"
+      - "Prioritize enjoyment and recovery"
+      - "Return home refreshed, not exhausted"
+    
+    training_principles:
+      - "Quality over quantity"
+      - "Incorporate vacation activities as training"
+      - "Listen to your body"
+      - "No guilt about missed workouts"
+      - "Focus on movement, not performance"
+  
+  prompt_sections:
+    vacation_context: |
+      Vacation Training Assessment:
+      - Duration: {vacation_duration} days
+      - Type: {vacation_type}
+      - Goal: {fitness_maintenance_goal}
+      - Planned activities: {planned_activities}
+      - Travel companions: {family_travel}
+      
+      Adjust expectations:
+      - 50-70% of normal training volume
+      - Focus on maintaining, not gaining
+      - Prioritize vacation enjoyment
+      - Use vacation activities as cross-training
+    
+    activity_integration: |
+      Turn Vacation Activities into Workouts:
+      
+      Beach Vacation:
+      - Beach runs (shorter due to sand resistance)
+      - Ocean swimming (natural resistance training)
+      - Beach volleyball (agility and cardio)
+      - Paddleboarding/kayaking (core and upper body)
+      - Morning yoga on the beach
+      
+      Mountain Vacation:
+      - Hiking (excellent cardio and strength)
+      - Trail running (if experienced)
+      - Mountain biking
+      - Rock climbing
+      - Altitude adaptation (natural training stress)
+      
+      City Vacation:
+      - Walking tours (10,000+ steps easily)
+      - Running tours of the city
+      - Bike city tours
+      - Stair climbing at monuments
+      - Hotel gym when weather is bad
+      
+      Cruise/Resort:
+      - Ship/resort gym facilities
+      - Pool swimming
+      - Group fitness classes
+      - Walking laps on deck/grounds
+      - Water aerobics
+    
+    flexible_workout_options: |
+      Time-Efficient Vacation Workouts:
+      
+      15-Minute Morning Energizer:
+      - 5 min dynamic stretching
+      - 8 min circuit:
+        * 30s jumping jacks
+        * 30s push-ups
+        * 30s squats
+        * 30s plank
+        * (Repeat 2x)
+      - 2 min cool-down stretch
+      
+      30-Minute Beach/Park Workout:
+      - 10 min easy jog
+      - 15 min strength circuit:
+        * Lunges x 15 each leg
+        * Push-ups x 15
+        * Mountain climbers x 20
+        * Burpees x 10
+        * Rest 1 min, repeat 3x
+      - 5 min walk and stretch
+      
+      45-Minute Explorer Workout:
+      - Combine sightseeing with fitness
+      - Run/walk to destination (15 min)
+      - Bodyweight circuit at park/beach (15 min)
+      - Explore area (active recovery)
+      - Run/walk back (15 min)
+    
+    family_friendly_options: |
+      Activities for Family/Group Travel:
+      
+      Everyone Can Enjoy:
+      - Morning family walks
+      - Beach/pool games
+      - Bike tours at easy pace
+      - Nature hikes with photo stops
+      - Frisbee, soccer, catch
+      
+      Solo Training Windows:
+      - Early morning before others wake
+      - During afternoon naps/rest time
+      - Evening while others relax
+      - Quick hotel gym sessions
+      
+      Make it Fun:
+      - Fitness challenges with travel companions
+      - Step count competitions
+      - Active excursion planning
+      - Dance parties in the room
+    
+    recovery_focus: |
+      Vacation as Active Recovery:
+      
+      Benefits of Reduced Training:
+      - Mental refresh from routine
+      - Physical recovery from accumulated fatigue
+      - Exploration of new activities
+      - Renewed motivation upon return
+      
+      Recovery Activities:
+      - Gentle swimming
+      - Easy walks
+      - Stretching/yoga
+      - Massage/spa treatments
+      - Extra sleep
+      
+      Nutrition Balance:
+      - Enjoy local cuisine
+      - Stay hydrated (especially in heat/altitude)
+      - Don't restrict excessively
+      - Balance indulgences with activity
+      - Try new healthy local foods
+    
+    minimal_equipment_workouts: |
+      No Equipment Needed:
+      
+      Hotel Room Circuit (20 min):
+      Round 1 (Repeat 3x):
+      - Squats x 20
+      - Push-ups x 15
+      - Bicycle crunches x 20
+      - Wall sit x 30s
+      
+      Round 2 (Repeat 3x):
+      - Lunges x 10 each
+      - Tricep dips (on chair) x 15
+      - Plank x 45s
+      - Jump squats x 15
+      
+      Beach/Outdoor HIIT (25 min):
+      - 5 min warm-up jog
+      - 30s sprint / 90s walk (x8)
+      - 5 min cool-down walk
+      
+      Resistance Band Travel Set:
+      If packed bands:
+      - Rows, presses, lateral raises
+      - Assisted squats and lunges
+      - Core rotations
+      - 15 min full-body routine
+    
+    return_home_transition: |
+      Post-Vacation Training Resume:
+      
+      Week 1 Return:
+      - Start at 70% of pre-vacation volume
+      - Focus on routine re-establishment
+      - Don't jump into intense training
+      - Address any jet lag first
+      
+      Gradual Build Back:
+      - Week 1: 70% volume, easy intensity
+      - Week 2: 85% volume, moderate intensity
+      - Week 3: 100% volume, normal intensity
+      - Week 4: Ready for progression
+      
+      Maintain Vacation Lessons:
+      - New activities you enjoyed
+      - Relaxed approach to training
+      - Balance learned on vacation
+      - Fresh perspective on goals
+  
+  output_format:
+    structure: |
+      ## Vacation Training Plan - {vacation_type} Getaway
+      
+      ### Overview
+      - Duration: {vacation_duration} days
+      - Fitness Goal: {fitness_maintenance_goal}
+      - Daily Activity Target: {activity_target}
+      
+      ### Suggested Schedule
+      {for each day}
+      #### Day {day_number} - {day_theme}
+      **Morning Option** (20-30 min):
+      {morning_workout_or_activity}
+      
+      **Vacation Activity Integration**:
+      {planned_vacation_activity_as_exercise}
+      
+      **Evening Option** (if desired):
+      {gentle_evening_activity}
+      
+      **Total Activity**: {estimated_active_minutes}
+      **Intensity**: {low|moderate}
+      {/for}
+      
+      ### Equipment-Free Options
+      {list_of_no_equipment_workouts}
+      
+      ### Local Opportunities
+      {destination_specific_activities}
+      
+      ### Recovery Focus
+      {recovery_recommendations}
+      
+      ### Return Home Plan
+      {brief_transition_strategy}
+    
+    required_fields:
+      - daily_activity_options
+      - intensity_level
+      - equipment_needs
+      - duration_ranges
+    
+    optional_fields:
+      - specific_destination_tips
+      - weather_contingencies
+      - group_activity_ideas
+      - nutrition_suggestions
+
+variables:
+  daily_activity_target:
+    type: enum
+    values: ["30min", "45min", "60min", "flexible"]
+    default: "30min"
+    
+  workout_timing_preference:
+    type: enum
+    values: ["early_morning", "mid_day", "evening", "whenever"]
+    default: "early_morning"
+    
+  intensity_on_vacation:
+    type: enum
+    values: ["very_light", "light", "moderate", "maintain_normal"]
+    default: "light"
+    
+  equipment_packing:
+    type: enum
+    values: ["nothing", "resistance_bands", "jump_rope", "full_kit"]
+    default: "resistance_bands"

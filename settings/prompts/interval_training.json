@@ -1,0 +1,21 @@
+{
+  "id": "interval_training",
+  "name": "High-Intensity Interval Template",
+  "description": "Template for generating HIIT and interval training workouts",
+  "prompt": "Create a {interval_type} interval workout for {sport}.\n\nAthlete Profile:\n- Current FTP: {ftp}W\n- Max HR: {max_hr} bpm\n- Training phase: {training_phase}\n\nInterval Structure:\n- Number of intervals: {num_intervals}\n- Work duration: {work_duration}\n- Rest duration: {rest_duration}\n- Target power/pace: {intensity_target}% of FTP/threshold\n\nSpecial requirements:\n{special_requirements}\n\nProvide:\n1. Detailed warm-up protocol\n2. Exact power/pace/HR targets for each interval\n3. Recovery between intervals\n4. Cool-down procedure\n5. Total TSS/training load estimate",
+  "variables": {
+    "interval_type": "Type of intervals (VO2max, threshold, sprint, etc.)",
+    "sport": "Sport discipline",
+    "ftp": "Functional Threshold Power",
+    "max_hr": "Maximum heart rate",
+    "training_phase": "Current training phase (base, build, peak, etc.)",
+    "num_intervals": "Number of intervals (e.g., 5, 8, 10)",
+    "work_duration": "Duration of work intervals (e.g., 3 min, 30 sec)",
+    "rest_duration": "Duration of rest intervals",
+    "intensity_target": "Target intensity as percentage (e.g., 120 for VO2max)",
+    "special_requirements": "Any special requirements or limitations"
+  },
+  "is_default": false,
+  "created_at": "2025-01-17T10:00:00",
+  "updated_at": "2025-01-17T10:00:00"
+}

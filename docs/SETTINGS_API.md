@@ -246,6 +246,94 @@ Converts a natural language prompt to structured JSON.
 }
 ```
 
+## Zone Distribution Management
+
+### Get Zone Distribution Settings
+```
+GET /api/settings/zone-distribution
+```
+
+Retrieves current zone distribution settings including user global targets and sport-specific overrides.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "philosophy": "polarized",
+    "user_targets": {
+      "1": 80.0,
+      "2": 10.0,
+      "3": 10.0
+    },
+    "sport_distributions": {
+      "Cycling": {
+        "1": 85.0,
+        "2": 5.0,
+        "3": 10.0
+      }
+    }
+  }
+}
+```
+
+### Update User Zone Distribution
+```
+PUT /api/settings/zone-distribution/user
+```
+
+Updates the user's global zone distribution targets. Requires authentication.
+
+**Request Body:**
+```json
+{
+  "zone_distribution": {
+    "1": 75.0,
+    "2": 15.0,
+    "3": 10.0
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "User zone distribution updated successfully"
+}
+```
+
+### Update Sport Zone Distribution
+```
+PUT /api/settings/zone-distribution/sport/{sport_name}
+```
+
+Updates zone distribution targets for a specific sport. Requires authentication.
+
+**Request Body:**
+```json
+{
+  "zone_distribution": {
+    "1": 85.0,
+    "2": 5.0,
+    "3": 10.0
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Zone distribution for Cycling updated successfully"
+}
+```
+
+**Validation:**
+- Zone distributions must sum to exactly 100%
+- Zone numbers must be 1, 2, or 3
+- Sport name must exist in configuration
+
 ## Error Responses
 
 All endpoints may return error responses in the following format:
