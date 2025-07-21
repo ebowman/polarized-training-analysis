@@ -2963,9 +2963,12 @@
             
             // Create chart data (only show selected time range, exclude rest days)
             const allDaysInRange = trainingDays.slice(todayIndex - (timeRange - 1), todayIndex + 1);
-            const chartData = allDaysInRange.filter(d => 
-                (d.isPast || d.isToday) && d.minutes > 0 // Only show days with actual workouts
-            );
+            const chartData = allDaysInRange.filter(d => {
+                // Only show days with meaningful training (zone data or strength training)
+                const hasZoneData = (d.zone1Minutes + d.zone2Minutes + d.zone3Minutes) > 0;
+                const hasStrengthTraining = d.strengthMinutes > 0;
+                return (d.isPast || d.isToday) && (hasZoneData || hasStrengthTraining);
+            });
             
             // Update stats - show both polarized and total time
             const totalText = rollingAncillaryMinutes > 0 ? 
