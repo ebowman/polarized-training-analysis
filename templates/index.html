@@ -790,10 +790,10 @@
                 <h3 id="progress-title">Progress</h3>
                 <div style="position: relative; width: 120px; height: 120px; margin: 10px auto;">
                     <canvas id="progressChart" width="120" height="120"></canvas>
-                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
-                        <div class="value" id="progress-percent" style="font-size: 1.8em; margin: 0;">-</div>
-                        <div class="label" id="progress-sublabel" style="font-size: 0.8em; margin: 0;">of target</div>
-                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 5px;">
+                    <div class="value" id="progress-percent" style="font-size: 1.8em; margin: 0;">-</div>
+                    <div class="label" id="progress-sublabel" style="font-size: 0.8em; margin: 0;">of target</div>
                 </div>
                 <div class="label" id="progress-label" style="font-size: 0.9em;">- / 360 min</div>
                 <div class="volume-guidance" id="volume-guidance" style="font-size: 0.8em; margin-top: 5px; color: #bbb; font-weight: normal;"></div>
@@ -1160,9 +1160,6 @@
                 }
                 
                 loadingDiv.style.display = 'none';
-                // Display all activities (no filtering) and show analysis for selected time range
-                displaySummary(workoutData.activities);
-                displayCombinedChart(workoutData.activities, workoutData);
                 // Only load AI recommendations if we have training data
                 if (workoutData && workoutData.activities && workoutData.activities.length > 0) {
                     loadAIRecommendations();
@@ -1186,8 +1183,21 @@
                     const isStrengthTraining = ['WeightTraining', 'Workout'].includes(sportType);
                     
                     if (isStrengthTraining) {
-                        // Use raw activity data for strength training
-                        displayActivities.push(rawActivity);
+                        // Transform raw activity data to match analyzed activity structure
+                        const transformedActivity = {
+                            id: rawActivity.id,
+                            name: rawActivity.name,
+                            date: rawActivity.start_date,
+                            duration_minutes: Math.round(rawActivity.elapsed_time / 60),
+                            sport_type: rawActivity.sport_type || rawActivity.type,
+                            type: rawActivity.type,
+                            zone1_percent: 0,
+                            zone2_percent: 0, 
+                            zone3_percent: 0,
+                            average_hr: null,
+                            average_power: null
+                        };
+                        displayActivities.push(transformedActivity);
                     } else if (analyzedMap.has(activityId)) {
                         // Use analyzed data for other activities
                         displayActivities.push(analyzedMap.get(activityId));
@@ -1201,6 +1211,9 @@
                     return dateB - dateA;
                 });
                 
+                // Display all activities including strength training and show analysis for selected time range
+                displaySummary(displayActivities);
+                displayCombinedChart(workoutData.activities, workoutData);
                 displayWorkouts(displayActivities);
                 
             } catch (error) {
@@ -1231,26 +1244,39 @@
                 return activityDate >= rangeStart;
             });
             
+            // Separate polarized training from ancillary work
+            const polarizedActivities = filteredActivities.filter(activity => {
+                const sportType = activity.sport_type || activity.type || 'Unknown';
+                return !['WeightTraining', 'Workout'].includes(sportType);
+            });
+            
+            const ancillaryActivities = filteredActivities.filter(activity => {
+                const sportType = activity.sport_type || activity.type || 'Unknown';
+                return ['WeightTraining', 'Workout'].includes(sportType);
+            });
+            
             // Calculate summary stats for selected time range
             const totalActivities = filteredActivities.length;
-            const totalMinutes = filteredActivities.reduce((sum, a) => sum + a.duration_minutes, 0);
+            const polarizedMinutes = polarizedActivities.reduce((sum, a) => sum + a.duration_minutes, 0);
+            const ancillaryMinutes = ancillaryActivities.reduce((sum, a) => sum + a.duration_minutes, 0);
+            const totalMinutes = polarizedMinutes + ancillaryMinutes;
             const totalHours = totalMinutes / 60;
             
-            // Calculate weighted zone percentages for selected time range
+            // Calculate weighted zone percentages for polarized training only
             let totalZone1Minutes = 0;
             let totalZone2Minutes = 0;
             let totalZone3Minutes = 0;
             
-            filteredActivities.forEach(activity => {
+            polarizedActivities.forEach(activity => {
                 const activityMinutes = activity.duration_minutes;
                 totalZone1Minutes += activityMinutes * (activity.zone1_percent / 100);
                 totalZone2Minutes += activityMinutes * (activity.zone2_percent / 100);
                 totalZone3Minutes += activityMinutes * (activity.zone3_percent / 100);
             });
             
-            const zone1Percent = totalMinutes > 0 ? (totalZone1Minutes / totalMinutes) * 100 : 0;
-            const zone2Percent = totalMinutes > 0 ? (totalZone2Minutes / totalMinutes) * 100 : 0;
-            const zone3Percent = totalMinutes > 0 ? (totalZone3Minutes / totalMinutes) * 100 : 0;
+            const zone1Percent = polarizedMinutes > 0 ? (totalZone1Minutes / polarizedMinutes) * 100 : 0;
+            const zone2Percent = polarizedMinutes > 0 ? (totalZone2Minutes / polarizedMinutes) * 100 : 0;
+            const zone3Percent = polarizedMinutes > 0 ? (totalZone3Minutes / polarizedMinutes) * 100 : 0;
             
             // Calculate adherence score
             const zone1Target = 80;
@@ -1264,11 +1290,11 @@
             const totalDeviation = (zone1Deviation * 0.5) + (zone2Deviation * 0.25) + (zone3Deviation * 0.25);
             const adherenceScore = Math.max(0, 100 - totalDeviation);
             
-            // Calculate target based on time range (360 minutes per week)
+            // Calculate target based on time range (360 minutes per week for polarized training)
             const weeklyTarget = 360;
             const dailyTarget = weeklyTarget / 7;
             const targetMinutes = Math.round(dailyTarget * timeRange);
-            const progressPercent = Math.min(100, (totalMinutes / targetMinutes) * 100);
+            const progressPercent = Math.min(100, (polarizedMinutes / targetMinutes) * 100);
             
             // Update achievement trend
             document.getElementById('achievement-current').textContent = Math.round(progressPercent) + '%';
@@ -1288,7 +1314,8 @@
             
             // Update text displays
             document.getElementById('progress-percent').textContent = Math.round(progressPercent) + '%';
-            document.getElementById('progress-label').textContent = `${Math.round(totalMinutes)} / ${targetMinutes} min`;
+            const ancillaryText = ancillaryMinutes > 0 ? ` + ${Math.round(ancillaryMinutes)} min ancillary` : '';
+            document.getElementById('progress-label').textContent = `${Math.round(polarizedMinutes)} / ${targetMinutes} min${ancillaryText}`;
             document.getElementById('progress-title').textContent = `${timeRange}-Day Achievement`;
             
             // Draw donut chart
@@ -1296,28 +1323,62 @@
                 window.progressChart.destroy();
             }
             
+            // Create dual-ring chart: outer ring for polarized training, inner ring for ancillary
+            // Both rings use the same 360-minute scale for proper comparison
+            const ancillaryPercent = ancillaryMinutes > 0 ? Math.min(100, (ancillaryMinutes / targetMinutes) * 100) : 0;
+            
             window.progressChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     datasets: [{
-                        data: [totalMinutes, Math.max(0, targetMinutes - totalMinutes)],
+                        // Outer ring: Polarized training
+                        data: [polarizedMinutes, Math.max(0, targetMinutes - polarizedMinutes)],
                         backgroundColor: [
                             progressPercent >= 100 ? '#27ae60' : progressPercent >= 75 ? '#f39c12' : '#e74c3c',
                             '#ecf0f1'
                         ],
-                        borderWidth: 0
+                        borderWidth: 0,
+                        weight: 1
+                    }, {
+                        // Inner ring: Ancillary work 
+                        data: ancillaryMinutes > 0 ? [ancillaryMinutes, Math.max(0, targetMinutes - ancillaryMinutes)] : [0, 1],
+                        backgroundColor: ancillaryMinutes > 0 ? [
+                            ancillaryPercent >= 100 ? '#6a1b9a' : ancillaryPercent >= 75 ? '#8e24aa' : '#9c27b0',
+                            'rgba(200, 200, 200, 0.4)'
+                        ] : ['transparent', 'transparent'],
+                        borderWidth: 0,
+                        weight: 0.5
                     }]
                 },
                 options: {
                     responsive: false,
                     maintainAspectRatio: false,
-                    cutout: '70%',
+                    cutout: '40%',  // Reduced for better inner ring visibility
                     plugins: {
                         legend: {
                             display: false
                         },
                         tooltip: {
-                            enabled: false
+                            callbacks: {
+                                label: function(context) {
+                                    const dataset = context.chart.data.datasets[context.datasetIndex];
+                                    if (dataset.weight === 1) {
+                                        // Outer ring: Polarized training
+                                        if (context.dataIndex === 0) {
+                                            return `Polarized: ${Math.round(polarizedMinutes)} / ${targetMinutes} min (${Math.round(progressPercent)}%)`;
+                                        } else {
+                                            return `Remaining: ${Math.round(targetMinutes - polarizedMinutes)} min`;
+                                        }
+                                    } else {
+                                        // Inner ring: Ancillary work
+                                        if (context.dataIndex === 0 && ancillaryMinutes > 0) {
+                                            return `Ancillary: ${Math.round(ancillaryMinutes)} min (${Math.round(ancillaryPercent)}% of ${targetMinutes} min scale)`;
+                                        } else {
+                                            return '';
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1327,11 +1388,11 @@
             
             // Add volume-based training guidance for selected period
             let volumeGuidance = '';
-            const remainingMinutes = Math.max(0, targetMinutes - totalMinutes);
+            const remainingMinutes = Math.max(0, targetMinutes - polarizedMinutes);
             if (progressPercent >= 100) {
                 volumeGuidance = `✅ Target met!`;
             } else {
-                const shortfall = targetMinutes - totalMinutes;
+                const shortfall = targetMinutes - polarizedMinutes;
                 const shortfallHours = (shortfall / 60).toFixed(1);
                 volumeGuidance = `❌ Missed by ${shortfall} min (${shortfallHours}h)`;
             }
@@ -1382,7 +1443,13 @@
                     return activityDate >= dayStart && activityDate <= dayEnd;
                 });
                 
-                const dailyTotal = dayActivities.reduce((sum, a) => sum + a.duration_minutes, 0);
+                // Only count polarized training for achievement calculation
+                const polarizedDayActivities = dayActivities.filter(activity => {
+                    const sportType = activity.sport_type || activity.type || 'Unknown';
+                    return !['WeightTraining', 'Workout'].includes(sportType);
+                });
+                
+                const dailyTotal = polarizedDayActivities.reduce((sum, a) => sum + a.duration_minutes, 0);
                 const achievement = Math.min(100, (dailyTotal / 360) * 100);
                 dailyAchievements.push(achievement);
             }

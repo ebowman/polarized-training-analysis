@@ -471,7 +471,7 @@ class DownloadManager:
             if self.is_downloading():
                 return False
             
-            # Reset state
+            # Reset state (also handles COMPLETED/ERROR states)
             self.status = DownloadStatus.INITIALIZING
             self.progress = 0
             self.processed_activities = 0

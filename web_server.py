@@ -487,7 +487,7 @@ def api_download_latest():
         
         # Check if download is already in progress
         download_manager = DownloadManager()
-        if download_manager.status != DownloadStatus.IDLE:
+        if download_manager.is_downloading():
             return jsonify({
                 'error': 'Download already in progress',
                 'status': download_manager.status.value
