@@ -36,12 +36,77 @@ CACHE_DURATION = 300  # 5 minutes in seconds
 ai_sessions = {}  # session_id -> {"status": "pending|ready|error", "data": ..., "timestamp": ...}
 ai_sessions_lock = threading.Lock()
 
+# Enhanced status management for detailed AI provider messages
+class AISessionManager:
+    def __init__(self):
+        self.sessions = {}
+        self.lock = threading.Lock()
+    
+    def create_session(self, session_id: str, initial_status: str = "pending"):
+        with self.lock:
+            self.sessions[session_id] = {
+                "status": initial_status,
+                "messages": [],
+                "timestamp": time.time(),
+                "current_provider": None
+            }
+    
+    def update_status(self, session_id: str, status: str, message: str = None, current_provider: str = None):
+        with self.lock:
+            if session_id in self.sessions:
+                self.sessions[session_id]["status"] = status
+                self.sessions[session_id]["timestamp"] = time.time()
+                if message:
+                    self.sessions[session_id]["messages"].append({
+                        "timestamp": time.time(),
+                        "message": message
+                    })
+                if current_provider:
+                    self.sessions[session_id]["current_provider"] = current_provider
+    
+    def set_result(self, session_id: str, data: dict):
+        with self.lock:
+            if session_id in self.sessions:
+                self.sessions[session_id]["status"] = "ready"
+                self.sessions[session_id]["data"] = data
+                self.sessions[session_id]["timestamp"] = time.time()
+    
+    def set_error(self, session_id: str, error_message: str):
+        with self.lock:
+            if session_id in self.sessions:
+                self.sessions[session_id]["status"] = "error"
+                self.sessions[session_id]["error"] = error_message
+                self.sessions[session_id]["timestamp"] = time.time()
+    
+    def get_session(self, session_id: str):
+        with self.lock:
+            return self.sessions.get(session_id)
+    
+    def cleanup_old_sessions(self, max_age_seconds: int = 3600):
+        """Remove sessions older than max_age_seconds"""
+        current_time = time.time()
+        with self.lock:
+            expired_sessions = [
+                sid for sid, data in self.sessions.items()
+                if current_time - data["timestamp"] > max_age_seconds
+            ]
+            for sid in expired_sessions:
+                del self.sessions[sid]
+
+# Create enhanced session manager
+ai_session_manager = AISessionManager()
+
 # AI recommendation engine (initialize with error handling)
 ai_engine = None
 try:
     print("🔄 Initializing AI engine at startup...")
     from ai_recommendations import AIRecommendationEngine
-    ai_engine = AIRecommendationEngine()
+    
+    # Create status callback to track AI provider initialization
+    def ai_status_callback(message):
+        print(f"🤖 AI Status: {message}")
+    
+    ai_engine = AIRecommendationEngine(status_callback=ai_status_callback)
     print("✅ AI recommendations enabled")
 except Exception as e:
     print(f"⚠️  AI recommendations disabled: {type(e).__name__}: {e}")
@@ -86,7 +151,7 @@ def start_ai_generation(session_id: str, training_data: dict):
             # Save to history
             ai_engine.save_recommendation_history(ai_recommendations)
             
-            # Convert to dict format for JSON response
+            # Convert to dict format for JSON response with debug info
             recommendations_dict = [
                 {
                     'pathway_name': rec.pathway_name,
@@ -97,7 +162,10 @@ def start_ai_generation(session_id: str, training_data: dict):
                         'structure': rec.today.structure,
                         'reasoning': rec.today.reasoning,
                         'equipment': rec.today.equipment,
-                        'intensity_zones': rec.today.intensity_zones
+                        'intensity_zones': rec.today.intensity_zones,
+                        'debug_prompt': rec.today.debug_prompt,
+                        'debug_response': rec.today.debug_response,
+                        'debug_provider': rec.today.debug_provider
                     },
                     'tomorrow': {
                         'workout_type': rec.tomorrow.workout_type,
@@ -106,21 +174,38 @@ def start_ai_generation(session_id: str, training_data: dict):
                         'structure': rec.tomorrow.structure,
                         'reasoning': rec.tomorrow.reasoning,
                         'equipment': rec.tomorrow.equipment,
-                        'intensity_zones': rec.tomorrow.intensity_zones
+                        'intensity_zones': rec.tomorrow.intensity_zones,
+                        'debug_prompt': rec.tomorrow.debug_prompt,
+                        'debug_response': rec.tomorrow.debug_response,
+                        'debug_provider': rec.tomorrow.debug_provider
                     },
                     'overall_reasoning': rec.overall_reasoning,
                     'priority': rec.priority,
-                    'generated_at': rec.generated_at
+                    'generated_at': rec.generated_at,
+                    'debug_prompt': rec.debug_prompt,
+                    'debug_response': rec.debug_response,
+                    'debug_provider': rec.debug_provider
                 }
                 for rec in ai_recommendations
             ]
+            
+            # Extract session-level debug info from first recommendation (they all share the same generation)
+            session_debug_data = {}
+            if ai_recommendations and len(ai_recommendations) > 0:
+                first_rec = ai_recommendations[0]
+                session_debug_data = {
+                    'debug_prompt': first_rec.debug_prompt,
+                    'debug_response': first_rec.debug_response,
+                    'debug_provider': first_rec.debug_provider
+                }
             
             with ai_sessions_lock:
                 ai_sessions[session_id] = {
                     "status": "ready",
                     "data": {
                         'ai_recommendations': recommendations_dict,
-                        'generated_at': datetime.now().isoformat()
+                        'generated_at': datetime.now().isoformat(),
+                        **session_debug_data  # Add session-level debug data
                     },
                     "timestamp": time.time()
                 }
@@ -132,19 +217,18 @@ def start_ai_generation(session_id: str, training_data: dict):
             # Provide more specific error messages
             if "openai" in error_message.lower() and ("503" in error_message or "service" in error_message):
                 error_message = "OpenAI service is temporarily unavailable. Please try again in a few moments."
+            elif "anthropic" in error_message.lower() and ("503" in error_message or "service" in error_message):
+                error_message = "Claude service is temporarily unavailable. Trying OpenAI fallback..."
             elif "rate limit" in error_message.lower():
-                error_message = "OpenAI rate limit reached. Please wait a minute before trying again."
+                error_message = "AI rate limit reached. Please wait a minute before trying again."
             elif "api key" in error_message.lower():
-                error_message = "Invalid OpenAI API key. Please check your .env file configuration."
+                error_message = "Invalid AI API key. Please check your .env file configuration."
             elif "timeout" in error_message.lower():
                 error_message = "Request timed out. The AI service might be overloaded. Please try again."
+            elif "All providers failed" in error_message:
+                error_message = "All AI providers failed. Please check your API keys and try again."
             
-            with ai_sessions_lock:
-                ai_sessions[session_id] = {
-                    "status": "error",
-                    "error": error_message,
-                    "timestamp": time.time()
-                }
+            ai_session_manager.set_error(session_id, error_message)
     
     # Start background thread
     thread = threading.Thread(target=generate)
@@ -154,19 +238,38 @@ def start_ai_generation(session_id: str, training_data: dict):
     return session_id
 
 def start_pathway_ai_generation(session_id: str, training_data: dict, pathway_context: dict):
-    """Start AI recommendation generation for recovery pathways with context"""
+    """Start AI recommendation generation for recovery pathways with context using enhanced session manager"""
     def generate():
         try:
-            with ai_sessions_lock:
-                ai_sessions[session_id] = {
-                    "status": "pending",
-                    "timestamp": time.time()
-                }
+            # Create session with enhanced manager
+            ai_session_manager.create_session(session_id, "pending")
+            ai_session_manager.update_status(session_id, "pending", "Starting pathway recommendation generation...")
+            
+            # Create status callback for pathway generation
+            def pathway_status_callback(message: str):
+                print(f"🛤️ Pathway AI Status: {message}")
+                ai_session_manager.update_status(session_id, "pending", message)
+                
+                # Extract provider info from message
+                if "Claude" in message and "4" in message:
+                    ai_session_manager.update_status(session_id, "pending", message, "Claude Opus 4")
+                elif "Claude" in message:
+                    ai_session_manager.update_status(session_id, "pending", message, "Claude")
+                elif "OpenAI" in message or "GPT" in message:
+                    ai_session_manager.update_status(session_id, "pending", message, "OpenAI GPT-4o")
+            
+            # Set the status callback on the AI engine
+            original_callback = ai_engine.status_callback
+            ai_engine.status_callback = pathway_status_callback
             
             # Generate AI recommendations with context
+            ai_session_manager.update_status(session_id, "pending", "Generating recovery pathway recommendations...")
             pathway_recommendations = ai_engine.generate_pathway_recommendations(training_data, pathway_context)
             
-            # Convert to dict format
+            # Restore original callback
+            ai_engine.status_callback = original_callback
+            
+            # Convert to dict format with debug info
             recommendations_dict = {}
             for pathway_type, rec in pathway_recommendations.items():
                 if rec:
@@ -178,35 +281,37 @@ def start_pathway_ai_generation(session_id: str, training_data: dict, pathway_co
                         'reasoning': rec.reasoning,
                         'equipment': rec.equipment,
                         'intensity_zones': rec.intensity_zones,
-                        'priority': rec.priority
+                        'priority': rec.priority,
+                        'debug_prompt': rec.debug_prompt,
+                        'debug_response': rec.debug_response,
+                        'debug_provider': rec.debug_provider
                     }
             
-            with ai_sessions_lock:
-                ai_sessions[session_id] = {
-                    "status": "ready",
-                    "data": {
-                        'pathway_recommendations': recommendations_dict,
-                        'generated_at': datetime.now().isoformat()
-                    },
-                    "timestamp": time.time()
-                }
+            # Set result using enhanced session manager
+            ai_session_manager.set_result(session_id, {
+                'pathway_recommendations': recommendations_dict,
+                'generated_at': datetime.now().isoformat()
+            })
                 
         except Exception as e:
             print(f"Error in pathway AI generation: {e}")
             error_message = str(e)
             
-            # Provide more specific error messages
-            if "service" in error_message.lower() and "unavailable" in error_message.lower():
-                error_message = "AI service is temporarily unavailable. Please try again in a few moments."
+            # Provide more specific error messages (same as main recommendations)
+            if "openai" in error_message.lower() and ("503" in error_message or "service" in error_message):
+                error_message = "OpenAI service is temporarily unavailable. Please try again in a few moments."
+            elif "anthropic" in error_message.lower() and ("503" in error_message or "service" in error_message):
+                error_message = "Claude service is temporarily unavailable. Trying OpenAI fallback..."
             elif "rate limit" in error_message.lower():
                 error_message = "AI rate limit reached. Please wait a minute before trying again."
+            elif "api key" in error_message.lower():
+                error_message = "Invalid AI API key. Please check your .env file configuration."
+            elif "timeout" in error_message.lower():
+                error_message = "Request timed out. The AI service might be overloaded. Please try again."
+            elif "All providers failed" in error_message:
+                error_message = "All AI providers failed. Please check your API keys and try again."
             
-            with ai_sessions_lock:
-                ai_sessions[session_id] = {
-                    "status": "error",
-                    "error": error_message,
-                    "timestamp": time.time()
-                }
+            ai_session_manager.set_error(session_id, error_message)
     
     # Start background thread
     thread = threading.Thread(target=generate)
@@ -710,25 +815,68 @@ def api_refresh():
 
 @app.route('/api/ai-status/<session_id>')
 def api_ai_status(session_id):
-    """API endpoint to check AI recommendation status"""
+    """API endpoint to check AI recommendation status with detailed messages"""
     if not ai_engine:
-        return jsonify({'error': 'AI recommendations are not available. Check your OpenAI API key in .env file.'}), 503
+        return jsonify({'error': 'AI recommendations are not available. Check your API keys in .env file.'}), 503
     
-    with ai_sessions_lock:
-        session_data = ai_sessions.get(session_id)
+    # Check enhanced session manager first
+    session_data = ai_session_manager.get_session(session_id)
     
     if not session_data:
-        return jsonify({'error': 'Invalid or expired session ID'}), 404
+        # Fall back to legacy session storage
+        with ai_sessions_lock:
+            legacy_session = ai_sessions.get(session_id)
+        
+        if not legacy_session:
+            return jsonify({'error': 'Session not found'}), 404
+        
+        # Convert legacy session to new format
+        status = legacy_session.get('status')
+        if status == 'pending':
+            return jsonify({
+                'status': 'pending',
+                'message': 'AI recommendations are being generated...',
+                'current_provider': 'Unknown',
+                'messages': []
+            })
+        elif status == 'error':
+            return jsonify({
+                'status': 'error',
+                'error': legacy_session.get('error', 'Unknown error')
+            }), 500
+        elif status == 'ready':
+            return jsonify({
+                'status': 'ready',
+                **legacy_session['data']
+            })
     
-    # Return status without data for pending/error states
-    if session_data['status'] == 'pending':
-        return jsonify({'status': 'pending'})
-    elif session_data['status'] == 'error':
-        return jsonify({'status': 'error', 'error': session_data.get('error', 'Unknown error')})
-    elif session_data['status'] == 'ready':
+    # Enhanced session data
+    status = session_data.get('status')
+    
+    if status == 'pending':
+        # Get latest message
+        messages = session_data.get('messages', [])
+        latest_message = messages[-1]['message'] if messages else 'Starting AI generation...'
+        current_provider = session_data.get('current_provider', 'Detecting providers...')
+        
+        return jsonify({
+            'status': 'pending',
+            'message': latest_message,
+            'current_provider': current_provider,
+            'messages': messages,
+            'timestamp': session_data.get('timestamp')
+        })
+    elif status == 'error':
+        return jsonify({
+            'status': 'error',
+            'error': session_data.get('error', 'Unknown error'),
+            'messages': session_data.get('messages', [])
+        }), 500
+    elif status == 'ready':
         return jsonify({
             'status': 'ready',
-            **session_data['data']
+            'messages': session_data.get('messages', []),
+            **session_data.get('data', {})
         })
     else:
         return jsonify({'error': 'Invalid session status'}), 500
@@ -746,7 +894,9 @@ def api_ai_recommendations_pathways():
         try:
             print("🔄 Attempting to initialize AI engine...")
             from ai_recommendations import AIRecommendationEngine
-            ai_engine = AIRecommendationEngine()
+            def ai_status_callback(message):
+                print(f"🤖 AI Status: {message}")
+            ai_engine = AIRecommendationEngine(status_callback=ai_status_callback)
             print("✅ AI recommendations re-enabled")
         except ValueError as e:
             print(f"❌ AI engine ValueError: {e}")
@@ -798,7 +948,9 @@ def api_ai_recommendations_refresh():
     if not ai_engine:
         try:
             from ai_recommendations import AIRecommendationEngine
-            ai_engine = AIRecommendationEngine()
+            def ai_status_callback(message):
+                print(f"🤖 AI Status: {message}")
+            ai_engine = AIRecommendationEngine(status_callback=ai_status_callback)
             print("✅ AI recommendations re-enabled")
         except ValueError as e:
             # Missing or invalid API key

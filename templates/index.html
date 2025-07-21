@@ -2576,7 +2576,7 @@
                         clearTimeout(aiPollingInterval);
                         aiPollingInterval = null;
                     }
-                    displayAIRecommendations(data.ai_recommendations);
+                    displayAIRecommendations(data.ai_recommendations, data);
                 } else if (data.status === 'error') {
                     // Stop polling and display error
                     if (aiPollingInterval) {
@@ -4105,7 +4105,7 @@
             });
         }
         
-        function displayAIRecommendations(recommendations) {
+        function displayAIRecommendations(recommendations, sessionData = null) {
             const aiRecommendationsDiv = document.getElementById('ai-recommendations');
             const cardsDiv = document.getElementById('ai-recommendation-cards');
             
@@ -4139,10 +4139,10 @@
                 }
             });
             
-            // Add single debug panel for entire AI recommendation section
-            if (recommendations && recommendations.length > 0 && recommendations[0]) {
+            // Add single debug panel for entire AI recommendation section using session-level debug data
+            if (sessionData && (sessionData.debug_prompt || sessionData.debug_response)) {
                 const debugPanelId = 'ai-recommendations-debug-panel';
-                cardsDiv.insertAdjacentHTML('beforeend', createAIDebugPanel(recommendations[0], debugPanelId));
+                cardsDiv.insertAdjacentHTML('beforeend', createAIDebugPanel(sessionData, debugPanelId));
             }
             
             aiRecommendationsDiv.style.display = 'block';
@@ -4159,7 +4159,8 @@
 
         // AI Debug Panel Functions
         function createAIDebugPanel(debugInfo, panelId) {
-            if (!debugInfo || (!debugInfo.debug_prompt && !debugInfo.debug_response)) {
+            // Show debug panel if we have any debug info at all
+            if (!debugInfo || (!debugInfo.debug_prompt && !debugInfo.debug_response && !debugInfo.debug_provider)) {
                 return '';
             }
             
