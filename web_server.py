@@ -136,17 +136,35 @@ def cleanup_old_sessions():
             del ai_sessions[session_id]
 
 def start_ai_generation(session_id: str, training_data: dict):
-    """Start AI recommendation generation in background thread"""
+    """Start AI recommendation generation in background thread using enhanced session manager"""
     def generate():
         try:
-            with ai_sessions_lock:
-                ai_sessions[session_id] = {
-                    "status": "pending",
-                    "timestamp": time.time()
-                }
+            # Create session with enhanced manager
+            ai_session_manager.create_session(session_id, "pending")
+            ai_session_manager.update_status(session_id, "pending", "Starting AI recommendation generation...")
+            
+            # Create status callback for main recommendation generation
+            def main_status_callback(message: str):
+                print(f"🎯 Main AI Status: {message}")
+                ai_session_manager.update_status(session_id, "pending", message)
+                
+                # Extract provider info from message
+                if "Claude" in message and "4" in message:
+                    ai_session_manager.update_status(session_id, "pending", message, "Claude Opus 4")
+                elif "Claude" in message:
+                    ai_session_manager.update_status(session_id, "pending", message, "Claude")
+                elif "OpenAI" in message:
+                    ai_session_manager.update_status(session_id, "pending", message, "OpenAI GPT-4o")
+            
+            # Temporarily update AI engine status callback
+            original_callback = ai_engine.status_callback
+            ai_engine.status_callback = main_status_callback
             
             # Generate AI recommendations
             ai_recommendations = ai_engine.generate_ai_recommendations(training_data)
+            
+            # Restore original callback
+            ai_engine.status_callback = original_callback
             
             # Save to history
             ai_engine.save_recommendation_history(ai_recommendations)
@@ -199,16 +217,13 @@ def start_ai_generation(session_id: str, training_data: dict):
                     'debug_provider': first_rec.debug_provider
                 }
             
-            with ai_sessions_lock:
-                ai_sessions[session_id] = {
-                    "status": "ready",
-                    "data": {
-                        'ai_recommendations': recommendations_dict,
-                        'generated_at': datetime.now().isoformat(),
-                        **session_debug_data  # Add session-level debug data
-                    },
-                    "timestamp": time.time()
-                }
+            # Use enhanced session manager to set result
+            result_data = {
+                'ai_recommendations': recommendations_dict,
+                'generated_at': datetime.now().isoformat(),
+                **session_debug_data  # Add session-level debug data
+            }
+            ai_session_manager.set_result(session_id, result_data)
                 
         except Exception as e:
             print(f"Error in background AI generation: {e}")
