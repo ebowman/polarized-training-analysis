@@ -2961,8 +2961,11 @@
             // Generate training table
             generateTrainingTable(trainingDays, targetMinutes);
             
-            // Create chart data (only show selected time range)
-            const chartData = trainingDays.slice(todayIndex - (timeRange - 1), todayIndex + 1);
+            // Create chart data (only show selected time range, exclude rest days)
+            const allDaysInRange = trainingDays.slice(todayIndex - (timeRange - 1), todayIndex + 1);
+            const chartData = allDaysInRange.filter(d => 
+                (d.isPast || d.isToday) && d.minutes > 0 // Only show days with actual workouts
+            );
             
             // Update stats - show both polarized and total time
             const totalText = rollingAncillaryMinutes > 0 ? 
@@ -3002,28 +3005,28 @@
                     labels: chartData.map(d => d.dateStr),
                     datasets: [{
                         label: 'Zone 1',
-                        data: chartData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.zone1Minutes : 0),
+                        data: chartData.map(d => d.zone1Minutes),
                         backgroundColor: '#4CAF50',
                         borderColor: '#388E3C',
                         borderWidth: 1,
                         stack: 'actual'
                     }, {
                         label: 'Zone 2',
-                        data: chartData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.zone2Minutes : 0),
+                        data: chartData.map(d => d.zone2Minutes),
                         backgroundColor: '#FF9800',
                         borderColor: '#F57C00',
                         borderWidth: 1,
                         stack: 'actual'
                     }, {
                         label: 'Zone 3',
-                        data: chartData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.zone3Minutes : 0),
+                        data: chartData.map(d => d.zone3Minutes),
                         backgroundColor: '#F44336',
                         borderColor: '#D32F2F',
                         borderWidth: 1,
                         stack: 'actual'
                     }, {
                         label: 'Ancillary Training',
-                        data: chartData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.strengthMinutes : 0),
+                        data: chartData.map(d => d.strengthMinutes),
                         backgroundColor: '#9C27B0',
                         borderColor: '#6A1B9A',
                         borderWidth: 1,
