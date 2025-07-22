@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
 from dotenv import load_dotenv
-from ai_providers import AIProviderFactory, AIProvider
+from ai_providers import AIProviderFactory, AIProvider, AIProviderManager
 
 load_dotenv()
 
@@ -35,6 +35,10 @@ class AIWorkoutRecommendation:
     intensity_zones: List[int]
     priority: str
     generated_at: str
+    # Debug information (optional)
+    debug_prompt: Optional[str] = None
+    debug_response: Optional[str] = None
+    debug_provider: Optional[str] = None
 
 @dataclass
 class AIWorkoutPathway:
@@ -45,6 +49,10 @@ class AIWorkoutPathway:
     overall_reasoning: str
     priority: str
     generated_at: str
+    # Debug information (optional)
+    debug_prompt: Optional[str] = None
+    debug_response: Optional[str] = None
+    debug_provider: Optional[str] = None
 
 @dataclass
 class TrainingAnalysis:
@@ -880,12 +888,16 @@ Return ONLY the JSON array, no other text or markdown.
 class AIRecommendationEngine:
     """AI-powered workout recommendation engine with multi-provider support"""
     
-    def __init__(self, provider: Optional[AIProvider] = None):
-        # Use provided provider or create one from factory
+    def __init__(self, provider: Optional[AIProvider] = None, status_callback=None):
+        # Use provided provider or create new provider manager with fallback
         if provider:
             self.provider = provider
+            self.provider_manager = None
+            self.status_callback = status_callback or (lambda msg: print(f"📝 {msg}"))
         else:
-            self.provider = AIProviderFactory.create_provider()
+            self.status_callback = status_callback or (lambda msg: print(f"📝 {msg}"))
+            self.provider_manager = AIProviderFactory.create_manager(self.status_callback)
+            self.provider = None  # Use manager instead
         
         self.prompt_builder = PromptBuilder()
         
@@ -893,25 +905,53 @@ class AIRecommendationEngine:
         self.max_retries = 3
     
     def generate_pathway_recommendations(self, training_data: Dict, 
-                                       pathway_context: Dict) -> Dict[str, AIWorkoutRecommendation]:
-        """Generate AI-powered recovery pathway recommendations"""
+                                       pathway_context: Dict,
+                                       include_debug: bool = True) -> Dict[str, AIWorkoutRecommendation]:
+        """Generate AI-powered recovery pathway recommendations using enhanced provider system"""
         
         # Build recovery pathway specific prompt
         prompt = self.prompt_builder.build_recovery_pathway_prompt(training_data, pathway_context)
         
-        # Use AI provider to generate response
+        # Use enhanced provider system with status callbacks
         try:
-            response = self.provider.generate_completion(prompt)
+            if self.provider_manager:
+                self.status_callback(f"📝 Pathway prompt length: {len(prompt)} characters")
+                self.status_callback(f"📋 Starting pathway AI generation with fallback support")
+                
+                # Use provider manager with fallback
+                response = self.provider_manager.generate_with_fallback(prompt)
+                provider_name = self.provider_manager.get_current_provider_name() if include_debug else None
+                
+                self.status_callback(f"✅ Successfully generated pathway recommendations using {provider_name}")
+            else:
+                # Fallback to direct provider (legacy support)
+                self.status_callback(f"📝 Using direct provider for pathway generation")
+                response = self.provider.generate_completion(prompt)
+                provider_name = self.provider.get_provider_name() if include_debug else None
+            
             print(f"🤖 AI Recovery Pathway Response: {response}")
             
-            # Parse JSON response
+            # Parse JSON response with retry logic
             import json
-            try:
-                pathway_data = json.loads(response)
-            except json.JSONDecodeError as e:
-                print(f"❌ JSON parse error: {e}")
-                print(f"Raw response: {response}")
-                raise ValueError(f"Invalid JSON response from AI: {e}")
+            max_parse_retries = 2
+            for parse_attempt in range(max_parse_retries):
+                try:
+                    pathway_data = json.loads(response)
+                    break
+                except json.JSONDecodeError as e:
+                    if parse_attempt < max_parse_retries - 1:
+                        self.status_callback(f"⚠️  JSON parse error on attempt {parse_attempt + 1}, retrying: {e}")
+                        # Try to clean the response
+                        response = response.strip()
+                        if response.startswith('```json'):
+                            response = response[7:]
+                        if response.endswith('```'):
+                            response = response[:-3]
+                        response = response.strip()
+                    else:
+                        self.status_callback(f"❌ JSON parse failed after all retries: {e}")
+                        print(f"Raw response that failed to parse: {response}")
+                        raise ValueError(f"Invalid JSON response from AI after {max_parse_retries} attempts: {e}")
             
             # Convert to AIWorkoutRecommendation objects
             pathway_recommendations = {}
@@ -926,67 +966,94 @@ class AIRecommendationEngine:
                         equipment=rec_data.get('equipment', 'Unknown'),
                         intensity_zones=rec_data.get('intensity_zones', []),
                         priority=rec_data.get('priority', 'medium'),
-                        generated_at=datetime.now().isoformat()
+                        generated_at=datetime.now().isoformat(),
+                        debug_prompt=prompt if include_debug else None,
+                        debug_response=response if include_debug else None,
+                        debug_provider=provider_name if include_debug else None
                     )
             
+            self.status_callback(f"✅ Successfully parsed {len(pathway_recommendations)} pathway recommendations")
             return pathway_recommendations
             
         except Exception as e:
+            self.status_callback(f"❌ Error generating AI pathway recommendations: {str(e)}")
             print(f"❌ Error generating AI pathway recommendations: {e}")
             raise
 
     def generate_ai_recommendations(self, training_data: Dict, 
-                                  num_recommendations: int = 3) -> List[AIWorkoutPathway]:
+                                  num_recommendations: int = 3, 
+                                  include_debug: bool = True) -> List[AIWorkoutPathway]:
         """Generate AI-powered workout recommendations using the new architecture"""
         
         # Build prompt using the new PromptBuilder
         prompt = self.prompt_builder.build_prompt(training_data, num_recommendations)
         
-        # Call AI provider with retry logic
-        return self._call_ai_with_retry(prompt)
+        # Call AI provider with retry logic and debug info
+        return self._call_ai_with_retry(prompt, include_debug)
     
-    def _call_ai_with_retry(self, prompt: str) -> List[AIWorkoutPathway]:
+    def _call_ai_with_retry(self, prompt: str, include_debug: bool = True) -> List[AIWorkoutPathway]:
         """Call AI provider with retry logic and error handling"""
         
+        # If we have a provider manager, use it directly (no retry needed as it handles fallback)
+        if self.provider_manager:
+            try:
+                self.status_callback(f"📝 Prompt length: {len(prompt)} characters")
+                self.status_callback(f"📋 Starting AI generation with fallback support")
+                
+                # Call provider manager with fallback
+                response_json = self.provider_manager.generate_with_fallback(prompt)
+                
+                # Parse and validate response with debug info
+                provider_name = self.provider_manager.get_current_provider_name()
+                recommendations = self._parse_response(response_json, prompt if include_debug else None, provider_name if include_debug else None)
+                
+                self.status_callback(f"✅ Successfully generated {len(recommendations)} recommendations")
+                return recommendations
+                
+            except Exception as e:
+                self.status_callback(f"❌ All AI providers failed: {str(e)}")
+                return self._create_fallback_recommendations(f"All providers failed: {str(e)}")
+        
+        # Legacy single provider retry logic
         for attempt in range(self.max_retries):
             try:
                 provider_name = self.provider.get_provider_name()
-                print(f"🤖 Calling {provider_name} AI (attempt {attempt + 1}/{self.max_retries})...")
+                self.status_callback(f"🤖 Calling {provider_name} AI (attempt {attempt + 1}/{self.max_retries})...")
                 
                 if attempt == 0:  # Only log prompt details on first attempt
-                    print(f"📝 Prompt length: {len(prompt)} characters")
-                    print(f"📋 Prompt preview (first 500 chars):\n{prompt[:500]}...")
-                    print(f"📋 Prompt ending (last 200 chars):\n...{prompt[-200:]}")
+                    self.status_callback(f"📝 Prompt length: {len(prompt)} characters")
+                    self.status_callback(f"📋 Prompt preview (first 500 chars):\n{prompt[:500]}...")
+                    self.status_callback(f"📋 Prompt ending (last 200 chars):\n...{prompt[-200:]}")
                 
                 # Call AI provider
                 response_json = self.provider.generate_completion(prompt)
                 
-                # Parse and validate response
-                recommendations = self._parse_response(response_json)
+                # Parse and validate response with debug info
+                recommendations = self._parse_response(response_json, prompt if include_debug else None, provider_name if include_debug else None)
                 
-                print(f"✅ Successfully generated {len(recommendations)} recommendations using {provider_name}")
+                self.status_callback(f"✅ Successfully generated {len(recommendations)} recommendations using {provider_name}")
                 return recommendations
                 
             except json.JSONDecodeError as e:
                 if attempt < self.max_retries - 1:
-                    print(f"⚠️  JSON decode error, retrying: {e}")
-                    print(f"Response that failed to parse: {response_json[:500]}...")
+                    self.status_callback(f"⚠️  JSON decode error, retrying: {e}")
+                    self.status_callback(f"Response that failed to parse: {response_json[:500]}...")
                     continue
                 else:
-                    print(f"❌ JSON decode failed after all retries: {e}")
+                    self.status_callback(f"❌ JSON decode failed after all retries: {e}")
                     return self._create_fallback_recommendations(f"JSON decode error: {e}")
                     
             except Exception as e:
                 error_msg = str(e)
                 if attempt < self.max_retries - 1:
-                    print(f"⚠️  Error on attempt {attempt + 1}, retrying: {error_msg}")
+                    self.status_callback(f"⚠️  Error on attempt {attempt + 1}, retrying: {error_msg}")
                     # Add more context for debugging
                     if "'str' object has no attribute" in error_msg:
-                        print(f"Debug: This error usually means the response format is unexpected")
-                        print(f"Debug: Check if response is being parsed correctly")
+                        self.status_callback(f"Debug: This error usually means the response format is unexpected")
+                        self.status_callback(f"Debug: Check if response is being parsed correctly")
                     continue
                 else:
-                    print(f"❌ All retry attempts failed: {error_msg}")
+                    self.status_callback(f"❌ All retry attempts failed: {error_msg}")
                     return self._create_fallback_recommendations(f"All attempts failed: {error_msg}")
         
         # If we get here, all retries failed
@@ -1109,10 +1176,14 @@ Return ONLY the JSON, no other text."""
         
         return prompt
     
-    def _parse_response(self, response_json: str) -> List[AIWorkoutPathway]:
+    def _parse_response(self, response_json: str, debug_prompt: Optional[str] = None, debug_provider: Optional[str] = None) -> List[AIWorkoutPathway]:
         """Parse and validate AI response"""
-        provider_name = self.provider.get_provider_name()
-        print(f"✅ {provider_name} response received")
+        if self.provider_manager:
+            provider_name = self.provider_manager.get_current_provider_name()
+        else:
+            provider_name = self.provider.get_provider_name()
+        
+        self.status_callback(f"✅ {provider_name} response received")
         
         if response_json is None:
             raise ValueError(f"{provider_name} returned None for content")
@@ -1150,7 +1221,7 @@ Return ONLY the JSON, no other text."""
         else:
             raise ValueError(f"Unexpected response format: {type(parsed_data)}")
         
-        return self._convert_to_recommendations(recommendations_data)
+        return self._convert_to_recommendations(recommendations_data, debug_prompt, response_json, debug_provider)
     
     def _clean_json_response(self, response: str) -> str:
         """Clean up JSON response by removing code blocks"""
@@ -1160,7 +1231,10 @@ Return ONLY the JSON, no other text."""
             response = response[:-3]
         return response.strip()
     
-    def _convert_to_recommendations(self, recommendations_data: List[dict]) -> List[AIWorkoutPathway]:
+    def _convert_to_recommendations(self, recommendations_data: List[dict], 
+                                  debug_prompt: Optional[str] = None,
+                                  debug_response: Optional[str] = None, 
+                                  debug_provider: Optional[str] = None) -> List[AIWorkoutPathway]:
         """Convert parsed JSON data to AIWorkoutPathway objects"""
         ai_pathways = []
         
@@ -1192,7 +1266,10 @@ Return ONLY the JSON, no other text."""
                         equipment=today_data.get('equipment', 'General'),
                         intensity_zones=today_data.get('intensity_zones', [1]),
                         priority=rec_data.get('priority', 'medium'),
-                        generated_at=datetime.now().isoformat()
+                        generated_at=datetime.now().isoformat(),
+                        debug_prompt=debug_prompt,
+                        debug_response=debug_response,
+                        debug_provider=debug_provider
                     )
                     
                     tomorrow_workout = AIWorkoutRecommendation(
@@ -1204,7 +1281,10 @@ Return ONLY the JSON, no other text."""
                         equipment=tomorrow_data.get('equipment', 'General'),
                         intensity_zones=tomorrow_data.get('intensity_zones', [1]),
                         priority=rec_data.get('priority', 'medium'),
-                        generated_at=datetime.now().isoformat()
+                        generated_at=datetime.now().isoformat(),
+                        debug_prompt=debug_prompt,
+                        debug_response=debug_response,
+                        debug_provider=debug_provider
                     )
                     
                     pathway = AIWorkoutPathway(
@@ -1213,7 +1293,10 @@ Return ONLY the JSON, no other text."""
                         tomorrow=tomorrow_workout,
                         overall_reasoning=rec_data.get('overall_reasoning', ''),
                         priority=rec_data.get('priority', 'medium'),
-                        generated_at=datetime.now().isoformat()
+                        generated_at=datetime.now().isoformat(),
+                        debug_prompt=debug_prompt,
+                        debug_response=debug_response,
+                        debug_provider=debug_provider
                     )
                     
                     ai_pathways.append(pathway)
@@ -1229,7 +1312,10 @@ Return ONLY the JSON, no other text."""
                         equipment=rec_data.get('equipment', 'General'),
                         intensity_zones=rec_data.get('intensity_zones', [1]),
                         priority=rec_data.get('priority', 'medium'),
-                        generated_at=datetime.now().isoformat()
+                        generated_at=datetime.now().isoformat(),
+                        debug_prompt=debug_prompt,
+                        debug_response=debug_response,
+                        debug_provider=debug_provider
                     )
                     
                     # Create a pathway with the same workout for both days
@@ -1239,7 +1325,10 @@ Return ONLY the JSON, no other text."""
                         tomorrow=workout,
                         overall_reasoning=rec_data.get('reasoning', ''),
                         priority=rec_data.get('priority', 'medium'),
-                        generated_at=datetime.now().isoformat()
+                        generated_at=datetime.now().isoformat(),
+                        debug_prompt=debug_prompt,
+                        debug_response=debug_response,
+                        debug_provider=debug_provider
                     )
                     
                     ai_pathways.append(pathway)
@@ -1262,7 +1351,10 @@ Return ONLY the JSON, no other text."""
             equipment="General",
             intensity_zones=[1],
             priority="medium",
-            generated_at=datetime.now().isoformat()
+            generated_at=datetime.now().isoformat(),
+            debug_prompt=None,
+            debug_response=None,
+            debug_provider=None
         )
         
         return [AIWorkoutPathway(
@@ -1271,7 +1363,10 @@ Return ONLY the JSON, no other text."""
             tomorrow=fallback_workout,
             overall_reasoning=f"AI service unavailable: {error_message}",
             priority="medium",
-            generated_at=datetime.now().isoformat()
+            generated_at=datetime.now().isoformat(),
+            debug_prompt=None,
+            debug_response=None,
+            debug_provider=None
         )]
     
     def save_recommendation_history(self, recommendations: List[AIWorkoutPathway], 
