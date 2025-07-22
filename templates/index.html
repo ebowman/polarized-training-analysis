@@ -2977,8 +2977,8 @@
             // Generate training table
             generateTrainingTable(trainingDays, targetMinutes);
             
-            // Create chart data (only show selected time range)
-            const chartData = trainingDays.slice(todayIndex - (timeRange - 1), todayIndex + 1);
+            // Create chart data (show selected time range + future 6 days for projections)
+            const chartData = trainingDays.slice(todayIndex - (timeRange - 1), todayIndex + 7);
             
             // Update stats - show both polarized and total time
             const totalText = rollingAncillaryMinutes > 0 ? 
@@ -3044,6 +3044,27 @@
                         borderColor: '#6A1B9A',
                         borderWidth: 1,
                         stack: 'actual'
+                    }, {
+                        label: 'Zone 1 Needed',
+                        data: chartData.map(d => d.isFuture || (d.isToday && d.minutes === 0) ? d.projectedZone1Minutes || 0 : 0),
+                        backgroundColor: 'rgba(76, 175, 80, 0.6)',
+                        borderColor: '#4CAF50',
+                        borderWidth: 1,
+                        stack: 'projected'
+                    }, {
+                        label: 'Zone 2 Needed',
+                        data: chartData.map(d => d.isFuture || (d.isToday && d.minutes === 0) ? d.projectedZone2Minutes || 0 : 0),
+                        backgroundColor: 'rgba(255, 152, 0, 0.6)',
+                        borderColor: '#FF9800',
+                        borderWidth: 1,
+                        stack: 'projected'
+                    }, {
+                        label: 'Zone 3 Needed',
+                        data: chartData.map(d => d.isFuture || (d.isToday && d.minutes === 0) ? d.projectedZone3Minutes || 0 : 0),
+                        backgroundColor: 'rgba(244, 67, 54, 0.6)',
+                        borderColor: '#F44336',
+                        borderWidth: 1,
+                        stack: 'projected'
                     }]
                 },
                 options: {
