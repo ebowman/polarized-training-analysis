@@ -3018,53 +3018,65 @@
                     labels: chartData.map(d => d.dateStr),
                     datasets: [{
                         label: 'Zone 1',
-                        data: chartData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.zone1Minutes : 0),
-                        backgroundColor: '#4CAF50',
-                        borderColor: '#388E3C',
+                        data: chartData.map(d => {
+                            if (d.isPast || (d.isToday && d.minutes > 0)) {
+                                return d.zone1Minutes;
+                            } else if (d.isFuture || (d.isToday && d.minutes === 0)) {
+                                return d.projectedZone1Minutes || 0;
+                            }
+                            return 0;
+                        }),
+                        backgroundColor: chartData.map(d => 
+                            (d.isFuture || (d.isToday && d.minutes === 0)) 
+                                ? 'rgba(76, 175, 80, 0.6)' 
+                                : '#4CAF50'
+                        ),
+                        borderColor: '#4CAF50',
                         borderWidth: 1,
-                        stack: 'actual'
+                        stack: 'training'
                     }, {
                         label: 'Zone 2',
-                        data: chartData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.zone2Minutes : 0),
-                        backgroundColor: '#FF9800',
-                        borderColor: '#F57C00',
+                        data: chartData.map(d => {
+                            if (d.isPast || (d.isToday && d.minutes > 0)) {
+                                return d.zone2Minutes;
+                            } else if (d.isFuture || (d.isToday && d.minutes === 0)) {
+                                return d.projectedZone2Minutes || 0;
+                            }
+                            return 0;
+                        }),
+                        backgroundColor: chartData.map(d => 
+                            (d.isFuture || (d.isToday && d.minutes === 0)) 
+                                ? 'rgba(255, 152, 0, 0.6)' 
+                                : '#FF9800'
+                        ),
+                        borderColor: '#FF9800',
                         borderWidth: 1,
-                        stack: 'actual'
+                        stack: 'training'
                     }, {
                         label: 'Zone 3',
-                        data: chartData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.zone3Minutes : 0),
-                        backgroundColor: '#F44336',
-                        borderColor: '#D32F2F',
+                        data: chartData.map(d => {
+                            if (d.isPast || (d.isToday && d.minutes > 0)) {
+                                return d.zone3Minutes;
+                            } else if (d.isFuture || (d.isToday && d.minutes === 0)) {
+                                return d.projectedZone3Minutes || 0;
+                            }
+                            return 0;
+                        }),
+                        backgroundColor: chartData.map(d => 
+                            (d.isFuture || (d.isToday && d.minutes === 0)) 
+                                ? 'rgba(244, 67, 54, 0.6)' 
+                                : '#F44336'
+                        ),
+                        borderColor: '#F44336',
                         borderWidth: 1,
-                        stack: 'actual'
+                        stack: 'training'
                     }, {
                         label: 'Ancillary Training',
                         data: chartData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.strengthMinutes : 0),
                         backgroundColor: '#9C27B0',
                         borderColor: '#6A1B9A',
                         borderWidth: 1,
-                        stack: 'actual'
-                    }, {
-                        label: 'Zone 1 Needed',
-                        data: chartData.map(d => d.isFuture || (d.isToday && d.minutes === 0) ? d.projectedZone1Minutes || 0 : 0),
-                        backgroundColor: 'rgba(76, 175, 80, 0.6)',
-                        borderColor: '#4CAF50',
-                        borderWidth: 1,
-                        stack: 'projected'
-                    }, {
-                        label: 'Zone 2 Needed',
-                        data: chartData.map(d => d.isFuture || (d.isToday && d.minutes === 0) ? d.projectedZone2Minutes || 0 : 0),
-                        backgroundColor: 'rgba(255, 152, 0, 0.6)',
-                        borderColor: '#FF9800',
-                        borderWidth: 1,
-                        stack: 'projected'
-                    }, {
-                        label: 'Zone 3 Needed',
-                        data: chartData.map(d => d.isFuture || (d.isToday && d.minutes === 0) ? d.projectedZone3Minutes || 0 : 0),
-                        backgroundColor: 'rgba(244, 67, 54, 0.6)',
-                        borderColor: '#F44336',
-                        borderWidth: 1,
-                        stack: 'projected'
+                        stack: 'training'
                     }]
                 },
                 options: {
