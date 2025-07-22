@@ -3095,6 +3095,10 @@
                             }
                         }
                     },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
                     plugins: {
                         legend: {
                             display: true,
@@ -3105,6 +3109,50 @@
                             text: `Daily Target: ${Math.round(dailyTarget)} minutes`,
                             position: 'bottom',
                             color: '#e74c3c'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    return context[0].label;
+                                },
+                                beforeBody: function(context) {
+                                    const dataIndex = context[0].dataIndex;
+                                    const day = chartData[dataIndex];
+                                    
+                                    if (day.isFuture || (day.isToday && day.minutes === 0)) {
+                                        return 'Future projection:';
+                                    } else {
+                                        return 'Completed:';
+                                    }
+                                },
+                                afterBody: function(context) {
+                                    const dataIndex = context[0].dataIndex;
+                                    const day = chartData[dataIndex];
+                                    
+                                    const z1Minutes = day.isFuture || (day.isToday && day.minutes === 0) ? 
+                                        (day.projectedZone1Minutes || 0) : day.zone1Minutes;
+                                    const z2Minutes = day.isFuture || (day.isToday && day.minutes === 0) ? 
+                                        (day.projectedZone2Minutes || 0) : day.zone2Minutes;
+                                    const z3Minutes = day.isFuture || (day.isToday && day.minutes === 0) ? 
+                                        (day.projectedZone3Minutes || 0) : day.zone3Minutes;
+                                    const ancillaryMinutes = day.isFuture || (day.isToday && day.minutes === 0) ? 
+                                        0 : day.strengthMinutes;
+                                    
+                                    const totalMinutes = z1Minutes + z2Minutes + z3Minutes + ancillaryMinutes;
+                                    
+                                    const lines = [];
+                                    if (z1Minutes > 0) lines.push(`Zone 1: ${Math.round(z1Minutes)} min`);
+                                    if (z2Minutes > 0) lines.push(`Zone 2: ${Math.round(z2Minutes)} min`);
+                                    if (z3Minutes > 0) lines.push(`Zone 3: ${Math.round(z3Minutes)} min`);
+                                    if (ancillaryMinutes > 0) lines.push(`Ancillary: ${Math.round(ancillaryMinutes)} min`);
+                                    lines.push(`Total: ${Math.round(totalMinutes)} min`);
+                                    
+                                    return lines;
+                                },
+                                label: function(context) {
+                                    return null;
+                                }
+                            }
                         }
                     }
                 }
