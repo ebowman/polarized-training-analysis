@@ -1798,15 +1798,16 @@
             const now = new Date();
             
             for (let i = 6; i >= 0; i--) {
-                const dayEnd = new Date(now.getTime() - (i * 24 * 60 * 60 * 1000));
-                const dayStart = new Date(dayEnd.getTime() - (6 * 24 * 60 * 60 * 1000)); // 7 days back
+                const targetDate = new Date(now.getTime() - (i * 24 * 60 * 60 * 1000));
+                const targetDateStr = targetDate.toLocaleDateString('en-US');
                 
+                // Find activities for this specific day only
                 const dayActivities = activities.filter(activity => {
                     const activityDate = new Date(activity.date);
-                    return activityDate >= dayStart && activityDate <= dayEnd;
+                    return activityDate.toLocaleDateString('en-US') === targetDateStr;
                 });
                 
-                // Calculate zone percentages for this day's 7-day window
+                // Calculate zone percentages for this specific day
                 const totalMinutes = dayActivities.reduce((sum, a) => sum + a.duration_minutes, 0);
                 
                 if (totalMinutes > 0) {
@@ -1819,25 +1820,39 @@
                         zone3Minutes += activityMinutes * (activity.zone3_percent / 100);
                     });
                     
-                    const zone1Percent = (zone1Minutes / totalMinutes) * 100;
-                    const zone2Percent = (zone2Minutes / totalMinutes) * 100;
-                    const zone3Percent = (zone3Minutes / totalMinutes) * 100;
-                    
-                    dailyZones.push({
-                        zone1: zone1Percent,
-                        zone2: zone2Percent,
-                        zone3: zone3Percent
-                    });
+                    // Only add to chart if there are actual zone minutes (not just duration)
+                    if (zone1Minutes + zone2Minutes + zone3Minutes > 0) {
+                        const zone1Percent = (zone1Minutes / totalMinutes) * 100;
+                        const zone2Percent = (zone2Minutes / totalMinutes) * 100;
+                        const zone3Percent = (zone3Minutes / totalMinutes) * 100;
+                        
+                        dailyZones.push({
+                            zone1: zone1Percent,
+                            zone2: zone2Percent,
+                            zone3: zone3Percent,
+                            hasData: true
+                        });
+                    } else {
+                        // Day has activities but no zone data (e.g., yoga, stretching)
+                        dailyZones.push({
+                            zone1: 0,
+                            zone2: 0,
+                            zone3: 0,
+                            hasData: false
+                        });
+                    }
                 } else {
+                    // No activities on this day
                     dailyZones.push({
                         zone1: 0,
                         zone2: 0,
-                        zone3: 0
+                        zone3: 0,
+                        hasData: false
                     });
                 }
             }
             
-            // Draw vertical stacked bars for each day
+            // Draw vertical stacked bars for each day (only days with zone data)
             const barWidth = canvas.width / 7;
             const chartHeight = canvas.height;
             
@@ -1845,7 +1860,8 @@
                 const x = i * barWidth;
                 const day = dailyZones[i];
                 
-                if (day.zone1 + day.zone2 + day.zone3 > 0) {
+                // Only draw bars for days with actual training zone data
+                if (day.hasData && day.zone1 + day.zone2 + day.zone3 > 0) {
                     // Calculate heights as percentages of total chart height
                     const zone1Height = (day.zone1 / 100) * chartHeight;
                     const zone2Height = (day.zone2 / 100) * chartHeight;
@@ -2961,14 +2977,8 @@
             // Generate training table
             generateTrainingTable(trainingDays, targetMinutes);
             
-            // Create chart data (only show selected time range, exclude rest days)
-            const allDaysInRange = trainingDays.slice(todayIndex - (timeRange - 1), todayIndex + 1);
-            const chartData = allDaysInRange.filter(d => {
-                // Only show days with meaningful training (zone data or strength training)
-                const hasZoneData = (d.zone1Minutes + d.zone2Minutes + d.zone3Minutes) > 0;
-                const hasStrengthTraining = d.strengthMinutes > 0;
-                return (d.isPast || d.isToday) && (hasZoneData || hasStrengthTraining);
-            });
+            // Create chart data (only show selected time range)
+            const chartData = trainingDays.slice(todayIndex - (timeRange - 1), todayIndex + 1);
             
             // Update stats - show both polarized and total time
             const totalText = rollingAncillaryMinutes > 0 ? 
@@ -3008,28 +3018,28 @@
                     labels: chartData.map(d => d.dateStr),
                     datasets: [{
                         label: 'Zone 1',
-                        data: chartData.map(d => d.zone1Minutes),
+                        data: chartData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.zone1Minutes : 0),
                         backgroundColor: '#4CAF50',
                         borderColor: '#388E3C',
                         borderWidth: 1,
                         stack: 'actual'
                     }, {
                         label: 'Zone 2',
-                        data: chartData.map(d => d.zone2Minutes),
+                        data: chartData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.zone2Minutes : 0),
                         backgroundColor: '#FF9800',
                         borderColor: '#F57C00',
                         borderWidth: 1,
                         stack: 'actual'
                     }, {
                         label: 'Zone 3',
-                        data: chartData.map(d => d.zone3Minutes),
+                        data: chartData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.zone3Minutes : 0),
                         backgroundColor: '#F44336',
                         borderColor: '#D32F2F',
                         borderWidth: 1,
                         stack: 'actual'
                     }, {
                         label: 'Ancillary Training',
-                        data: chartData.map(d => d.strengthMinutes),
+                        data: chartData.map(d => d.isPast || (d.isToday && d.minutes > 0) ? d.strengthMinutes : 0),
                         backgroundColor: '#9C27B0',
                         borderColor: '#6A1B9A',
                         borderWidth: 1,
